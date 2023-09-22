@@ -1,0 +1,140 @@
+"""
+三维数据的叠加显示 (离散)
+==========================
+
+注意:
+
+我们并没有为 create_overlay 添加一个alpha参数,
+需要设置透明度设置, 请使用 colormap.set_alpha 之类的
+函数为 colormap 设置 alpha 值
+
+这是因为 overylay 可以叠加多个数据, 当需要mask一些值时,
+需要提供额外的信息, 会增加 overlay 函数的参数量, 让
+overlay 函数更晦涩
+"""
+import numpy as np
+import cigvis
+from cigvis import colormap
+
+
+def show(bg, fg):
+    """
+    叠加地震和类别(地震相), alpha=0.5
+    """
+    fg[fg == 1] = 100
+    values = np.unique(fg)
+    colors = ['red', 'green', 'yellow', 'blue', (0, 0.5, 0.5)]
+    cmap = colormap.custom_disc_cmap(values, colors)
+    cmap = colormap.set_alpha(cmap, 0.5)  # Note:
+
+    nodes1 = cigvis.create_overlay(bg,
+                                   fg,
+                                   fg_cmap=cmap,
+                                   fg_interpolation='nearest')
+
+    cbar1 = cigvis.create_colorbar(cmap=cmap,
+                                   clim=[fg.min(), fg.max()],
+                                   discrete=True,
+                                   disc_ticks=[values.astype(int)],
+                                   label_str='Facies')
+    nodes1.append(cbar1)
+    """
+    mask 值最小的一类, 但是在colorbar中显示最小的一类(白色)
+    """
+    values = np.unique(fg)
+    colors = ['red', 'green', 'yellow', 'blue', (0, 0.5, 0.5)]
+    cmap = colormap.custom_disc_cmap(values, colors)
+    cmap = colormap.set_alpha_except_min(cmap, 0.5)  # Note:
+
+    nodes2 = cigvis.create_overlay(bg,
+                                   fg,
+                                   fg_cmap=cmap,
+                                   fg_interpolation='nearest')
+
+    cbar2 = cigvis.create_colorbar(cmap=cmap,
+                                   clim=[fg.min(), fg.max()],
+                                   discrete=True,
+                                   disc_ticks=[values.astype(int)],
+                                   label_str='Facies')
+    nodes2.append(cbar2)
+    """
+    mask 最小的一类, 同时 colorbar 也去除 
+    """
+    values = np.unique(fg)
+    colors = ['red', 'green', 'yellow', 'blue', (0, 0.5, 0.5)]
+    cmap = colormap.custom_disc_cmap(values, colors)
+    cmap = colormap.set_alpha_except_min(cmap, 0.5)  # Note:
+
+    nodes3 = cigvis.create_overlay(bg,
+                                   fg,
+                                   fg_cmap=cmap,
+                                   fg_interpolation='nearest')
+
+    values = values[1:]
+    cbar3 = cigvis.create_colorbar(cmap=cmap,
+                                   clim=[fg.min(), fg.max()],
+                                   discrete=True,
+                                   disc_ticks=[values.astype(int)],
+                                   label_str='Facies')
+    nodes3.append(cbar3)
+    """
+    mask 最大的一类
+    """
+    values = np.unique(fg)
+    colors = ['red', 'green', 'yellow', 'blue', (0, 0.5, 0.5)]
+    cmap = colormap.custom_disc_cmap(values, colors)
+    cmap = colormap.set_alpha_except_max(cmap, 0.5)  # Note:
+
+    nodes4 = cigvis.create_overlay(bg,
+                                   fg,
+                                   fg_cmap=cmap,
+                                   fg_interpolation='nearest')
+
+    values = values[:-1]
+    cbar4 = cigvis.create_colorbar(cmap=cmap,
+                                   clim=[fg.min(), fg.max()],
+                                   discrete=True,
+                                   disc_ticks=[values.astype(int)],
+                                   label_str='Facies')
+    nodes4.append(cbar4)
+    """
+    mask 特定的值, 不是最小或最大, 可以是多个值
+    """
+    values = np.unique(fg)
+    colors = ['red', 'green', 'yellow', 'blue', (0, 0.5, 0.5)]
+    cmap = colormap.custom_disc_cmap(values, colors)
+    cmap = colormap.set_alpha_except_values(cmap,
+                                            0.5,
+                                            clim=[fg.min(), fg.max()],
+                                            values=[0, 100])  # Note:
+
+    nodes5 = cigvis.create_overlay(bg,
+                                   fg,
+                                   fg_cmap=cmap,
+                                   fg_interpolation='nearest')
+
+    values = values[values != 0]
+    values = values[values != 100]
+    cbar5 = cigvis.create_colorbar(cmap=cmap,
+                                   clim=[fg.min(), fg.max()],
+                                   discrete=True,
+                                   disc_ticks=[values.astype(int)],
+                                   label_str='Facies')
+    nodes5.append(cbar5)
+
+    cigvis.plot3D([nodes1, nodes2, nodes3, nodes4, nodes5],
+                  grid=(2, 3),
+                  size=(1800, 1200),
+                  cbar_region_ratio=0.18)
+
+
+if __name__ == '__main__':
+    root = '/Users/lijintao/work/mygit/pyseisview/data/'
+    sxp = root + 'seis_h360x600x400.dat'
+    lxp = root + 'label_h360x600x400.dat'
+    ni, nx, nt = 400, 600, 360
+
+    sx = np.memmap(sxp, np.float32, 'c', shape=(ni, nx, nt))
+    lx = np.memmap(lxp, np.float32, 'c', shape=(ni, nx, nt))
+
+    show(sx, lx)

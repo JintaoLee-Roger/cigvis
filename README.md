@@ -1,0 +1,1 @@
+# CIGVis - a tool for geophysical data visualization

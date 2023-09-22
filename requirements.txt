@@ -1,0 +1,4 @@
+vispy>=0.14.0
+numpy>=1.20.1
+scipy
+matplotlib
