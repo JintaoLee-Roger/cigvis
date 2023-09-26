@@ -21,7 +21,6 @@ from matplotlib.colors import ListedColormap, LinearSegmentedColormap
 from matplotlib.colors import Colormap as mplColormap
 import matplotlib.colors as mcolors
 import numpy as np
-import io
 
 from vispy.color import Colormap as vispyColormap
 from vispy.color import get_colormap as get_vispycmap
@@ -475,7 +474,7 @@ def plot_cmap(cmap, norm: List = None, save: str = None):
     plt.show()
 
 
-def plot_all_custom_cmap(norm: List = None, save: str = None):
+def plot_all_custom_cmap(norm: List = None, save: str = None, dpi=300):
     """
     plot all custom cmaps with a norm
     """
@@ -501,6 +500,6 @@ def plot_all_custom_cmap(norm: List = None, save: str = None):
     plt.tight_layout()
 
     if save is not None:
-        plt.savefig(save, bbox_inches='tight', pad_inches=0.02, dpi=600)
+        plt.savefig(save, bbox_inches='tight', pad_inches=0.02, dpi=dpi)
 
     plt.show()

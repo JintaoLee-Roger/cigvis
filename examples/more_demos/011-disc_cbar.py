@@ -2,7 +2,14 @@
 离散的colorbar
 ======================
 
+.. image:: ../../_static/cigvis/more_demos/011.png
+    :alt: image
+    :align: center
+
 """
+
+# sphinx_gallery_thumbnail_path = '_static/cigvis/more_demos/011.png'
+
 import numpy as np
 import cigvis
 from cigvis import colormap
@@ -19,7 +26,7 @@ def show_discrete_cbar(d):
         cmap='jet',
         clim=[d.min(), d.max()],
         discrete=True,
-        disc_ticks=[np.unique(d), ['A', 'B', 'C', 'D', 'E']],
+        disc_ticks=[np.unique(d), ['CA', 'CB', 'CC', 'CD', '100']],
         label_str='Facies')
     nodes1.append(cbar1)
     """
@@ -69,8 +76,9 @@ def show_discrete_cbar(d):
 
     cigvis.plot3D([nodes1, nodes2, nodes3, nodes4],
                   grid=(2, 2),
-                  cbar_region_ratio=0.14,
-                  size=(1600, 1200))
+                  cbar_region_ratio=0.18,
+                  size=(1400, 1000),
+                  savename='example.png')
 
 
 if __name__ == '__main__':

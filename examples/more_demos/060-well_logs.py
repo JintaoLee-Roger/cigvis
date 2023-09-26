@@ -2,7 +2,14 @@
 测井轨迹
 =============
 
+.. image:: ../../_static/cigvis/more_demos/060.png
+    :alt: image
+    :align: center
+
 """
+
+# sphinx_gallery_thumbnail_path = '_static/cigvis/more_demos/060.png'
+
 import numpy as np
 import cigvis
 
@@ -15,8 +22,6 @@ def show(sx, points):
 
     nodes1 = cigvis.create_slices(sx)
     nodes1 += cigvis.create_well_logs(points, cmap='orange', radius_tube=3)
-
-
     """
     显示将测井显示为一条等半径的tube,
     颜色为深度
@@ -25,7 +30,10 @@ def show(sx, points):
     nodes2 = cigvis.create_slices(sx)
     nodes2 += cigvis.create_well_logs(points, cmap='jet', radius_tube=3)
 
-    cigvis.plot3D([nodes1, nodes2], grid=(1, 2), zoom_factor=4)
+    cigvis.plot3D([nodes1, nodes2],
+                  grid=(1, 2),
+                  zoom_factor=4,
+                  savename='example.png')
 
 
 if __name__ == '__main__':

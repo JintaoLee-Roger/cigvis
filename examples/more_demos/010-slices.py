@@ -2,10 +2,16 @@
 三维数据的显示
 ======================
 
+.. image:: ../../_static/cigvis/more_demos/010.png
+    :alt: image
+    :align: center
+
 """
+
+# sphinx_gallery_thumbnail_path = '_static/cigvis/more_demos/010.png'
+
 import numpy as np
 import cigvis
-from cigvis import colormap
 
 
 def show(d):
@@ -23,8 +29,9 @@ def show(d):
 
     cigvis.plot3D([nodes1, nodes2, nodes3],
                   grid=(1, 3),
-                  size=(1600, 500),
-                  cbar_region_ratio=0.15)
+                  size=(1500, 500),
+                  cbar_region_ratio=0.18,
+                  savename='example.png')
 
 
 if __name__ == '__main__':

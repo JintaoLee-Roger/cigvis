@@ -2,7 +2,14 @@
 测井轨迹和测井曲线
 ===================
 
+.. image:: ../../_static/cigvis/more_demos/061.png
+    :alt: image
+    :align: center
+
 """
+
+# sphinx_gallery_thumbnail_path = '_static/cigvis/more_demos/061.png'
+
 import numpy as np
 import cigvis
 
@@ -56,7 +63,8 @@ def show(sx, points, values, null_value):
     cigvis.plot3D([nodes1, nodes2, nodes3],
                   grid=(1, 3),
                   zoom_factor=16,
-                  share=True)
+                  share=True,
+                  savename='example.png')
 
 
 if __name__ == '__main__':

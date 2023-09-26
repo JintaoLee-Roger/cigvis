@@ -11,7 +11,15 @@
 这是因为 overylay 可以叠加多个数据, 当需要mask一些值时,
 需要提供额外的信息, 会增加 overlay 函数的参数量, 让
 overlay 函数更晦涩
+
+.. image:: ../../_static/cigvis/more_demos/020.png
+    :alt: image
+    :align: center
+
 """
+
+# sphinx_gallery_thumbnail_path = '_static/cigvis/more_demos/020.png'
+
 import numpy as np
 import cigvis
 from cigvis import colormap
@@ -94,7 +102,7 @@ def show(bg, fg):
     cbar4 = cigvis.create_colorbar(cmap=cmap,
                                    clim=[fg.min(), fg.max()],
                                    discrete=True,
-                                   disc_ticks=[values.astype(int)],
+                                   disc_ticks=[values],
                                    label_str='Facies')
     nodes4.append(cbar4)
     """
@@ -118,14 +126,15 @@ def show(bg, fg):
     cbar5 = cigvis.create_colorbar(cmap=cmap,
                                    clim=[fg.min(), fg.max()],
                                    discrete=True,
-                                   disc_ticks=[values.astype(int)],
+                                   disc_ticks=[values],
                                    label_str='Facies')
     nodes5.append(cbar5)
 
     cigvis.plot3D([nodes1, nodes2, nodes3, nodes4, nodes5],
                   grid=(2, 3),
-                  size=(1800, 1200),
-                  cbar_region_ratio=0.18)
+                  size=(1300, 800),
+                  cbar_region_ratio=0.24,
+                  savename='example.png')
 
 
 if __name__ == '__main__':

@@ -147,7 +147,7 @@ class VisCanvas(scene.SceneCanvas):
         else:
             # pass
             # for view in self.view:
-            self._attach_light_share(self.view[0], self.nodes)
+            self._attach_light_share(self.view[-1], self.nodes)
 
         self.freeze()
 
@@ -574,5 +574,5 @@ class VisCanvas(scene.SceneCanvas):
         link all cameras
         """
 
-        for view in self.view[1:]:
-            view.camera.link(self.view[0].camera)
+        for view in self.view[:-1]:
+            view.camera.link(self.view[-1].camera)

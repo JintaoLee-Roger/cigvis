@@ -2,10 +2,16 @@
 层位(N, 3)显示
 ================
 
+.. image:: ../../_static/cigvis/more_demos/041.png
+    :alt: image
+    :align: center
+
 """
+
+# sphinx_gallery_thumbnail_path = '_static/cigvis/more_demos/041.png'
+
 import numpy as np
 import cigvis
-from cigvis import colormap
 
 
 def show(sx, sfs):
@@ -72,7 +78,10 @@ def show(sx, sfs):
     points = [[70, 50, 158], [20, 100, 80]]
     nodes4 += cigvis.create_points(points, r=3)
 
-    cigvis.plot3D([nodes1, nodes2, nodes3, nodes4], grid=(2, 2))
+    cigvis.plot3D([nodes1, nodes2, nodes3, nodes4],
+                  grid=(2, 2),
+                  share=True,
+                  savename='example.png')
 
 
 if __name__ == '__main__':

@@ -2,17 +2,23 @@
 地质体
 ===========
 
+.. image:: ../../_static/cigvis/more_demos/050.png
+    :alt: image
+    :align: center
+
 """
+
+# sphinx_gallery_thumbnail_path = '_static/cigvis/more_demos/050.png'
+
 import numpy as np
 import cigvis
-from cigvis import colormap
 
 
 def show1(sx, lx, level):
     nodes = cigvis.create_slices(sx)
     nodes += cigvis.create_bodys(lx, level, margin=0)
 
-    cigvis.plot3D(nodes)
+    cigvis.plot3D(nodes, savename='example.png')
 
 
 if __name__ == '__main__':

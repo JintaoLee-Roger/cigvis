@@ -48,7 +48,7 @@ from typing import List, Tuple, Union, Dict
 import copy
 import numpy as np
 import plotly.graph_objects as go
-from skimage.measure import marching_cubes
+# from skimage.measure import marching_cubes
 
 import cigvis
 from cigvis import colormap

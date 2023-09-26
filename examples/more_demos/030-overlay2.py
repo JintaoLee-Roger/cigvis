@@ -2,7 +2,14 @@
 三维数据的叠加显示 (连续)
 ==========================
 
+.. image:: ../../_static/cigvis/more_demos/030.png
+    :alt: image
+    :align: center
+
 """
+
+# sphinx_gallery_thumbnail_path = '_static/cigvis/more_demos/030.png'
+
 import numpy as np
 import cigvis
 from cigvis import colormap
@@ -53,7 +60,7 @@ def show(bg, fg, fx):
 
     values = np.unique(fx).astype(int)
     values = values[1:]
-    labels = ['fx'+str(i) for i in values]
+    labels = ['fx' + str(i) for i in values]
     cbar3 = cigvis.create_colorbar(cmap='jet',
                                    clim=[fx.min(), fx.max()],
                                    label_str='fault',
@@ -83,8 +90,10 @@ def show(bg, fg, fx):
 
     cigvis.plot3D([nodes1, nodes2, nodes3, nodes4],
                   grid=(2, 2),
-                  size=(1400, 1200),
-                  cbar_region_ratio=0.18)
+                  size=(1300, 1000),
+                  cbar_region_ratio=0.18,
+                  share=True,
+                  savename='example.png')
 
 
 if __name__ == '__main__':
