@@ -95,6 +95,10 @@ cigvis内部的这些功能允许以多种方式交互可视化各种地球物�
 这些功能为使用cigvis在一个单一画布内强大地可视化和比较多个独立的3D数据集提供了有效的方式。
 
 
+## 示例所用的数据
+
+所有示例所用到的数据可以在 [https://rec.ustc.edu.cn/share/19a16120-5c42-11ee-a0d4-4329aa6b754b](https://rec.ustc.edu.cn/share/19a16120-5c42-11ee-a0d4-4329aa6b754b) 下载，密码：`1234`
+
 ## 示例库
 
 请参阅：[cigvis/gallery](https://cigvis.readthedocs.io/gallery)

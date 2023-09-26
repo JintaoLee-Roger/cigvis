@@ -98,6 +98,10 @@ You can find example code for this functionality in the documentation at [cigvis
 These capabilities provide a powerful way to visualize and compare multiple independent 3D data sets within a single canvas using cigvis.
 
 
+## Example Data
+
+All data used by examples in the [gallery](https://cigvis.readthedocs.io/gallery) can be download at [https://rec.ustc.edu.cn/share/19a16120-5c42-11ee-a0d4-4329aa6b754b](https://rec.ustc.edu.cn/share/19a16120-5c42-11ee-a0d4-4329aa6b754b), password: `1234`.
+
 
 ## Example Gallery
 

@@ -16,6 +16,7 @@ DIR = Path(__file__).parent.resolve()
 
 sys.path.append(str(Path(".").resolve()))
 
+
 def download_image():
     print('Run git to download images')
     down_path = DIR / '_static/images'
@@ -28,8 +29,8 @@ def download_image():
 
 download_image()
 
-
 from sphinx_gallery.scrapers import figure_rst
+
 
 class PNGScraper(object):
 
@@ -144,10 +145,31 @@ html_static_path = ['_static']
 # The main toctree document.
 master_doc = 'index'
 
-# html_theme_options = {
-#     "use_edit_page_button": True,
-#     "header_links_before_dropdown": 7,
-# }
+html_theme_options = {
+    "use_edit_page_button":
+    True,
+    "icon_links": [
+        {
+            "name": "GitHub",
+            "url": "https://github.com/JintaoLee-Roger/cigvis",
+            "icon": "fa-brands fa-github",
+        },
+        {
+            "name": "PyPI",
+            "url": "https://pypi.org/project/cigvis/",
+            "icon": "fa-custom fa-pypi",
+        },
+    ]
+}
+
+html_context = {
+    "github_url":
+    "https://github.com/JintaoLee-Roger/cigvis",  # or your GitHub Enterprise site
+    "github_user": "JintaoLee-Roger",
+    "github_repo": "cigvis",
+    "github_version": "main",
+    "doc_path": "https://cigvis.readthedocs.io/en/latest/",
+}
 
 html_title = 'CIGVis'
 
@@ -156,6 +178,3 @@ html_show_sphinx = True
 html_show_copyright = True
 
 htmlhelp_basename = 'cigvisdoc'
-
-
-
