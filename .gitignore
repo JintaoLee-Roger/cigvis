@@ -14,12 +14,14 @@ docs/_build
 cpp
 
 test*
+data/*
 
-docs/*
 *.ipynb
 
+docs/_static/
 docs/api/
-docs/gallery/1D2D
+docs/gallery/1D
+docs/gallery/2D
 docs/gallery/3Dvispy
 docs/gallery/colormap
 docs/gallery/more_demos/
