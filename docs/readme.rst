@@ -4,23 +4,45 @@ CIGVis - a tool for visualizing multidimensional geophysical data
 Overview
 ------------
 
-**cigvis** is a tool for visualizing multidimensional geophysical data, developed by the `Computational Interpretation Group (CIG) <https://cig.ustc.edu.cn/main.htm>`_. Users can quickly visualize data with just a few lines of code.
+**cigvis** is a tool for visualizing multidimensional geophysical data, 
+developed by the 
+`Computational Interpretation Group (CIG) <https://cig.ustc.edu.cn/main.htm>`_. 
+Users can quickly visualize data with just a few lines of code.
 
-cigvis can be used for various geophysical data visualizations, including 3D seismic data, overlays of seismic data with other information like labels, faults, RGT, horizon surfaces, well log trajectories, and well log curves, 3D geological bodies, 2D data, and 1D data, among others. Its GitHub repository can be found at `github.com/JintaoLee-Roger/cigvis <https://github.com/JintaoLee-Roger/cigvis>`_, and documentation is available at `https://cigvis.readthedocs.io/ <https://cigvis.readthedocs.io/>`.
+cigvis can be used for various geophysical data visualizations, 
+including 3D seismic data, overlays of seismic data with other 
+information like labels, faults, RGT, horizon surfaces, well log 
+trajectories, and well log curves, 3D geological bodies, 2D data, 
+and 1D data, among others. Its GitHub repository can be found at 
+`github.com/JintaoLee-Roger/cigvis <https://github.com/JintaoLee-Roger/cigvis>`_, 
+and documentation is available at 
+`https://cigvis.readthedocs.io/ <https://cigvis.readthedocs.io/>`_.
 
-cigvis leverages the power of underlying libraries such as `vispy <https://github.com/vispy/vispy>`_ for 3D visualization, `matplotlib <https://matplotlib.org/>`_ for 2D and 1D visualization, and `plotly <https://plotly.com/>`_ for Jupyter environments (work in progress). The 3D visualization component is heavily based on the code from `yunzhishi/seismic-canvas <https://github.com/yunzhishi/seismic-canvas>`_ and has been further developed upon this foundation.
+cigvis leverages the power of underlying libraries such as 
+`vispy <https://github.com/vispy/vispy>`_ for 3D visualization, 
+`matplotlib <https://matplotlib.org/>`_ for 2D and 1D visualization, 
+and `plotly <https://plotly.com/>`_ for Jupyter environments (work in progress). 
+The 3D visualization component is heavily based on the code from 
+`yunzhishi/seismic-canvas <https://github.com/yunzhishi/seismic-canvas>`_ 
+and has been further developed upon this foundation.
 
 Installation
 ----------------
 
-To install via PyPI, use::
+To install via PyPI, use
+
+.. code-block:: bash
 
     pip install cigvis
 
-For local installation, clone the repository from GitHub and then install it using pip::
+
+For local installation, clone the repository from GitHub and then install it using pip:
+
+.. code-block:: bash
 
     git clone https://github.com/JintaoLee-Roger/cigvis.git
     pip install -e .
+
 
 Core Features
 -----------------
@@ -41,7 +63,9 @@ The fundamental structure of cigvis's visualization code consists of:
 2. Creating nodes
 3. Passing nodes to the ``plot3D`` function
 
-For example::
+For example
+
+.. code-block:: bash
 
     import numpy as np
     import cigvis
@@ -54,6 +78,7 @@ For example::
 
     # Visualize in 3D
     cigvis.plot3D(nodes)
+
 
 This basic code structure allows you to quickly visualize your geophysical data using cigvis. Simply load your data, create nodes, and pass them to the ``plot3D`` function as demonstrated in the example above.
 
@@ -81,7 +106,8 @@ We visualize a three-dimensional data volume as multiple slices along the x, y, 
 
 Horizon data can be represented as scatter points with a shape of (N, 3), or as z-values on a regular grid of size (n1, n2).
 
-Well log trajectories are displayed as tubes, where the size of the first well log curve is represented by the color and radius at each position along the tube. Other well log curves are displayed as surfaces attached to the tube's edge. An example is shown below (code available at `cigvis/gallery/3Dvispy/09 <https://cigvis.readthedocs.io/gallery/3Dvispy/09-slice_surf_body_logs.html#sphx-glr-gallery-3dvispy-09-slice-surf-body-logs-py>`_).
+Well log trajectories are displayed as tubes, where the size of the first well log curve is represented by the color and radius at each position along the tube. Other well log curves are displayed as surfaces attached to the tube's edge. An example is shown below 
+(code available at `cigvis/gallery/3Dvispy/09 <https://cigvis.readthedocs.io/en/latest/gallery/3Dvispy/09-slice_surf_body_logs.html#sphx-glr-gallery-3dvispy-09-slice-surf-body-logs-py>`_).
 
 .. image:: https://raw.githubusercontent.com/JintaoLee-Roger/images/main/cigvis/3Dvispy/09.png
    :alt: 09
@@ -91,13 +117,15 @@ These capabilities within cigvis allow for versatile and interactive visualizati
 Multivolumes in One Canvas
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-You can pass multiple independent nodes combinations to the ``plot3D`` function while specifying a grid (e.g., ``grid=(2,2)``). This allows you to divide the canvas into multiple independent sub-canvases, where each sub-canvas displays a separate 3D data set within the same canvas. The example code for this can be found in the documentation at `cigvis/gallery/3Dvispy/10 <https://cigvis.readthedocs.io/gallery/3Dvispy/10-multi_canvas.html#sphx-glr-gallery-3dvispy-10-multi-canvas-py>`_.
+You can pass multiple independent nodes combinations to the ``plot3D`` function while specifying a grid (e.g., ``grid=(2,2)``). This allows you to divide the canvas into multiple independent sub-canvases, where each sub-canvas displays a separate 3D data set within the same canvas. The example code for this can be found in the documentation 
+at `cigvis/gallery/3Dvispy/10 <https://cigvis.readthedocs.io/en/latest/gallery/3Dvispy/10-multi_canvas.html#sphx-glr-gallery-3dvispy-10-multi-canvas-py>`_.
 
 .. image:: https://raw.githubusercontent.com/JintaoLee-Roger/images/main/cigvis/3Dvispy/10.gif
    :alt: 10
 
 Furthermore, you can link the cameras of all sub-canvases together (just need pass ``share=True`` to ``plot3D`` function). This means that any rotation, scaling, or slicing performed in one sub-canvas will be mirrored in all other sub-canvases, ensuring that they all exhibit the same changes simultaneously. This feature is highly advantageous when comparing multiple sets of data, such as results from different experiments, results alongside labels, seismic data compared with attributes, and more. 
-You can find example code for this functionality in the documentation at `cigvis/gallery/3Dvispy/11 <https://cigvis.readthedocs.io/gallery/3Dvispy/11-share_cameras.html#sphx-glr-gallery-3dvispy-11-share-cameras-py>`_.
+You can find example code for this functionality in the documentation 
+at `cigvis/gallery/3Dvispy/11 <https://cigvis.readthedocs.io/en/latest/gallery/3Dvispy/11-share_cameras.html#sphx-glr-gallery-3dvispy-11-share-cameras-py>`_.
 
 .. image:: https://raw.githubusercontent.com/JintaoLee-Roger/images/main/cigvis/3Dvispy/11.gif
    :alt: 11

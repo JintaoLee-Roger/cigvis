@@ -29,13 +29,13 @@ package_name = "cigvis"
 description = "CIGVis is a tool for geophysical data visualization, " + \
       "which developed by Computational Interpretation Group (CIG)"
 
-setup(
-    name=package_name,
-    version=version,
-    author="Jintao Li, and others",
-    url="https://github.com/JintaoLee-Roger/cigvis",
-    license='MIT',
-    description=description,
-    long_description="",
-    python_requires=">=3.7",
-    packages=find_packages())
+setup(name=package_name,
+      version=version,
+      author="Jintao Li, and others",
+      url="https://github.com/JintaoLee-Roger/cigvis",
+      license='MIT',
+      description=description,
+      long_description=Path("README.md").read_text(encoding="utf-8"),
+      long_description_content_type="text/markdown",
+      python_requires=">=3.7",
+      packages=find_packages())

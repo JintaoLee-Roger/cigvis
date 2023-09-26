@@ -74,7 +74,7 @@ cigvis.plot3D(nodes)
 
 层位数据可以表示为（N，3）形状的散点，或者表示为尺寸为（n1，n2）的规则网格上的z值。
 
-测井轨迹显示为管道，其中第一个测井曲线的尺寸由沿管道的每个位置的颜色和半径表示。其他测井曲线显示为附加到管道边缘的表面。下面显示了一个示例（代码可在[cigvis/gallery/3Dvispy/09](https://cigvis.readthedocs.io/gallery/3Dvispy/09-slice_surf_body_logs.html#sphx-glr-gallery-3dvispy-09-slice-surf-body-logs-py)找到）。
+测井轨迹显示为管道，其中第一个测井曲线的尺寸由沿管道的每个位置的颜色和半径表示。其他测井曲线显示为附加到管道边缘的表面。下面显示了一个示例（代码可在[cigvis/gallery/3Dvispy/09](https://cigvis.readthedocs.io/en/latest/gallery/3Dvispy/09-slice_surf_body_logs.html#sphx-glr-gallery-3dvispy-09-slice-surf-body-logs-py)找到）。
 
 ![09](https://raw.githubusercontent.com/JintaoLee-Roger/images/main/cigvis/3Dvispy/09.png)
 
@@ -83,12 +83,12 @@ cigvis内部的这些功能允许以多种方式交互可视化各种地球物�
 ### 一个画布上的多个体积数据
 
 在指定网格（例如`grid=(2,2)`）的同时，您可以将多个独立的节点组合传
-递给`plot3D`函数。这允许您将画布分成多个独立的子画布，每个子画布在同一画布中显示不同的3D数据集。有关此功能的示例代码可以在文档中找到[cigvis/gallery/3Dvispy/10](https://cigvis.readthedocs.io/gallery/3Dvispy/10-multi_canvas.html#sphx-glr-gallery-3dvispy-10-multi-canvas-py)。
+递给`plot3D`函数。这允许您将画布分成多个独立的子画布，每个子画布在同一画布中显示不同的3D数据集。有关此功能的示例代码可以在文档中找到[cigvis/gallery/3Dvispy/10](https://cigvis.readthedocs.io/en/latest/gallery/3Dvispy/10-multi_canvas.html#sphx-glr-gallery-3dvispy-10-multi-canvas-py)。
 
 ![10](https://raw.githubusercontent.com/JintaoLee-Roger/images/main/cigvis/3Dvispy/10.gif)
 
 此外，您可以将所有子画布的摄像机链接在一起（只需将`share=True`传递给`plot3D`函数）。这意味着在一个子画布中进行的旋转、缩放或切片操作将同时在所有其他子画布中进行镜像，确保它们同时展示相同的更改。这个功能在比较多组数据时非常有优势，比如不同实验的结果、与标签一起的结果、地震数据与属性的结果等等。
-您可以在文档中找到此功能的示例代码[cigvis/gallery/3Dvispy/11](https://cigvis.readthedocs.io/gallery/3Dvispy/11-share_cameras.html#sphx-glr-gallery-3dvispy-11-share-cameras-py)。
+您可以在文档中找到此功能的示例代码[cigvis/gallery/3Dvispy/11](https://cigvis.readthedocs.io/en/latest/gallery/3Dvispy/11-share_cameras.html#sphx-glr-gallery-3dvispy-11-share-cameras-py)。
 
 ![11](https://raw.githubusercontent.com/JintaoLee-Roger/images/main/cigvis/3Dvispy/11.gif)
 

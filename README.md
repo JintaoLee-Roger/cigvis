@@ -77,7 +77,7 @@ We visualize a three-dimensional data volume as multiple slices along the x, y, 
 
 Horizon data can be represented as scatter points with a shape of (N, 3), or as z-values on a regular grid of size (n1, n2).
 
-Well log trajectories are displayed as tubes, where the size of the first well log curve is represented by the color and radius at each position along the tube. Other well log curves are displayed as surfaces attached to the tube's edge. An example is shown below (code available at [cigvis/gallery/3Dvispy/09](https://cigvis.readthedocs.io/gallery/3Dvispy/09-slice_surf_body_logs.html#sphx-glr-gallery-3dvispy-09-slice-surf-body-logs-py)).
+Well log trajectories are displayed as tubes, where the size of the first well log curve is represented by the color and radius at each position along the tube. Other well log curves are displayed as surfaces attached to the tube's edge. An example is shown below (code available at [cigvis/gallery/3Dvispy/09](https://cigvis.readthedocs.io/en/latest/gallery/3Dvispy/09-slice_surf_body_logs.html#sphx-glr-gallery-3dvispy-09-slice-surf-body-logs-py)).
 
 ![09](https://raw.githubusercontent.com/JintaoLee-Roger/images/main/cigvis/3Dvispy/09.png)
 
@@ -86,12 +86,12 @@ These capabilities within cigvis allow for versatile and interactive visualizati
 
 ### Multivolumes in One Canvas
 
-You can pass multiple independent nodes combinations to the `plot3D` function while specifying a grid (e.g., `grid=(2,2)`). This allows you to divide the canvas into multiple independent sub-canvases, where each sub-canvas displays a separate 3D data set within the same canvas. The example code for this can be found in the documentation at [cigvis/gallery/3Dvispy/10](https://cigvis.readthedocs.io/gallery/3Dvispy/10-multi_canvas.html#sphx-glr-gallery-3dvispy-10-multi-canvas-py).
+You can pass multiple independent nodes combinations to the `plot3D` function while specifying a grid (e.g., `grid=(2,2)`). This allows you to divide the canvas into multiple independent sub-canvases, where each sub-canvas displays a separate 3D data set within the same canvas. The example code for this can be found in the documentation at [cigvis/gallery/3Dvispy/10](https://cigvis.readthedocs.io/en/latest/gallery/3Dvispy/10-multi_canvas.html#sphx-glr-gallery-3dvispy-10-multi-canvas-py).
 
 ![10](https://raw.githubusercontent.com/JintaoLee-Roger/images/main/cigvis/3Dvispy/10.gif)
 
 Furthermore, you can link the cameras of all sub-canvases together (just need pass `share=True` to `plot3D` function). This means that any rotation, scaling, or slicing performed in one sub-canvas will be mirrored in all other sub-canvases, ensuring that they all exhibit the same changes simultaneously. This feature is highly advantageous when comparing multiple sets of data, such as results from different experiments, results alongside labels, seismic data compared with attributes, and more. 
-You can find example code for this functionality in the documentation at [cigvis/gallery/3Dvispy/11](https://cigvis.readthedocs.io/gallery/3Dvispy/11-share_cameras.html#sphx-glr-gallery-3dvispy-11-share-cameras-py).
+You can find example code for this functionality in the documentation at [cigvis/gallery/3Dvispy/11](https://cigvis.readthedocs.io/en/latest/gallery/3Dvispy/11-share_cameras.html#sphx-glr-gallery-3dvispy-11-share-cameras-py).
 
 ![11](https://raw.githubusercontent.com/JintaoLee-Roger/images/main/cigvis/3Dvispy/11.gif)
 
