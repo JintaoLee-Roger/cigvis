@@ -105,6 +105,6 @@ All data used by examples in the [gallery](https://cigvis.readthedocs.io/gallery
 
 ## Example Gallery
 
-See: [cigvis/gallery](https://cigvis.readthedocs.io/gallery)
+See: [cigvis/gallery](https://cigvis.readthedocs.io/en/latest/gallery/index.html)
 
 
