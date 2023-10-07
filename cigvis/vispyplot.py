@@ -24,11 +24,12 @@ In plotly, for a seismic volume,
 
 from typing import List, Tuple, Dict, Union
 import warnings
+import os
 import numpy as np
 from cigvis.vispynodes import (VisCanvas, volume_slices, Colorbar, WellLog,
                                XYZAxis)
 
-from vispy.scene.visuals import Mesh, Line, Isosurface
+from vispy.scene.visuals import Mesh, Line
 import vispy
 from vispy.gloo.util import _screenshot
 from scipy.ndimage import gaussian_filter
@@ -393,7 +394,7 @@ def create_surfaces(surfs: List[np.ndarray],
 
     mesh_nodes = []
     for s, v, c in zip(surfaces, values, colors):
-        mask = s < 0
+        mask = np.logical_or(s < 0, np.isnan(s))
         vertices, faces = surfaceutils.get_vertices_and_faces(
             s, mask, anti_rot=anti_rot)
         if v is not None:
@@ -403,6 +404,13 @@ def create_surfaces(surfs: List[np.ndarray],
             c = c[~mask].flatten().reshape(-1, channel)
 
         mesh_kwargs = vispyutils.get_valid_kwargs('mesh', **kwargs)
+
+        if kwargs.get('color', None) is not None:
+            v = None
+            c = None
+        if c is not None:
+            v = None
+
         mesh = Mesh(vertices=vertices,
                     faces=faces,
                     vertex_values=v,
@@ -410,7 +418,7 @@ def create_surfaces(surfs: List[np.ndarray],
                     shading='smooth',
                     **mesh_kwargs)
 
-        if v is not None:
+        if v is not None and c is None and kwargs.get('color', None) is None:
             mesh.cmap = cmap
             mesh.clim = clim
 
@@ -463,15 +471,18 @@ def create_bodys(volume: np.ndarray,
         volume[:, volume.shape[1] - 1, :] = margin
         volume[:, :, volume.shape[2] - 1] = margin
 
-    # verts, faces, normals, values = marching_cubes(volume, level)
-    # kwargs = vispyutils.get_valid_kwargs('mesh', **kwargs)
-    # body = Mesh(verts, faces, color=color, shading='smooth', **kwargs)
+    from skimage.measure import marching_cubes
+    # marching_cubes in skimage is more faster
+    # F3 demo, salt body, skimage: 3.04s, vispy: 21.44s
+    verts, faces, normals, values = marching_cubes(volume, level)
+    kwargs = vispyutils.get_valid_kwargs('mesh', **kwargs)
+    body = Mesh(verts, faces, color=color, shading='smooth', **kwargs)
 
     # HACK, NOTE: use Isosurface or convert to Mesh?
-    body = Isosurface(volume, level=level, color=color, shading='smooth')
-    # must call _prepare_draw before attaching ShadingFilter
-    # see: https://github.com/vispy/vispy/issues/2254#issuecomment-967276060
-    body._prepare_draw(body)
+    # body = Isosurface(volume, level=level, color=color, shading='smooth')
+    # # must call _prepare_draw before attaching ShadingFilter
+    # # see: https://github.com/vispy/vispy/issues/2254#issuecomment-967276060
+    # body._prepare_draw(body)
 
     return [body]
 
@@ -658,10 +669,9 @@ def create_well_logs(points: np.ndarray,
 
 def create_points(points: np.ndarray,
                   r: float = 2,
-                  color_type='single',
                   color: str = 'green',
                   cmap='jet',
-                  return_cbar: bool = False,
+                  clim=None,
                   **kwargs):
     """
     create a node to show points using Mesh instead of Marker
@@ -669,116 +679,84 @@ def create_points(points: np.ndarray,
     Parameters
     ----------
     points : array-like
-        points, shape is like (N, 3) or (N, 4) or (N, 6) or (N, 7), 
-        means (x, y, z) or (x, y, z, v), or (x, y, z, r, g, b) 
-        or (x, y, z, r, g, b, a). The 3-n columns is used to control
-        the point color, see `color_type` parameter.
+        points, shape is like (N, 3).
     r : float
         the radius of a point, to control the size of a point
-    color_type : str
-        'single' or 'depth' or 'multi'. 
-        If 'single', use `color` to fill all points,
-        if 'depth', use its depth as the color value,
-        if 'multi', fill points by their values/colors by `cmap`. Such as:
-        >>> points.shape = (N, 3) # points[:, 2] is the value column
-        >>> points.shape = (N, 4) # points[:, 3] is the value column
-
-        \# ignore `cmap`, fill a point by their (r, g, b)
-        >>> points.shape = (N, 6) # each row is (x, y, z, r, g, b)
-
-        \# ignore `cmap`, fill a point by their (r, g, b, a)
-        >>> points.shape = (N, 7) # each row is (x, y, z, r, g, b, a)
     color : str
-        color to fill when using `color_type='single'`
+        color to fill
     cmap : str
-        colormap to map when set `color_type != 'single'`
-    return_cbar : bool
-        return a colorbar
-    cbar_params : Dict
-        params to create a colorbar
+        colormap to map when set `vertex_values`
+    clim : List
+        clim if use cmap
 
     kwargs : Dict
         parameters for Mesh 
     """
     points = np.array(points)
     assert points.ndim == 2 and points.shape[1] >= 3
-    x = points[:, 0]
-    y = points[:, 1]
-    z = points[:, 2]
+    vertices, faces = cigvis.meshs.cube_points(points[:, :3], r)
 
-    p1 = np.c_[x - r, y - r, z - r]
-    p2 = np.c_[x - r, y - r, z + r]
-    p3 = np.c_[x - r, y + r, z - r]
-    p4 = np.c_[x - r, y + r, z + r]
-    p5 = np.c_[x + r, y - r, z - r]
-    p6 = np.c_[x + r, y - r, z + r]
-    p7 = np.c_[x + r, y + r, z - r]
-    p8 = np.c_[x + r, y + r, z + r]
-
-    # N, 8, 3
-    p = np.stack([p1, p2, p3, p4, p5, p6, p7, p8]).transpose(1, 0, 2)
-
-    # start vert for each point mesh
-    offsets = np.arange(len(points)) * 8
-
-    # faces for one points
-    vertex_indices = np.array([[0, 3, 2], [0, 1, 3], [0, 6, 2], [0, 4, 6],
-                               [0, 5, 1], [0, 4, 5], [4, 7, 6], [4, 5, 7],
-                               [2, 7, 3], [2, 6, 7], [1, 7, 3], [1, 5, 7]])
-    vertex_indices = vertex_indices.reshape(1, -1)
-
-    # faces.shape = (N, 36)
-    faces = vertex_indices + offsets[:, np.newaxis]
-    faces = faces.reshape(len(points), 12, 3)
-
-    if color_type == 'single':
-        if color is None:
-            color = 'red'
-        vertex_colors = None
-        vertex_values = None
-        cmap = None
-    elif color_type == 'depth':
-        color = None
-        vertex_values = np.repeat(points[:, -1], 8, axis=0)
-        vertex_colors = None
-        cmap = colormap.cmap_to_vispy(cmap)
-        clim = [vertex_values.min(), vertex_values.max()]
+    if color is not None:
+        kwargs['vertex_values'] = None
+        kwargs['vertex_colors'] = None
     else:
-        if points.shape[1] == 3 or points.shape[1] == 4:
-            color = None
-            vertex_values = np.repeat(points[:, -1], 8, axis=0)
-            vertex_colors = None
-            cmap = colormap.cmap_to_vispy(cmap)
-            clim = [vertex_values.min(), vertex_values.max()]
-        elif points.shape[1] == 6 or points.shape[1] == 7:
-            color = None
-            vertex_values = None
-            cmap = None
-            vertex_colors = np.repeat(points[:, 3:], 8, axis=0)
-        else:
-            raise RuntimeError("Invalid shape")
+        vertex_values = kwargs.get('vertex_values', None)
+        if vertex_values is not None:
+            assert len(vertex_values) == len(points)
+            vertex_values = np.array(vertex_values)
+            if clim is None:
+                clim = [vertex_values.min(), vertex_values.max()]
+            kwargs['vertex_values'] = np.repeat(vertex_values, 8)
+        vertex_colors = kwargs.get('vertex_colors', None)
+        if vertex_colors is not None:
+            assert len(vertex_colors) == len(points)
+            kwargs['vertex_colors'] = np.repeat(vertex_colors, 8)
 
     mesh_kwargs = vispyutils.get_valid_kwargs('mesh', **kwargs)
-    faces = faces.reshape(-1, 3)
-    point_mesh = Mesh(p.reshape(-1, 3).astype(float),
+    point_mesh = Mesh(vertices=vertices,
                       faces=faces,
                       color=color,
-                      vertex_colors=vertex_colors,
-                      vertex_values=vertex_values,
                       shading='flat',
                       **mesh_kwargs)
-    # shadingfilter = ShadingFilter(shading='flat', light_dir=(1, 1, -1))
-    # point_mesh.attach(shadingfilter)
 
-    if cmap is not None:
+    if color is None and kwargs.get('vertex_values', None) is not None:
         point_mesh.cmap = cmap
         point_mesh.clim = clim
 
-    if return_cbar:
-        kwargs = vispyutils.get_valid_kwargs('colorbar', **kwargs)
-        cbar = create_colorbar(cmap, clim, **kwargs)
-        return [point_mesh], cbar
     return [point_mesh]
+
+
+def create_fault_skin(skin_dir,
+                      suffix='*',
+                      endian='>',
+                      values_type='likelihood',
+                      cmap='jet',
+                      clim=None,
+                      **kwargs):
+    """"""
+    if os.path.isfile(skin_dir):
+        vertices, faces, values = cigvis.io.load_one_skin(
+            skin_dir, endian, values_type)
+    elif os.path.isdir(skin_dir):
+        vertices, faces, values = cigvis.io.load_skins(skin_dir, suffix,
+                                                       endian, values_type)
+    if kwargs.get('color', None) is not None:
+        values = None
+    if clim is None and values is not None:
+        clim = [values.min(), values.max()]
+
+    node = Mesh(vertices,
+                faces,
+                vertex_values=values,
+                shading='smooth',
+                **kwargs)
+    if values is not None and kwargs.get('vertex_colors',
+                                         None) is None and kwargs.get(
+                                             'color', None) is None:
+        node.cmap = cmap
+        node.clim = clim
+
+    return [node]
 
 
 def plot3D(nodes: List,

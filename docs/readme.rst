@@ -1,3 +1,7 @@
+.. image:: https://raw.githubusercontent.com/JintaoLee-Roger/images/main/cigvis/more_demos/070.png
+   :align: center
+   :alt: 01
+
 CIGVis - a tool for visualizing multidimensional geophysical data
 ======================================================================
 
@@ -94,6 +98,7 @@ Press ``<f>`` to increase ``fov`` value, press ``<F>`` or ``<Shift> + <f>`` to d
 
 .. image:: https://raw.githubusercontent.com/JintaoLee-Roger/images/main/cigvis/ex.gif
    :alt: ex1
+   :align: center
 
 Press ``<a>`` to print the camera's parameters, and press ``<s>`` to save a screen shot.
 
@@ -111,6 +116,7 @@ Well log trajectories are displayed as tubes, where the size of the first well l
 
 .. image:: https://raw.githubusercontent.com/JintaoLee-Roger/images/main/cigvis/3Dvispy/09.png
    :alt: 09
+   :align: center
 
 These capabilities within cigvis allow for versatile and interactive visualizations of a wide range of geophysical data types, enhancing the understanding and analysis of such data in geoscience applications.
 
@@ -122,6 +128,7 @@ at `cigvis/gallery/3Dvispy/10 <https://cigvis.readthedocs.io/en/latest/gallery/3
 
 .. image:: https://raw.githubusercontent.com/JintaoLee-Roger/images/main/cigvis/3Dvispy/10.gif
    :alt: 10
+   :align: center
 
 Furthermore, you can link the cameras of all sub-canvases together (just need pass ``share=True`` to ``plot3D`` function). This means that any rotation, scaling, or slicing performed in one sub-canvas will be mirrored in all other sub-canvases, ensuring that they all exhibit the same changes simultaneously. This feature is highly advantageous when comparing multiple sets of data, such as results from different experiments, results alongside labels, seismic data compared with attributes, and more. 
 You can find example code for this functionality in the documentation 
@@ -129,6 +136,7 @@ at `cigvis/gallery/3Dvispy/11 <https://cigvis.readthedocs.io/en/latest/gallery/3
 
 .. image:: https://raw.githubusercontent.com/JintaoLee-Roger/images/main/cigvis/3Dvispy/11.gif
    :alt: 11
+   :align: center
 
 These capabilities provide a powerful way to visualize and compare multiple independent 3D data sets within a single canvas using cigvis.
 
@@ -138,7 +146,7 @@ Example Data
 ---------------
 
 All data used by examples in the 
-`gallery <https://cigvis.readthedocs.io/gallery>`_ 
+`gallery <https://cigvis.readthedocs.io/en/latest/gallery/index.html>`_ 
 can be download at 
 `https://rec.ustc.edu.cn/share/19a16120-5c42-11ee-a0d4-4329aa6b754b <https://rec.ustc.edu.cn/share/19a16120-5c42-11ee-a0d4-4329aa6b754b>`_, 
 password: ``1234``.
@@ -148,4 +156,4 @@ password: ``1234``.
 Example Gallery
 ------------------
 
-See: `cigvis/gallery <https://cigvis.readthedocs.io/gallery>`_
+See: `cigvis/gallery <https://cigvis.readthedocs.io/en/latest/gallery/index.html>`_

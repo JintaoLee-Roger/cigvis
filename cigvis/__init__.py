@@ -33,6 +33,7 @@ import sys
 from .config import *
 from . import io
 from . import colormap
+from . import meshs
 
 injupyter = 'ipykernel_launcher.py' in sys.argv[0] or 'lab' in sys.argv[0]
 

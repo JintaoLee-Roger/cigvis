@@ -1,3 +1,5 @@
+![im1](https://raw.githubusercontent.com/JintaoLee-Roger/images/main/cigvis/more_demos/070.png)
+
 # CIGVis - a tool for geophysical data visualization
 
 ## 概述
@@ -101,4 +103,4 @@ cigvis内部的这些功能允许以多种方式交互可视化各种地球物�
 
 ## 示例库
 
-请参阅：[cigvis/gallery](https://cigvis.readthedocs.io/gallery)
+请参阅：[cigvis/gallery](https://cigvis.readthedocs.io/en/latest/gallery/index.html)

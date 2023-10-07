@@ -16,6 +16,8 @@ class FixedImage(scene.visuals.Image):
     fixed location image, input slices, instead of volume, disable
     drag mode
 
+    TODO: tilted placement
+
     Parameters
     -----------
     imgs : array-like or List[array-like]
@@ -102,22 +104,6 @@ class FixedImage(scene.visuals.Image):
 
         self.highlight = SimpleNamespace()
         self.highlight.visable = False
-        # shape = imgs[0].shape
-
-        # # The selection highlight (a Plane visual with transparent color).
-        # # The plane is initialized before any rotation, on '+z' direction.
-        # self.highlight = scene.visuals.Plane(
-        #     parent=self,
-        #     width=shape[0],
-        #     height=shape[1],
-        #     direction='+z',
-        #     color=(1, 1, 0, 0.1))  # transparent yellow color
-        # # Move the plane to align with the image.
-        # self.highlight.transform = STTransform(translate=(shape[0] / 2,
-        #                                                   shape[1] / 2, 0))
-        # # This is to make sure we can see highlight plane through the images.
-        # self.highlight.set_gl_state('additive', depth_test=True)
-        # self.highlight.visible = False  # only show when selected
 
         # Apply SRT transform according to the axis attribute.
         self.transform = MatrixTransform()
