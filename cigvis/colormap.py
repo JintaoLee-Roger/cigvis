@@ -28,6 +28,30 @@ from vispy.color import get_colormap as get_vispycmap
 from .customcmap import *
 
 
+def blending_color(bg,
+                   fg,
+                   alpha: float,
+                   bgc='gray',
+                   fgc='jet',
+                   bgclims=None,
+                   fgclims=None):
+    if bgclims is None:
+        bgclims = [bg.min(), bg.max()]
+    if fgclims is None:
+        fgclims = [fg.min(), fg.max()]
+    norm1 = plt.Normalize(vmin=bgclims[0], vmax=bgclims[1])
+    norm2 = plt.Normalize(vmin=fgclims[0], vmax=fgclims[1])
+
+    cmap_rgb1 = plt.get_cmap(bgc)
+    cmap_rgb2 = plt.get_cmap(fgc)
+    arr1_rgb = cmap_rgb1(norm1(bg))
+    arr2_rgb = cmap_rgb2(norm2(fg))
+
+    blended_rgb = arr1_rgb * (1 - alpha) + arr2_rgb * alpha
+
+    return blended_rgb
+
+
 def get_cmap_from_str(cmap: str, includevispy: bool = False):
     """
     return a Colormap from a cmap string
@@ -108,6 +132,9 @@ def cmap_to_vispy(cmap) -> vispyColormap:
         return vispyColormap(colors)
     if isinstance(cmap, vispyColormap):
         return cmap
+
+    if isinstance(cmap, str):
+        raise ValueError('Unknow colormap')
 
 
 def custom_disc_cmap(values: List, colors: List):

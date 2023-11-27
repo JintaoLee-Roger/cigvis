@@ -16,6 +16,7 @@ from vispy.util import keys
 from vispy.gloo.util import _screenshot
 from vispy.visuals import MeshVisual, CompoundVisual
 from vispy import scene
+from vispy.gloo import gl
 
 import cigvis
 from .xyz_axis import XYZAxis
@@ -73,7 +74,7 @@ class VisCanvas(scene.SceneCanvas):
     def __init__(
         self,
         size: Tuple = (800, 720),
-        visual_nodes: Union[List, Dict] = [],
+        visual_nodes: Union[List, Dict] = None,
         grid: Tuple = None,
         share: bool = False,
         bgcolor: str = 'white',
@@ -82,7 +83,7 @@ class VisCanvas(scene.SceneCanvas):
         # for camera
         scale_factor: float = None,
         center=None,
-        fov: float = 45,
+        fov: float = 30,
         azimuth: float = 50,
         elevation: float = 50,
         zoom_factor: float = 1.0,
@@ -103,6 +104,7 @@ class VisCanvas(scene.SceneCanvas):
                                    keys='interactive',
                                    size=size,
                                    bgcolor=bgcolor)
+
         self.unfreeze()
         self.nodes = {}
 
@@ -114,6 +116,8 @@ class VisCanvas(scene.SceneCanvas):
         self.scale_factor = scale_factor
         self.center = center
         self.auto_range = auto_range
+        if not self.auto_range:
+            zoom_factor = 1
         self.zoom_factor = zoom_factor
         self.share = share
 
@@ -121,13 +125,6 @@ class VisCanvas(scene.SceneCanvas):
         for i, r in enumerate(cigvis.is_axis_reversed()):
             axis_scales[i] *= (1 - 2 * r)
         self.axis_scales = axis_scales
-
-        self._init_grid_input(grid, visual_nodes)
-
-        self.add_visual_nodes()
-
-        if self.share:
-            self.link_cameras()
 
         # Attach a ViewBox to a grid and initiate the camera with the given
         # parameters.
@@ -140,6 +137,49 @@ class VisCanvas(scene.SceneCanvas):
         self.selected = None  # no selection by default
         self.hover_on = None  # visual node that mouse hovers on, None by default
         self.selected2 = []
+
+        self.freeze()
+
+        if visual_nodes is not None:
+            self.add_nodes(visual_nodes, grid)
+
+    def update_camera(self, azimuth, elevation, fov):
+        self.azimuth = azimuth
+        self.elevation = elevation
+        self.fov = fov
+
+        if not hasattr(self, 'view'):
+            return
+
+        for view in self.view:
+            view.camera.azimuth = self.azimuth
+            view.camera.elevation = self.elevation
+            view.camera.fov = self.fov
+
+    def update_axis_scales(self, axis_scales):
+        axis_scales = list(axis_scales)
+        for i, r in enumerate(cigvis.is_axis_reversed()):
+            axis_scales[i] *= (1 - 2 * r)
+        self.axis_scales = axis_scales
+
+        if not hasattr(self, 'view'):
+            return
+
+        for view in self.view:
+            view.camera._flip_factors = self.axis_scales
+            view.camera._update_transform()
+            self.update()
+
+    def add_nodes(self, visual_nodes: Union[List, Dict], grid: Tuple = None):
+
+        self.unfreeze()
+
+        self._init_grid_input(grid, visual_nodes)
+
+        self.add_visual_nodes()
+
+        if self.share:
+            self.link_cameras()
 
         if not self.share:
             for view, nodes in zip(self.view, self.nodes.values()):
@@ -248,6 +288,12 @@ class VisCanvas(scene.SceneCanvas):
 
         # Press <s> to save a screenshot.
         if event.text == 's':
+            # viewport = list(gl.glGetParameter(gl.GL_VIEWPORT))
+            # border = (viewport[3] - self.size[1]) // 2
+            # viewport[0] = viewport[2] - self.size[0] - border
+            # viewport[1] = viewport[3] - self.size[1] - border
+            # viewport[2] = self.size[0]
+            # viewport[3] = self.size[1]
             screenshot = _screenshot()
             # screenshot = self.render()
             vispy.io.write_png(self.pngDir + self.title + '.png', screenshot)

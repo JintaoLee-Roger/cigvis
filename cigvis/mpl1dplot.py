@@ -19,6 +19,7 @@ from typing import List, Tuple, Dict
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator
+from cigvis import colormap
 
 ################## For traces plot #############
 
@@ -245,6 +246,117 @@ def plot_signal_compare(raw,
         plt.show()
 
 
+def plot1_with_fill(y,
+                    x=None,
+                    y2='min',
+                    v='y',
+                    cmap='jet',
+                    orient='h',
+                    xlabel='',
+                    ylabel='',
+                    title='',
+                    xlim=None,
+                    ylim=None,
+                    ax=None):
+    show = True
+    cmap = colormap.get_cmap_from_str(cmap)
+
+    if ax is not None:
+        show = False
+
+    if x is None:
+        x = np.arange(y.size)
+    assert y.size == x.size
+
+    if isinstance(y2, str):
+        if y2 == 'min':
+            y2 = float(y.min())
+        elif y2 == 'max':
+            y2 = float(y.max())
+        else:
+            raise ValueError("Invalid input of y2")
+
+    if isinstance(y2, (float, int)):
+        y2 = np.array([y2] * x.size)
+    if isinstance(y2, List):
+        y2 = np.array(y2)
+
+    assert isinstance(y2, np.ndarray) and y2.size == x.size
+
+    if isinstance(v, str):
+        if v == 'y':
+            v = y
+        elif v == 'x':
+            v = x
+        else:
+            raise ValueError("Invalid input of v")
+    if isinstance(v, List):
+        v = np.array(v)
+    assert isinstance(v, np.ndarray) and v.size == x.size
+    v = v.reshape(1, -1)
+
+    if ax is None:
+        if orient == 'h':
+            fig, ax = plt.subplots(figsize=(8, 2))
+        else:
+            fig, ax = plt.subplots(figsize=(2, 8))
+
+    if orient == 'h':
+        ax.plot(x, y, c='black')
+        ax.plot(x, y2, c='black')
+        ax.plot([x[0], x[0]], [y[0], y2[0]], c='black')
+        ax.plot([x[-1], x[-1]], [y[-1], y2[-1]], c='black')
+        polygon = ax.fill_between(x, y, y2, lw=0, color='none')
+    else:
+        ax.plot(y, x, c='black')
+        ax.plot(y2, x, c='black')
+        ax.plot([y[0], y2[0]], [x[0], x[0]], c='black')
+        ax.plot([y[-1], y2[-1]], [x[-1], x[-1]], c='black')
+        polygon = ax.fill_betweenx(x, y, y2, lw=0, color='none')
+        v = v.reshape(-1, 1)[::-1, :]
+
+    verts = np.vstack([p.vertices for p in polygon.get_paths()])
+    extent = [
+        verts[:, 0].min(), verts[:, 0].max(), verts[:, 1].min(),
+        verts[:, 1].max()
+    ]
+    filling = ax.imshow(v, cmap=cmap, aspect='auto', extent=extent)
+    filling.set_clip_path(polygon.get_paths()[0], transform=ax.transData)
+
+    _xlim, _ylim = None, None
+    if xlim:
+        if orient == 'v':
+            _ylim = xlim
+        else:
+            _xlim = xlim
+
+    if ylim:
+        if orient == 'v':
+            _xlim = ylim
+        else:
+            _ylim = ylim
+
+    if not _xlim:
+        _xlim = ax.get_xlim()
+    if not _ylim:
+        _ylim = ax.get_ylim()
+
+    ax.set_xlim(_xlim)
+    ax.set_ylim(_ylim)
+    ax.set_title(title)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+
+    if orient == 'v':
+        ax.invert_yaxis()
+        ax.xaxis.set_ticks_position('top')
+        ax.xaxis.set_label_position('top')
+
+    if show:
+        plt.tight_layout()
+        plt.show()
+
+
 ####### don't call ########
 
 
@@ -280,3 +392,18 @@ def _fill_traces(ax, x, y, fill_down, fill_up, orient='v', color='black'):
                             where=(y > fmax),
                             interpolate=True,
                             color=color)
+
+
+
+if __name__ == "__main__":
+    import cigvis
+    las = cigvis.io.load_las('data/cb23.las')
+    data = las['data']
+    h = data[:, 0]
+    sp = data[:, 1]
+    gr = data[:, 2]
+    h = h[gr != -999.25]
+    gr = gr[gr != -999.25]
+    
+    plot1_with_fill(gr, h, orient='v', cmap='SunRise')
+
