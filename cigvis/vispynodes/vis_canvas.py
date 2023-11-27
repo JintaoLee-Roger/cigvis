@@ -604,16 +604,21 @@ class VisCanvas(scene.SceneCanvas):
         Make it solid background, image from primary ViewBox shall be
         blocked if overlapping.
         """
-        view.interactive = True  # disable so that it won't be selectable
+        view.interactive = False  # disable so that it won't be selectable
+        colorbar.parent = view.scene
 
         # use PanZoomCamera so we can draw a **high qaulity** colorbar image
-        view.camera = scene.cameras.PanZoomCamera(aspect=1)
+        # view.camera = scene.cameras.PanZoomCamera(aspect=1)
+
         # disable mouse drag, keep zoom in/out
-        view.camera.viewbox.events.mouse_move.disconnect(
-            view.camera.viewbox_mouse_event)
-        colorbar.parent = view.scene
-        view.camera.flip = (0, 1, 0)
-        view.camera.set_range()
+        # view.camera.viewbox.events.mouse_move.disconnect(
+        #     view.camera.viewbox_mouse_event)
+
+        colorbar.pos = (0, self.size[1]/2/self.nrows)
+        colorbar.canvas_size = self.size
+        # view.camera.flip = (0, 1, 0)
+        # view.camera.set_range()
+        self.events.resize.connect(colorbar.on_resize)
 
     def link_cameras(self):
         """

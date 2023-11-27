@@ -2,18 +2,17 @@
 # Computational and Interpretation Group (CIG),
 # University of Science and Technology of China (USTC).
 # All rights reserved.
-
 """
 utils for plotly visualization in jupyter
 
 TODO: To be improved
 """
 
-
 from typing import Union, Tuple, List, Dict
 import numpy as np
 
 import cigvis
+from cigvis import colormap
 
 
 def make_xyz(idx: int, shape: Union[Tuple, List],
@@ -134,9 +133,35 @@ def make_slices(data: np.ndarray,
     return slices, pos
 
 
-def verifyshape(sshape: tuple,
-                shape: tuple,
-                axis: str) -> None:
+def make_triang(xx, yy, zz):
+    """
+    make triang mesh from meshgrid
+    """
+    x = xx.flatten()
+    y = yy.flatten()
+    z = zz.flatten()
+
+    n1, n2 = xx.shape
+    grid = np.arange(n1 * n2).reshape(n1, n2)
+    faces = np.zeros((n1 - 1, n2 - 1, 2, 3))
+    faces[:, :, 0, 0] = grid[:-1, :-1]
+    faces[:, :, 0, 1] = grid[1:, :-1]
+    faces[:, :, 0, 2] = grid[1:, 1:]
+    faces[:, :, 1, 0] = grid[:-1, :-1]
+    faces[:, :, 1, 1] = grid[1:, 1:]
+    faces[:, :, 1, 2] = grid[:-1, 1:]
+
+    faces = faces.reshape(-1, 3).astype(int)
+
+    i = faces[:, 0]
+    j = faces[:, 1]
+    k = faces[:, 2]
+
+    return x, y, z, i, j, k
+
+
+
+def verifyshape(sshape: tuple, shape: tuple, axis: str) -> None:
     """
     verify the slice shape is invalid
     Note: sshape is slice.shape which is transposed if line_first is False

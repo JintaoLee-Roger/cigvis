@@ -48,11 +48,12 @@ from typing import List, Tuple, Union, Dict
 import copy
 import numpy as np
 import plotly.graph_objects as go
-# from skimage.measure import marching_cubes
+from skimage.measure import marching_cubes
 
 import cigvis
 from cigvis import colormap
 from cigvis.utils import plotlyutils
+import cigvis.utils as utils
 
 
 def create_slices(volume: np.ndarray,
@@ -155,6 +156,110 @@ def create_slices(volume: np.ndarray,
     return traces
 
 
+def create_overlay(bg_volume: np.ndarray,
+                   fg_volume: np.ndarray,
+                   pos: Union[List, Dict] = None,
+                   bg_clim: List = None,
+                   fg_clim: List = None,
+                   bg_cmap: str = 'Petrel',
+                   fg_cmap: str = None,
+                   show_cbar: bool = False,
+                   cbar_type: str = 'fg',
+                   **kwargs):
+    """
+    """
+
+    # check
+    utils.check_mmap(bg_volume)
+    if not isinstance(fg_volume, List):
+        fg_volume = [fg_volume]
+    for volume in fg_volume:
+        assert bg_volume.shape == volume.shape
+        utils.check_mmap(volume)
+
+    shape = bg_volume.shape
+    line_first = cigvis.is_line_first()
+    if line_first:
+        nt = bg_volume.shape[2]
+    else:
+        nt = bg_volume.shape[0]
+
+    # set pos
+    if pos is None:
+        pos = dict(x=[0], y=[0], z=[nt - 1])
+    if isinstance(pos, List):
+        assert len(pos) == 3
+        if isinstance(pos[0], List):
+            x, y, z = pos
+        else:
+            x, y, z = [pos[0]], [pos[1]], [pos[2]]
+        pos = {'x': x, 'y': y, 'z': z}
+    assert isinstance(pos, Dict)
+
+    if bg_clim is None:
+        bg_clim = [bg_volume.min(), bg_volume.max()]
+    if fg_clim is None:
+        fg_clim = [[v.min(), v.max()] for v in fg_volume]
+    if not isinstance(fg_clim[0], (List, Tuple)):
+        fg_clim = [fg_clim]
+
+    assert fg_cmap is not None
+    if not isinstance(fg_cmap, (List, Tuple)):
+        fg_cmap = [fg_cmap]
+
+    rpos = pos
+    bg_slices, pos = plotlyutils.make_slices(bg_volume, pos=rpos)
+    fg_slices = []
+    for volume in fg_volume:
+        s, _ = plotlyutils.make_slices(volume, pos=rpos)
+        fg_slices.append(s)
+
+    dimname = dict(x='inline', y='crossline', z='time')
+
+    traces = []
+
+    idx = 0
+    for dim in ['x', 'y', 'z']:
+
+        assert len(bg_slices[dim]) == len(pos[dim])
+
+        for j in range(len(bg_slices[dim])):
+
+            if show_cbar and idx == 0:
+                showscale = True
+            else:
+                showscale = False
+
+            idx += 1
+
+            num = pos[dim][j]
+            name = f'{dim}/{dimname[dim]}'
+            xx, yy, zz = plotlyutils.make_xyz(num, shape, dim)
+            x, y, z, ii, jj, kk = plotlyutils.make_triang(xx, yy, zz)
+
+            # blending
+            bs = bg_slices[dim][j]
+            plotlyutils.verifyshape(bs.shape, shape, dim)
+            fs = [fg[dim][j] for fg in fg_slices]
+            colors = colormap.blend_multiple(bs, fs, bg_cmap, fg_cmap, bg_clim,
+                                             fg_clim)
+            colors = np.round(colors * 255).reshape(-1, 3)
+            cplotly = [f'rgb({x[0]}, {x[1]}, {x[2]})' for x in colors]
+
+            traces.append(
+                go.Mesh3d(x=x,
+                          y=y,
+                          z=z,
+                          i=ii,
+                          j=jj,
+                          k=kk,
+                          name=name,
+                          vertexcolor=cplotly,
+                          showscale=False))
+
+    return traces
+
+
 def create_surfaces(surfs,
                     volume=None,
                     value_type='depth',
@@ -244,7 +349,6 @@ def create_well_logs(points, values=None):
     tube = go.Streamtube()
 
 
-
 def create_points(points, color='red', size=3):
     points = np.array(points)
 
@@ -292,15 +396,6 @@ def create_bodys(volume, level, margin: float = None, color='yellow'):
                       flatshading=True)
 
     return [trace]
-
-
-def create_overlay(**kwargs):
-    """
-    """
-    warnings.warn(
-        "Plotly has poor support for overlay display, so we won't implement this",
-        UserWarning)
-    pass
 
 
 def plot3D(traces, **kwargs):

@@ -710,7 +710,7 @@ def create_points(points: np.ndarray,
         vertex_colors = kwargs.get('vertex_colors', None)
         if vertex_colors is not None:
             assert len(vertex_colors) == len(points)
-            kwargs['vertex_colors'] = np.repeat(vertex_colors, 8)
+            kwargs['vertex_colors'] = np.repeat(vertex_colors, 8, axis=0)
 
     mesh_kwargs = vispyutils.get_valid_kwargs('mesh', **kwargs)
     point_mesh = Mesh(vertices=vertices,

@@ -103,6 +103,8 @@ class Colorbar(scene.visuals.Image):
         self.dpi_scale = dpi_scale
 
         # Record the important drawing parameters.
+        self.pos = (0, 0)
+        self.canvas_size = None
         self.cbar_size = size  # tuple
         self.cmap_ = cmap
         self.discrete = discrete
@@ -155,6 +157,27 @@ class Colorbar(scene.visuals.Image):
         self.set_data(self._draw_colorbar())
         self.freeze()
 
+    def on_resize(self, event):
+        """ When window is resized, only need to move the position in vertical
+        direction, because the coordinate is relative to the secondary ViewBox
+        that stays on the right side of the canvas.
+        """
+        # TODO: Resize the image?
+        pos = np.array(self.pos).astype(np.single)
+        pos[1] *= event.size[1] / self.canvas_size[1]
+        self.pos = tuple(pos)
+
+        # Move the colorbar to specified position (with half-size padding, because
+        # Image visual uses a different anchor (top-left corner) rather than the
+        # center-left corner used by ColorBar visual.).
+        self.transform.reset()
+        self.transform.translate((
+            self.pos[0] / 2.618,  # make the gap smaller :)
+            self.pos[1] - self.size[1] / 2.))
+
+        # Update the canvas size.
+        self.canvas_size = event.size
+
     def _draw_colorbar(self):
         """
         Draw a Matplotlib colorbar, save this figure without any boundary to a
@@ -162,14 +185,17 @@ class Colorbar(scene.visuals.Image):
         """
         assert self.cbar_size is not None
         dpi = get_dpi()
-        figsize = (self.cbar_size[0] / dpi,
-                   self.cbar_size[1] / dpi*0.95)
+        figsize = (self.cbar_size[0] / dpi, self.cbar_size[1] / dpi)
 
         sm, ticks = self.get_ScalarMappable()
 
         # Put the colorbar at proper location on the Matplotlib fig.
-        fig, ax = plt.subplots(figsize=figsize)
-        cb = fig.colorbar(sm, cax=ax)
+        fig = plt.figure(figsize=figsize)
+        width = figsize[1] * 0.2 / figsize[0] / 5
+        cbar_axes = fig.add_axes([0.01, 0.01, width, 0.98])
+        # fig, ax = plt.subplots(figsize=figsize)
+        # cb = fig.colorbar(sm, cax=ax)
+        cb = fig.colorbar(sm, cax=cbar_axes)
         if self.discrete:
             cb.set_ticks(ticks['ticks'])
             cb.set_ticklabels(ticks['labels'])
@@ -188,7 +214,7 @@ class Colorbar(scene.visuals.Image):
         cb.outline.set_linewidth(self.border_width)
         cb.outline.set_edgecolor(self.border_color)
 
-        plt.tight_layout()
+        # plt.tight_layout()
 
         # Export the rendering to a numpy array in the buffer.
         buf = io.BytesIO()
@@ -198,8 +224,9 @@ class Colorbar(scene.visuals.Image):
             buf,
             format='png',
             bbox_inches='tight',
-            pad_inches=0.02,
-            dpi=dpi * self.dpi_scale,
+            pad_inches=0.01,
+            dpi=dpi,
+            # dpi=dpi * self.dpi_scale,
             transparent=True,
         )
 

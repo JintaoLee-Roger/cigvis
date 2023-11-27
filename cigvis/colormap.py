@@ -28,28 +28,40 @@ from vispy.color import get_colormap as get_vispycmap
 from .customcmap import *
 
 
-def blending_color(bg,
-                   fg,
-                   alpha: float,
-                   bgc='gray',
-                   fgc='jet',
-                   bgclims=None,
-                   fgclims=None):
-    if bgclims is None:
-        bgclims = [bg.min(), bg.max()]
-    if fgclims is None:
-        fgclims = [fg.min(), fg.max()]
-    norm1 = plt.Normalize(vmin=bgclims[0], vmax=bgclims[1])
-    norm2 = plt.Normalize(vmin=fgclims[0], vmax=fgclims[1])
+def blend_two_arrays(bg, fg, bg_cmap, fg_cmap, bg_clim, fg_clim):
+    """
+    blend two arrays using their cmap
+    """
+    if isinstance(bg_cmap, str):
+        bg_cmap = get_cmap_from_str(bg_cmap)
+    if isinstance(fg_cmap, str):
+        fg_cmap = get_cmap_from_str(fg_cmap)
+    norm1 = plt.Normalize(vmin=bg_clim[0], vmax=bg_clim[1])
+    norm2 = plt.Normalize(vmin=fg_clim[0], vmax=fg_clim[1])
+    arr1_rgba = bg_cmap(norm1(bg))
+    arr2_rgba = fg_cmap(norm2(fg))
 
-    cmap_rgb1 = plt.get_cmap(bgc)
-    cmap_rgb2 = plt.get_cmap(fgc)
-    arr1_rgb = cmap_rgb1(norm1(bg))
-    arr2_rgb = cmap_rgb2(norm2(fg))
+    alpha = arr2_rgba[:, :, 3][..., None]
+    out = arr1_rgba[:, :, :3] * (1 - alpha) + arr2_rgba[:, :, :3] * alpha
 
-    blended_rgb = arr1_rgb * (1 - alpha) + arr2_rgb * alpha
+    return out
 
-    return blended_rgb
+
+def blend_multiple(bg, fg, bg_cmap, fg_cmap, bg_clim, fg_clim):
+    """
+    """
+    out = blend_two_arrays(bg, fg[0], bg_cmap, fg_cmap[0], bg_clim, fg_clim[0])
+
+    for i in range(len(fg) - 1):
+        norm = plt.Normalize(vmin=fg_clim[i + 1][0], vmax=fg_clim[i + 1][1])
+        cmap = fg_cmap[i + 1]
+        if isinstance(cmap, str):
+            cmap = get_cmap_from_str(cmap)
+        arr_rgba = cmap(norm(fg[i + 1]))
+        alpha = arr_rgba[:, :, 3][..., None]
+        out = out * (1 - alpha) + arr_rgba[:, :, :3] * alpha
+
+    return out
 
 
 def get_cmap_from_str(cmap: str, includevispy: bool = False):
