@@ -339,6 +339,7 @@ def plot2d(
         xtick = xtick[xtick >= 0]
         xtick = xtick[xtick < img.shape[1]]
         xticklabels = xsample[0] + xtick * xsample[1]
+        xticklabels = [f'{x:.2f}' for x in xticklabels]
         ax.set_xticks(xtick)
         ax.set_xticklabels(xticklabels)
 
@@ -347,6 +348,7 @@ def plot2d(
         ytick = ytick[ytick >= 0]
         ytick = ytick[ytick < img.shape[0]]
         yticklabels = ysample[0] + ytick * ysample[1]
+        yticklabels = [f'{x:.2f}' for x in yticklabels]
         ax.set_yticks(ytick)
         ax.set_yticklabels(yticklabels)
 

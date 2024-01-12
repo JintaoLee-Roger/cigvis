@@ -116,9 +116,9 @@ def cmap_to_plotly(cmap):
     d = (d * 255).astype(int)
     plotly_cmap = []
 
-    for k in range(256):
+    for k in range(cmap.N):
         color = f'rgb({d[k, 0]},{d[k, 1]},{d[k, 2]})'
-        plotly_cmap.append([k / 255, color])
+        plotly_cmap.append([k / cmap.N, color])
 
     return plotly_cmap
 

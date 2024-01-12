@@ -60,7 +60,6 @@ def create_slices(volume: np.ndarray,
                   pos: Union[List, Dict] = None,
                   clim: List = None,
                   cmap: str = 'Petrel',
-                  alpha: float = 1,
                   show_cbar: bool = False,
                   cbar_params: Dict = None):
     """
@@ -79,8 +78,6 @@ def create_slices(volume: np.ndarray,
         [vmin, vmax] for plotting 
     cmap : str or Colormap
         colormap, it can be str or matplotlib's Colormap or vispy's Colormap
-    alpha : float
-        opacity
     show_bar : bool
         show colorbar
     cbar_params : Dict
@@ -147,7 +144,6 @@ def create_slices(volume: np.ndarray,
                            colorscale=cmap,
                            cmin=vmin,
                            cmax=vmax,
-                           opacity=alpha,
                            name=name,
                            colorbar=cbar_params,
                            showscale=showscale,
@@ -289,7 +285,7 @@ def create_surfaces(surfs,
     else:
         vmin, vmax = clim
 
-    cmap = colormap.cmap_to_plotly(cmap)
+    # cmap = colormap.cmap_to_plotly(cmap)
 
     traces = []
 
@@ -349,14 +345,14 @@ def create_well_logs(points, values=None):
     tube = go.Streamtube()
 
 
-def create_points(points, color='red', size=3):
+def create_points(points, color='red', size=3, sym='square'):
     points = np.array(points)
 
     trace = go.Scatter3d(x=points[:, 0],
                          y=points[:, 1],
                          z=points[:, 2],
                          mode='markers',
-                         marker=dict(symbol='square',
+                         marker=dict(symbol=sym,
                                      size=size,
                                      color=color,
                                      line=dict(width=1, color='black')),
@@ -385,15 +381,25 @@ def create_bodys(volume, level, margin: float = None, color='yellow'):
     j = faces[:, 1]
     k = faces[:, 2]
 
-    trace = go.Mesh3d(x=x,
-                      y=y,
-                      z=z,
-                      i=i,
-                      j=j,
-                      k=k,
-                      color=color,
-                      showscale=False,
-                      flatshading=True)
+    trace = go.Mesh3d(
+        x=x,
+        y=y,
+        z=z,
+        i=i,
+        j=j,
+        k=k,
+        color=color,
+        showscale=False,
+        flatshading=False,
+        # 光照效果
+        lighting=dict(ambient=0.1,
+                      diffuse=0.9,
+                      specular=0.5,
+                      roughness=0.3,
+                      fresnel=0.5),
+
+        # 光源位置
+        lightposition=dict(x=100, y=200, z=300))
 
     return [trace]
 
@@ -407,10 +413,12 @@ def plot3D(traces, **kwargs):
 
     fig = go.Figure(data=traces)
 
-    fig.update_layout(height=size[0],
-                      width=size[1],
-                      scene=scene,
-                      margin=dict(t=0, l=0, b=0))
+    fig.update_layout(
+        height=size[0],
+        width=size[1],
+        scene=scene,
+        #   margin=dict(l=10, r=10, t=10, b=10),
+    )
 
     savequality = kwargs.get('savequality', 1)
 
