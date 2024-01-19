@@ -1,6 +1,6 @@
 ### Hard to finish
 
-- [ ] get pos
+- [x] get pos
 - [ ] axised3d
 - [ ] change view2.width_max when resize
 - [ ] quiver
@@ -11,6 +11,7 @@
 - [x] inner marching cube
 - [x] optimize for loops (well_log, points)
 - [x] colormap, except range
+- [ ] bugs in multi-canvas overlay
 
 - [ ] jupyter
 - [ ] download volve dataset

@@ -107,18 +107,17 @@ def cmap_to_plotly(cmap):
         colormap used in plotly
     """
     if isinstance(cmap, str):
-        if cmap in list_custom_cmap():
-            cmap = get_custom_cmap(cmap)
-        else:
-            cmap = plt.get_cmap(cmap)
+        import plotly.express as px
+        if cmap in px.colors.named_colorscales():
+            return cmap
+        cmap = get_cmap_from_str(cmap)
 
-    d = cmap(np.arange(cmap.N))
-    d = (d * 255).astype(int)
+    d = cmap(np.linspace(0, 1, 256))
     plotly_cmap = []
 
-    for k in range(cmap.N):
-        color = f'rgb({d[k, 0]},{d[k, 1]},{d[k, 2]})'
-        plotly_cmap.append([k / cmap.N, color])
+    for k in range(256):
+        color = f'rgb({int(d[k, 0]*255)},{int(d[k, 1]*255)},{int(d[k, 2]*255)})'
+        plotly_cmap.append([k / 255, color])
 
     return plotly_cmap
 

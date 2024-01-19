@@ -27,7 +27,7 @@ def load_wellLog(p):
     x = [259, 619, 339, 141]
     y = [33, 545, 704, 84]
     z = np.arange(0, 0.2 * npoints, 0.2)
-    v = np.fromfile(p, '>f4').reshape(nlog, npoints)
+    v = np.fromfile(p, np.float32).reshape(nlog, npoints)
     v = 0.5 * np.log(v)
 
     nodes = []
@@ -44,20 +44,20 @@ def load_wellLog(p):
 
 if __name__ == '__main__':
 
-    root = '/Users/lijintao/Downloads/F3/f3d/data/'
+    root = '/Users/lijintao/Downloads/data/F3/'
     seisp = root + 'seis.dat'
     saltp = root + 'salt.dat'
     hz1p = root + 'hz1.dat'
-    hz2p = root + 'hz2.dat'
+    hz2p = root + 'hz.dat'
     unc1p = root + 'unc1.dat'
     unc2p = root + 'unc2.dat'
     ni, nx, nt = 591, 951, 362
     shape = (ni, nx, nt)
 
     # seismic
-    seis = np.memmap(seisp, '>f4', 'c', shape=shape)
+    seis = np.memmap(seisp, np.float32, 'c', shape=shape)
     # overlay
-    inter = np.memmap(root + 'intp.dat', '>f4', 'c', shape=shape)
+    inter = np.memmap(root + 'overlay.dat', np.float32, 'c', shape=shape)
 
     fg_cmap = colormap.set_alpha('jet', 0.6)
     fg_clim = [inter.max() * 0.15, inter.max() * 0.5]
@@ -70,17 +70,14 @@ if __name__ == '__main__':
                                   fg_clim=fg_clim,
                                   fg_interpolation='nearest')
 
-    salt = np.memmap(saltp, '>f4', 'c', shape=shape)
+    salt = np.memmap(saltp, np.float32, 'c', shape=shape)
     nodes += cigvis.create_bodys(salt, 0.0, 0.0, color='cyan')
 
-    # hz1 = np.fromfile(hz1p, '>f4').reshape(ni, nx)
-    hz2 = np.fromfile(hz2p, '>f4').reshape(ni, nx)
+    hz2 = np.fromfile(hz2p, np.float32).reshape(ni, nx)
     nodes += cigvis.create_surfaces([hz2], color='yellow')
 
-    unc = np.fromfile(root + 'unc.dat',
-                      '>f4').reshape(shape).astype(np.float32)
-    # unc1 = np.fromfile(unc1p, '>f4').reshape(ni, nx).astype(np.float32)
-    unc2 = np.fromfile(unc2p, '>f4').reshape(ni, nx).astype(np.float32)
+    unc = np.fromfile(root + 'unc.dat', np.float32).reshape(shape)
+    unc2 = np.fromfile(unc2p, np.float32).reshape(ni, nx)
     nodes += cigvis.create_surfaces([unc2], volume=unc, value_type='amp')
 
     nodes += load_wellLog(root + 'logs.dat')

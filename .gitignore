@@ -16,8 +16,6 @@ cpp
 test*
 data/*
 
-*.ipynb
-
 docs/_static/
 docs/api/
 docs/gallery/1D

@@ -22,6 +22,15 @@ def show(sx, points, values, null_value):
 
     v = values[:, 0]
 
+    v2 = v.copy()
+    v2[v2 < -900] = v[v!=-999.25].min()
+    logs1 = np.concatenate([points, v2[:, np.newaxis]], axis=1)
+    print(v2.min(), v2.max())
+    nodes0 = cigvis.create_slices(sx)
+    nodes0 += cigvis.create_Line_logs(
+        logs1[:, :4],
+        value_type='amp')
+
     nodes1 = cigvis.create_slices(sx)
     nodes1 += cigvis.create_well_logs(points,
                                       v,
@@ -60,11 +69,12 @@ def show(sx, points, values, null_value):
                                       radius_line=[2.2, 5],
                                       null_value=null_value)
 
-    cigvis.plot3D([nodes1, nodes2, nodes3],
-                  grid=(1, 3),
-                  zoom_factor=16,
-                  share=True,
-                  savename='example.png')
+    cigvis.plot3D(
+        [nodes0, nodes1, nodes2, nodes3],
+        grid=(2, 2),
+        #   zoom_factor=16,
+        share=True,
+        savename='example.png')
 
 
 if __name__ == '__main__':

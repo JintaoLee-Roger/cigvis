@@ -143,13 +143,16 @@ class AxisAlignedImage(scene.visuals.Image):
             raise ValueError('Invalid value for axis.')
         self._axis = value
 
-    def set_anchor(self, mouse_press_event):
-        """
-        Set an anchor point (2D coordinate on the image plane) when left click
-        in the selection mode (<Ctrl> pressed). After that, the dragging called
-        in func 'drag_visual_node' will try to move along the normal direction
-        and let the anchor follows user's mouse position as close as possible.
-        """
+    def get_click_pos3d(self, mouse_press_event):
+        pos = self._click_pos(mouse_press_event)
+        if self.axis == 'x':
+            return [self.pos, *pos]
+        if self.axis == 'y':
+            return [pos[0], self.pos, pos[1]]
+        if self.axis == 'z':
+            return [*pos, self.pos]
+
+    def _click_pos(self, mouse_press_event):
         # Get the screen-to-local transform to get camera coordinates.
         tr = self.canvas.scene.node_transform(self)
 
@@ -166,7 +169,16 @@ class AxisAlignedImage(scene.visuals.Image):
         # The following equation can be derived by Eq 1 and Eq 2.
         distance = (0. - click_pos[2]) / view_vector[2]
         # only need vec2
-        self.anchor = click_pos[:2] + distance * view_vector[:2]
+        return click_pos[:2] + distance * view_vector[:2]
+
+    def set_anchor(self, mouse_press_event):
+        """
+        Set an anchor point (2D coordinate on the image plane) when left click
+        in the selection mode (<Ctrl> pressed). After that, the dragging called
+        in func 'drag_visual_node' will try to move along the normal direction
+        and let the anchor follows user's mouse position as close as possible.
+        """
+        self.anchor = self._click_pos(mouse_press_event)
 
     def drag_visual_node(self, mouse_move_event):
         """

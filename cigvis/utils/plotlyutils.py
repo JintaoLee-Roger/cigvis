@@ -15,8 +15,10 @@ import cigvis
 from cigvis import colormap
 
 
-def make_xyz(idx: int, shape: Union[Tuple, List],
-             axis: str) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+def make_xyz(idx: int,
+             shape: Union[Tuple, List],
+             axis: str,
+             nshape=None) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     make xx, yy, zz (meshgrid) for plotly
 
@@ -42,19 +44,31 @@ def make_xyz(idx: int, shape: Union[Tuple, List],
         ni, nx, nt = shape
     else:
         nt, nx, ni = shape
+    if nshape is None:
+        if axis == 'x':
+            nshape = (nt, nx)
+        elif axis == 'y':
+            nshape = (nt, ni)
+        elif axis == 'z':
+            nshape = (nx, ni)
+
+    nn1, nn2 = nshape
 
     if axis == 'x' or axis == 'inline':
         assert idx >= 0 and idx < ni
-        yy, zz = np.meshgrid(np.arange(nx), np.arange(nt))
-        xx = idx * np.ones((nt, nx))
+        yy, zz = np.meshgrid(np.linspace(0, nx - 1, nn2),
+                             np.linspace(0, nt - 1, nn1))
+        xx = idx * np.ones((nn1, nn2))
     elif axis == 'y' or axis == 'crossline':
         assert idx >= 0 and idx < nx
-        xx, zz = np.meshgrid(np.arange(ni), np.arange(nt))
-        yy = idx * np.ones((nt, ni))
+        xx, zz = np.meshgrid(np.linspace(0, ni - 1, nn2),
+                             np.linspace(0, nt - 1, nn1))
+        yy = idx * np.ones((nn1, nn2))
     elif axis == 'z' or axis == 'time':
         assert idx >= 0 and idx < nt
-        xx, yy = np.meshgrid(np.arange(ni), np.arange(nx))
-        zz = idx * np.ones((nx, ni))
+        xx, yy = np.meshgrid(np.linspace(0, ni - 1, nn2),
+                             np.linspace(0, nx - 1, nn1))
+        zz = idx * np.ones((nn1, nn2))
     else:
         raise ValueError(f"Invalid value of axis: {axis}")
 
@@ -160,7 +174,6 @@ def make_triang(xx, yy, zz):
     return x, y, z, i, j, k
 
 
-
 def verifyshape(sshape: tuple, shape: tuple, axis: str) -> None:
     """
     verify the slice shape is invalid
@@ -260,7 +273,7 @@ def make_3Dscene(**kwargs):
     if 'showtitle' in kwargs and not kwargs.get('showtitle'):
         title = ['', '', '']
     else:
-        title = ['Inline', 'Crossline', 'Time']
+        title = kwargs.get('title', ['Inline', 'Crossline', 'Time'])
     scene['xaxis']['title'] = title[0]
     scene['yaxis']['title'] = title[1]
     scene['zaxis']['title'] = title[2]

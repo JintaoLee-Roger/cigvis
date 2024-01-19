@@ -194,8 +194,12 @@ class VisCanvas(scene.SceneCanvas):
     def on_mouse_press(self, event):
         # Hold <Alt> and click left to print position
         if keys.ALT in event.modifiers:
-            # TODO
-            pass
+            ## 屏幕/画布坐标系 Canvas Coordinates
+            # print(event.pos)
+
+            hover_on = self.visual_at(event.pos)
+            if hasattr(hover_on, 'get_click_pos3d'):
+                print(hover_on.get_click_pos3d(event))
 
         # Hold <Ctrl> to enter drag mode or press <d> to toggle.
         if keys.CONTROL in event.modifiers or self.drag_mode:

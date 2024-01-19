@@ -49,6 +49,7 @@ import copy
 import numpy as np
 import plotly.graph_objects as go
 from skimage.measure import marching_cubes
+from skimage import transform
 
 import cigvis
 from cigvis import colormap
@@ -60,6 +61,7 @@ def create_slices(volume: np.ndarray,
                   pos: Union[List, Dict] = None,
                   clim: List = None,
                   cmap: str = 'Petrel',
+                  scale: float = 1,
                   show_cbar: bool = False,
                   cbar_params: Dict = None):
     """
@@ -131,10 +133,15 @@ def create_slices(volume: np.ndarray,
             idx += 1
 
             s = slices[dim][j]
-            plotlyutils.verifyshape(s.shape, shape, dim)
+            if scale != 1:
+                s = transform.resize(
+                    s, (s.shape[0] // scale, s.shape[1] // scale),
+                    3,
+                    anti_aliasing=True)
+            # plotlyutils.verifyshape(s.shape, shape, dim)
             num = pos[dim][j]
             name = f'{dim}/{dimname[dim]}'
-            xx, yy, zz = plotlyutils.make_xyz(num, shape, dim)
+            xx, yy, zz = plotlyutils.make_xyz(num, shape, dim, s.shape)
 
             traces.append(
                 go.Surface(x=xx,
@@ -338,11 +345,11 @@ def create_Line_logs(logs, cmap='jet', line_width=8):
     return traces
 
 
-def create_well_logs(points, values=None):
+def create_well_logs(**kwargs):
     """
     use Mesh3D to create tube logs
     """
-    tube = go.Streamtube()
+    raise NotImplementedError("`create_well_logs` currently not supported in the jupyter, please run it with a .py file") # noqa: E501
 
 
 def create_points(points, color='red', size=3, sym='square'):
@@ -417,7 +424,7 @@ def plot3D(traces, **kwargs):
         height=size[0],
         width=size[1],
         scene=scene,
-        #   margin=dict(l=10, r=10, t=10, b=10),
+        margin=dict(l=5, r=5, t=5, b=5),
     )
 
     savequality = kwargs.get('savequality', 1)
