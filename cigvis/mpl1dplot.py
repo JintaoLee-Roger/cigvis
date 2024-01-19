@@ -112,6 +112,7 @@ def plot_multi_traces(data,
                       save: str = None,
                       show: bool = True,
                       dpi=600,
+                      lw=1,
                       ax=None):
     """
     data.shape = (h, n_traces)
@@ -137,7 +138,7 @@ def plot_multi_traces(data,
         l = (data[:, i] - data.min()) / r + prev_max
         prev_max = l.max() if data[:, i].sum() != 0 else prev_max + 1
         tick_pos.append(l.mean())
-        ax.plot(l, y, c=c)
+        ax.plot(l, y, c=c, lw=lw)
         _fill_traces(ax, l, y, fill_down, fill_up, color=fill_color)
 
     tick_label = np.arange(0, n)

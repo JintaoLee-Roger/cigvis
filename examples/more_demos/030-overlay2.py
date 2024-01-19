@@ -90,7 +90,7 @@ def show(bg, fg, fx):
 
     cigvis.plot3D([nodes1, nodes2, nodes3, nodes4],
                   grid=(2, 2),
-                  size=(1300, 1000),
+                  size=(1000,700),
                   cbar_region_ratio=0.18,
                   share=True,
                   savename='example.png')

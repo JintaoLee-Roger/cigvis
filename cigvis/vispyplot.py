@@ -768,7 +768,7 @@ def plot3D(nodes: List,
            savedir: str = './',
            save_cbar: bool = False,
            cbar_name: str = 'cbar.png',
-           size: Tuple = (1000, 800),
+           size: Tuple = (800, 600),
            **kwargs):
     """
     plot nodes in a 3D canvas
