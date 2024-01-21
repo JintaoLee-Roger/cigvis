@@ -288,8 +288,11 @@ class Controls(qtw.QWidget):
                 ny = int(self.ny_input.text())
                 nz = int(self.nz_input.text())
 
-                data = np.fromfile(file_path,
-                                   dtype=np.float32).reshape(nx, ny, nz)
+                if file_path.endswith('.vds'):
+                    data = cigvis.io.VDSReader(file_path)
+                else:
+                    data = np.fromfile(file_path,
+                                       dtype=np.float32).reshape(nx, ny, nz)
 
                 if not self.vmin_input.text():
                     self.vmin_input.setText(f'{data.min():.2f}')
@@ -562,6 +565,12 @@ def get_dim_from_filename(fname: str, return_int: bool = True):
     support template:
     - fname_h{z}x{y}x{x}.siff, i.e.,  fname_h128x500x200.dat
     """
+    if fname.endswith(".vds"):
+        vds = cigvis.io.VDSReader(fname)
+        shape = vds.shape
+        vds.close()
+        return str(shape[0]), str(shape[1]), str(shape[2])
+    
     f = fname.split('/')[-1]
     pattern = r'^[A-Za-z0-9_]+_h(\d+)x(\d+)x(\d+)+\.\w+$'
     m = re.match(pattern, f)

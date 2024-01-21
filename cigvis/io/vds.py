@@ -38,6 +38,7 @@ class VDSReader:
         self._shape = (self.layout.getDimensionNumSamples(2),
                        self.layout.getDimensionNumSamples(1),
                        self.layout.getDimensionNumSamples(0))
+        self._close = openvds.close
 
     def read(self, ib, ie, xb, xe, tb, te) -> np.ndarray:
         """
@@ -121,6 +122,9 @@ class VDSReader:
 
     def min(self) -> float:
         return self.ch_des.getValueRangeMin()
+    
+    def close(self) -> None:
+        self._close(self.vds)
 
 
 def create_vds_from_array(d: np.ndarray,
