@@ -301,6 +301,8 @@ def create_surfaces(surfs: List[np.ndarray],
                     shape: Union[Tuple, List] = None,
                     interp: bool = False,
                     return_cbar: bool = False,
+                    step1=1,
+                    step2=1,
                     **kwargs) -> List:
     """
     create a surfaces node
@@ -396,11 +398,14 @@ def create_surfaces(surfs: List[np.ndarray],
     for s, v, c in zip(surfaces, values, colors):
         mask = np.logical_or(s < 0, np.isnan(s))
         vertices, faces = surfaceutils.get_vertices_and_faces(
-            s, mask, anti_rot=anti_rot)
+            s, mask, anti_rot=anti_rot, step1=step1, step2=step2)
+        mask = mask[::step1, ::step2]
         if v is not None:
+            v = v[::step1, ::step2]
             v = v[~mask].flatten()
         if c is not None:
             channel = c.shape[-1]
+            c = c[::step1, ::step2, ...]
             c = c[~mask].flatten().reshape(-1, channel)
 
         mesh_kwargs = vispyutils.get_valid_kwargs('mesh', **kwargs)

@@ -53,6 +53,8 @@ if __name__ == '__main__':
     unc2p = root + 'unc2.dat'
     ni, nx, nt = 591, 951, 362
     shape = (ni, nx, nt)
+    step1 = 2
+    step2 = 4
 
     # seismic
     seis = np.memmap(seisp, np.float32, 'c', shape=shape)
@@ -74,15 +76,22 @@ if __name__ == '__main__':
     nodes += cigvis.create_bodys(salt, 0.0, 0.0, color='cyan')
 
     hz2 = np.fromfile(hz2p, np.float32).reshape(ni, nx)
-    nodes += cigvis.create_surfaces([hz2], color='yellow')
+    nodes += cigvis.create_surfaces([hz2],
+                                    color='yellow',
+                                    step1=step1,
+                                    step2=step2)
 
     unc = np.fromfile(root + 'unc.dat', np.float32).reshape(shape)
     unc2 = np.fromfile(unc2p, np.float32).reshape(ni, nx)
-    nodes += cigvis.create_surfaces([unc2], volume=unc, value_type='amp')
+    nodes += cigvis.create_surfaces([unc2],
+                                    volume=unc,
+                                    value_type='amp',
+                                    step1=step1,
+                                    step2=step2)
 
     nodes += load_wellLog(root + 'logs.dat')
 
-    nodes += cigvis.create_fault_skin(root + 'skins/')
+    # nodes += cigvis.create_fault_skin(root + 'skins/')
 
     cigvis.plot3D(nodes,
                   azimuth=-65.0,

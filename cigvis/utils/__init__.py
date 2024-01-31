@@ -4,6 +4,7 @@
 # All rights reserved.
 
 from .utils import *
+from .coord import *
 from . import surfaceutils
 from . import vispyutils
 from . import plotlyutils
