@@ -15,3 +15,4 @@ Including:
 from .las import load_las
 from .vds import VDSReader, create_vds_from_array
 from .fault_skin import load_skins, load_one_skin
+from . import horiz

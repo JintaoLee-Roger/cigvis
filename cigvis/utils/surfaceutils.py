@@ -18,63 +18,31 @@ from cigvis import is_line_first
 def get_vertices_and_faces(surf: np.ndarray,
                            mask: np.ndarray = None,
                            mask_type: str = 'e',
-                           anti_rot: bool = True) -> Tuple:
-    """
-    Get vertices and faces, which will be used in Mesh
-
-    Parameters
-    ----------
-    surf : array-like
-        the input surface, shape as (ni, nx)
-    mask : bool, array-like
-        mask is a bool array, whose shape is same as `surf`,
-        mask is used to remove some points in the x-y meshgrid.
-    mask_type : str
-        Choice of {'e', 'i'}, 
-        'e' means the `surf[i, j]` will be remove if `mask[i, j]` is True,
-        'i' means the `surf[i, j]` will be kept if `mask[i, j]` is True.
-    anti_rot : bool
-        If True, is anticlock rotation.
-        a         a, b, c is index of vertices
-        .  .      ==> If anticlock, face is [a, b, c]
-        .   .     ==> If not anticlock, face is [a, c, b]
-        b ... c
-
-
-    Returns
-    -------
-    vertices : array-like
-        shape as (n1*n2, 3), each row is (x, y, z) position
-    faces : array-like
-        shape as ((n1-1)*(n2-1)*2, 3), each row contains 3 points to
-        consist a face. Like:
-        a ... b    a           a ... b
-        .     . => .  .     &    .   .
-        .     . => .   .    &      . .
-        c ... d    c ... d           c
-        vertices (4 points) = [[0, 0, a], [0, 1, b], [1, 0, c], [1, 1, d]]
-        faces (2 faces) = [[0, 2, 3], [0, 1, 3]] (clockwise), 
-        or [[0, 3, 2], [0, 3, 2]] (anticlock)
-        In faces, x means x-th vertices
-    """
+                           anti_rot: bool = True,
+                           step1=2,
+                           step2=2) -> Tuple:
     n1, n2 = surf.shape
+    surf = surf[::step1, ::step2]
+    mask = mask[::step1, ::step2] if mask is not None else None
+    n1g, n2g = surf.shape
+
     if mask is not None and mask_type == 'e':
         mask = ~mask
 
     # set grid
     if mask is None:
-        grid = np.arange(n1 * n2).reshape(n1, n2)
+        grid = np.arange(n1g * n2g).reshape(n1g, n2g)
     else:
-        grid = np.zeros_like(surf) - 1
+        grid = -np.ones_like(mask, dtype=int)
         grid[mask] = np.arange(mask.sum())
 
     # get vertices
-    y, x = np.meshgrid(np.arange(n2), np.arange(n1))
+    y, x = np.meshgrid(np.arange(0, n2, step2), np.arange(0, n1, step1))
     vertices = np.stack((x, y, surf), axis=-1).reshape(-1, 3)
     if mask is not None:
         vertices = vertices[mask.flatten()]
 
-    faces = np.zeros((n1 - 1, n2 - 1, 2, 3))
+    faces = np.zeros((n1g - 1, n2g - 1, 2, 3))
     faces[:, :, 0, 0] = grid[:-1, :-1]
     faces[:, :, 0, 1] = grid[1:, :-1]
     faces[:, :, 0, 2] = grid[1:, 1:]
@@ -308,11 +276,3 @@ def interp_surf(volume: np.ndarray,
 
     return out
 
-
-def interp_scipy(volume, surf, order=1):
-    ni, nx, nt = volume.shape
-    x, y = np.meshgrid(np.arange(ni), np.arange(nx), indexing='ij')
-    coordinates = np.vstack((x.ravel(), y.ravel(), surf.ravel()))
-    out = map_coordinates(volume, coordinates, order=1, mode='reflect')
-    out = out.reshape(ni, nx)
-    return out
