@@ -20,7 +20,7 @@ import numpy as np
 import cigvis
 import matplotlib.pyplot as plt
 
-root = '/Users/lijintao/work/mygit/pyseisview/data/'
+root = '../../data/'
 sxp = root + 'seis_h360x600x400.dat'
 ni, nx, nt = 400, 600, 360
 

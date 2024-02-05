@@ -82,7 +82,7 @@ def show_discrete_cbar(d):
 
 
 if __name__ == '__main__':
-    root = '/Users/lijintao/work/mygit/pyseisview/data/'
+    root = '../../data/'
     lxp = root + 'label_h360x600x400.dat'
     ni, nx, nt = 400, 600, 360
 

@@ -17,7 +17,7 @@
 import numpy as np
 import cigvis
 
-root = '/Users/lijintao/work/mygit/pyseisview/data/'
+root = '../../data/'
 sxp = root + 'seis_h360x600x400.dat'
 lxp = root + 'label_h360x600x400.dat'
 ni, nx, nt = 400, 600, 360

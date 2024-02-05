@@ -25,7 +25,6 @@ def show(sx, points, values, null_value):
     v2 = v.copy()
     v2[v2 < -900] = v[v!=-999.25].min()
     logs1 = np.concatenate([points, v2[:, np.newaxis]], axis=1)
-    print(v2.min(), v2.max())
     nodes0 = cigvis.create_slices(sx)
     nodes0 += cigvis.create_Line_logs(
         logs1[:, :4],

@@ -138,7 +138,7 @@ def show(bg, fg):
 
 
 if __name__ == '__main__':
-    root = '/Users/lijintao/work/mygit/pyseisview/data/'
+    root = '../../data/'
     sxp = root + 'seis_h360x600x400.dat'
     lxp = root + 'label_h360x600x400.dat'
     ni, nx, nt = 400, 600, 360

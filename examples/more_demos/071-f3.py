@@ -91,7 +91,7 @@ if __name__ == '__main__':
 
     nodes += load_wellLog(root + 'logs.dat')
 
-    # nodes += cigvis.create_fault_skin(root + 'skins/')
+    nodes += cigvis.create_fault_skin(root + 'skins/')
 
     cigvis.plot3D(nodes,
                   azimuth=-65.0,
