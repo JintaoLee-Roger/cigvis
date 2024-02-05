@@ -66,7 +66,11 @@ cigvis.plot3D(nodes)
 
 ![ex1](https://raw.githubusercontent.com/JintaoLee-Roger/images/main/cigvis/ex.gif)
 
-按`<a>`键打印摄像机的参数，并按`<s>`键保存屏幕截图。
+按`<s>`键保存屏幕截图; 按`<a>`键打印摄像机的参数; 按下`<alt>` (`<option> in macos`) 并
+且鼠标左击一个位置，可以展示三维坐标。
+
+![ex2](https://raw.githubusercontent.com/JintaoLee-Roger/images/main/cigvis/ex2.gif)
+
 
 ### 各种地球物理数据
 

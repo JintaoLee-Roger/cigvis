@@ -15,3 +15,5 @@ rm -rf api/
 rm -rf _build
 
 rm -rf _static/*
+
+rm sg_execution_times.rst

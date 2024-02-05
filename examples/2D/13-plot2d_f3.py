@@ -1,3 +1,8 @@
+# Copyright (c) 2024 Jintao Li.
+# Computational and Interpretation Group (CIG),
+# University of Science and Technology of China (USTC).
+# All rights reserved.
+
 """
 2D & 1D
 ======================
@@ -7,6 +12,9 @@
     :align: center
 
 """
+
+# sphinx_gallery_thumbnail_path = '_static/cigvis/2D/13.png'
+
 
 import numpy as np
 import cigvis
@@ -94,6 +102,6 @@ cigvis.plot_multi_traces(
 )
 
 plt.tight_layout()
-plt.savefig('2Dcanvas.png', bbox_inches='tight', pad_inches=0.01, dpi=300)
+plt.savefig('2Dcanvas.png', bbox_inches='tight', pad_inches=0.01, dpi=100)
 
 plt.show()

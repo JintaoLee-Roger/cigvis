@@ -769,6 +769,7 @@ def plot3D(nodes: List,
            save_cbar: bool = False,
            cbar_name: str = 'cbar.png',
            size: Tuple = (800, 600),
+           run_app: bool = True,
            **kwargs):
     """
     plot nodes in a 3D canvas
@@ -851,4 +852,9 @@ def plot3D(nodes: List,
         screen_shot = _screenshot()
         vispy.io.write_png(savedir + savename, screen_shot)
 
+    if run_app:
+        vispy.app.run()
+
+
+def run():
     vispy.app.run()

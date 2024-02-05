@@ -9,14 +9,8 @@ utils to process surface, such as create triangular mesh
 from typing import List, Union, Tuple
 import numpy as np
 from scipy.interpolate import griddata
-from scipy.interpolate import interp1d
+from scipy.ndimage import map_coordinates
 from cigvis import is_line_first
-
-try:
-    import numba
-    USE_NUMBA = True
-except ImportError:
-    USE_NUMBA = False
 
 ##### Triangular meshing #######
 
@@ -225,32 +219,11 @@ def preproc_surf_pos(surf,
     return out_surf, value, color
 
 
-##### cdpxy to iline/xline
-
-
-def xy_to_ix(f,
-             cdpx_beg,
-             cdpy_beg,
-             i_interval,
-             x_interval,
-             time_beg,
-             dt,
-             istep=1,
-             xstep=1):
-    if not isinstance(f, np.ndarray):
-        f = np.loadtxt(f, np.float32)
-    out = np.zeros_like(f)
-    out[:, 2] = (f[:, 2] - time_beg) / dt
-    out[:, 1] = (f[:, 0] - cdpx_beg) / i_interval * istep
-    out[:, 0] = (f[:, 1] - cdpy_beg) / x_interval * xstep
-
-    return out
-
-
 ##### interpolation #####
 
 
-def interp_linefirst_impl(volume: np.ndarray, surf: np.ndarray) -> np.ndarray:
+def interp_linefirst_impl(volume: np.ndarray, surf: np.ndarray,
+                          order: int) -> np.ndarray:
     """
     interp value of linefirst volume in surf positions
 
@@ -267,17 +240,15 @@ def interp_linefirst_impl(volume: np.ndarray, surf: np.ndarray) -> np.ndarray:
         2D array, shape as (ni, nx), each point means value in z pos
     """
     ni, nx, nt = volume.shape
-    out = np.zeros_like(surf)
-    for i in range(ni):
-        for j in range(nx):
-            x = np.arange(nt)
-            out[i, j] = np.interp(surf[i, j], x, volume[i, j, :])
-
-    return out
+    x, y = np.meshgrid(np.arange(ni), np.arange(nx), indexing='ij')
+    coordinates = np.vstack((x.ravel(), y.ravel(), surf.ravel()))
+    out = map_coordinates(volume, coordinates, order=order, mode='reflect')
+    return out.reshape(ni, nx)
 
 
 # @numba.jit(nopython=True)
-def interp_timefirst_impl(volume: np.ndarray, surf: np.ndarray) -> np.ndarray:
+def interp_timefirst_impl(volume: np.ndarray, surf: np.ndarray,
+                          order: int) -> np.ndarray:
     """
     interp value of timefirst volume in surf positions
 
@@ -294,25 +265,15 @@ def interp_timefirst_impl(volume: np.ndarray, surf: np.ndarray) -> np.ndarray:
         2D array, shape as (nx, ni), each point means value in z/nt pos
     """
     nt, nx, ni = volume.shape
-    out = np.zeros_like(surf)
-    for j in range(nx):
-        for i in range(ni):
-            x = np.arange(nt)
-            out[j, i] = np.interp(surf[j, i], x, volume[:, j, i])
-
-    return out
+    y, x = np.meshgrid(np.arange(nx), np.arange(ni), indexing='ij')
+    coordinates = np.vstack((surf.ravel(), y.ravel(), x.ravel()))
+    out = map_coordinates(volume, coordinates, order=order, mode='reflect')
+    return out.reshape(nx, ni)
 
 
-# add numba to accelerate
-if USE_NUMBA:
-    interp_linefirst = numba.jit(nopython=True)(interp_linefirst_impl)
-    interp_timefirst = numba.jit(nopython=True)(interp_timefirst_impl)
-else:
-    interp_linefirst = interp_linefirst_impl
-    interp_timefirst = interp_timefirst_impl
-
-
-def interp_surf(volume: np.ndarray, surf: np.ndarray) -> np.ndarray:
+def interp_surf(volume: np.ndarray,
+                surf: np.ndarray,
+                order: int = 1) -> np.ndarray:
     """
     interp value of volume in surf positions
 
@@ -322,6 +283,8 @@ def interp_surf(volume: np.ndarray, surf: np.ndarray) -> np.ndarray:
         3D array
     surf : array-like
         2D array, each point means z/nt pos
+    order : int
+        interpolate method, 0 for nearest, 1 for linear
     
 
     Returns
@@ -339,50 +302,17 @@ def interp_surf(volume: np.ndarray, surf: np.ndarray) -> np.ndarray:
 
     out = np.zeros_like(surf)
     if line_first:
-        out = interp_linefirst(volume, surf)
+        out = interp_linefirst_impl(volume, surf, order=order)
     else:
-        out = interp_timefirst(volume, surf)
+        out = interp_timefirst_impl(volume, surf, order=order)
 
     return out
 
 
-def interp_surf_scipy(volume: np.ndarray,
-                      surf: np.ndarray,
-                      method: str = 'linear') -> np.ndarray:
-    """
-    interp value of volume in surf positions use scipy's interp1d
-
-    Parameters
-    ----------
-    volume : array-like
-        3D array
-    surf : array-like
-        2D array, each point means z/nt pos
-    method : str
-        method of scipy's interp1d
-    
-    Returns
-    -------
-    value : array-like
-        2D array, each point means value in z/nt pos
-    """
-    line_first = is_line_first()
-    if line_first:
-        ni, nx, nt = volume.shape
-        assert surf.shape == (ni, nx)
-    else:
-        nt, nx, ni = volume.shape
-        assert surf.shape == (nx, ni)
-
-    out = np.zeros_like(surf)
-    for i in range(ni):
-        for j in range(nx):
-            x = np.arange(nt)
-            if line_first:
-                intfunc = interp1d(x, volume[i, j, :], kind=method)
-                out[i, j] = intfunc(surf[i, j])
-            else:
-                intfunc = interp1d(x, volume[:, j, i], kind=method)
-                out[j, i] = intfunc(surf[j, i])
-
+def interp_scipy(volume, surf, order=1):
+    ni, nx, nt = volume.shape
+    x, y = np.meshgrid(np.arange(ni), np.arange(nx), indexing='ij')
+    coordinates = np.vstack((x.ravel(), y.ravel(), surf.ravel()))
+    out = map_coordinates(volume, coordinates, order=1, mode='reflect')
+    out = out.reshape(ni, nx)
     return out
