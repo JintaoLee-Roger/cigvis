@@ -68,8 +68,14 @@ Press `<f>` to increase `fov` value, press `<F>` or `<Shift> + <f>` to decrease 
 
 ![ex1](https://raw.githubusercontent.com/JintaoLee-Roger/images/main/cigvis/ex.gif)
 
-Press `<a>` to print the camera's parameters, and press `<s>` to 
-save a screen shot.
+Press `<s>` to save a screen shot.
+
+Press `<a>` to print the camera's parameters in real-time; hold on 
+the `<alt>` (or `<option>` in macos) and left click the mouse to 
+show the coordinate of the click point in the 3D volume.
+
+![ex2](https://raw.githubusercontent.com/JintaoLee-Roger/images/main/cigvis/ex2.gif)
+
 
 ### Various Geophysical data
 

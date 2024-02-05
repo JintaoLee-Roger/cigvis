@@ -39,3 +39,8 @@ More Demos
 
 See the :doc:`more demos Gallery <more_demos/index>` for examples.
 
+
+3D visualization in Jupyter
+----------------------------
+
+See the `cigvis/examples/3Djupyter <https://github.com/JintaoLee-Roger/cigvis/tree/main/examples/3Djupyter>`_ for examples.

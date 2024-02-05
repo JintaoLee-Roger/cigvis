@@ -100,7 +100,15 @@ Press ``<f>`` to increase ``fov`` value, press ``<F>`` or ``<Shift> + <f>`` to d
    :alt: ex1
    :align: center
 
-Press ``<a>`` to print the camera's parameters, and press ``<s>`` to save a screen shot.
+Press ``<s>`` to save a screen shot.
+
+Press ``<a>`` to print the camera's parameters in real-time; hold on 
+the ``<alt>`` (or ``<option>`` in macos) and left click the mouse to 
+show the coordinate of the click point in the 3D volume.
+
+.. image:: https://raw.githubusercontent.com/JintaoLee-Roger/images/main/cigvis/ex2.gif
+   :alt: ex2
+   :align: center
 
 Various Geophysical data
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^

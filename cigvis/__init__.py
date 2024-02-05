@@ -38,10 +38,10 @@ from . import gui
 
 injupyter = 'ipykernel_launcher.py' in sys.argv[0] or 'lab' in sys.argv[0]
 
-if injupyter:
-    from .plotlyplot import *
-else:
+if not injupyter:
     from .vispyplot import *
+else:
+    from .plotlyplot import *
 
 from .mpl2dplot import *
 from .mpl1dplot import *
