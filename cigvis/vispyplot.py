@@ -22,12 +22,18 @@ In plotly, for a seismic volume,
 
 """
 
-from typing import List, Tuple, Dict, Union
+from typing import Callable, List, Tuple, Dict, Union
 import warnings
 import os
 import numpy as np
-from cigvis.vispynodes import (VisCanvas, volume_slices, Colorbar, WellLog,
-                               XYZAxis)
+from cigvis.vispynodes import (
+    VisCanvas,
+    volume_slices,
+    AxisAlignedImage,
+    Colorbar,
+    WellLog,
+    XYZAxis,
+)
 
 from vispy.scene.visuals import Mesh, Line
 import vispy
@@ -39,6 +45,21 @@ from cigvis import colormap
 from cigvis.utils import surfaceutils
 from cigvis.utils import vispyutils
 import cigvis.utils as utils
+
+__all__ = [
+    "create_slices",
+    "add_mask",
+    "create_overlay",
+    "create_colorbar",
+    "create_surfaces",
+    "create_bodys",
+    "create_Line_logs",
+    "create_well_logs",
+    "create_points",
+    "create_fault_skin",
+    "plot3D",
+    "run",
+]
 
 
 def create_slices(volume: np.ndarray,
@@ -119,6 +140,84 @@ def create_slices(volume: np.ndarray,
     return nodes
 
 
+def add_mask(nodes: List,
+             volumes: Union[List[np.ndarray], np.ndarray],
+             clims: Union[List, Tuple] = None,
+             cmaps: Union[str, List] = None,
+             interpolation: str = 'linear',
+             method: str = 'auto',
+             preproc_funcs: Callable = None) -> List:
+    """
+    Add Mask/Overlay volumes
+    
+    Parameters
+    -----------
+    nodes: List[Node]
+        A List that contains `AxisAlignedImage` (may be created by `create_slices`)
+    volumes : array-like or List
+        3D array(s), foreground volume(s)/mask(s)
+    clims : List
+        [vmin, vmax] for foreground slices plotting
+    cmaps : str or Colormap
+        colormap for foreground slices, it can be str or matplotlib's Colormap or vispy's Colormap
+    interpolation : str
+        interpolation method. If the values of the slices is discrete, we recommand 
+        set as 'nearest'
+
+    Returns
+    -------
+    slices_nodes : List
+        list of slice nodes
+    """
+
+    if not isinstance(volumes, List):
+        volumes = [volumes]
+
+    for volume in volumes:
+        # TODO: check shape as same as base image
+        utils.check_mmap(volume)
+
+    if clims is None:
+        clims = [[v.min(), v.max()] for v in volumes]
+    if not isinstance(clims[0], (List, Tuple)):
+        clims = [clims]
+
+    if cmaps is None:
+        raise ValueError("'cmaps' cannot be 'None'")
+    if not isinstance(cmaps, List):
+        cmaps = [cmaps] * len(volumes)
+    for i in range(len(cmaps)):
+        cmaps[i] = colormap.cmap_to_vispy(cmaps[i])
+
+    if isinstance(interpolation, str):
+        interpolation = [interpolation] * len(volumes)
+    if not isinstance(preproc_funcs, List):
+        preproc_funcs = [preproc_funcs] * len(volumes)
+
+    shape = volumes[0].shape
+    line_first = cigvis.is_line_first()
+    if not line_first:
+        shape = shape[::-1]
+
+    for node in nodes:
+        if not isinstance(node, AxisAlignedImage):
+            continue
+        for i in range(len(volumes)):
+            node.add_mask(
+                volumes[i],
+                cmaps[i],
+                clims[i],
+                interpolation[i],
+                method,
+                preproc_funcs[i],
+            )
+
+    return nodes
+
+
+@utils.deprecated(
+    "This function will be removed in the feature version.\nExample:\nnodes=cigvis.create_overlay(bg, [fg1, fg2], fg_cmap=['jet', 'gray']\n==> change to ==>\nnodes=cigvis.create_slices(bg)\nnodes=cigvis.add_mask(nodes, [fg1, fg2], cmaps=['jet', 'gray'])\n",
+    "`cigvis.add_mask`")
 def create_overlay(bg_volume: np.ndarray,
                    fg_volume: np.ndarray,
                    pos: Union[List, Dict] = None,
