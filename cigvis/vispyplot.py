@@ -251,7 +251,7 @@ def create_overlay(bg_volume: np.ndarray,
 def create_colorbar(cmap,
                     clim: List,
                     discrete: bool = False,
-                    disc_ticks: List or Dict = None,
+                    disc_ticks: Union[List, Dict] = None,
                     label_str: str = '',
                     **kwargs) -> Colorbar:
     """
@@ -492,7 +492,7 @@ def create_bodys(volume: np.ndarray,
     return [body]
 
 
-def create_Line_logs(logs: List or np.ndarray,
+def create_Line_logs(logs: Union[List, np.ndarray],
                      value_type: str = 'depth',
                      cmap: str = 'jet',
                      clim: List = None,

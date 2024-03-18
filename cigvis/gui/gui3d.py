@@ -164,8 +164,8 @@ class Controls(qtw.QWidget):
         colormap_label = qtw.QLabel('Colormap:')
         self.colormap_combo = EditableComboBox()
         colormaps = [
-            'gray', 'seismic', 'Petrel', 'od_seismic1', 'od_seismic2',
-            'od_seismic3'
+            'gray', 'seismic', 'Petrel', 'stratum', 'od_seismic1', 
+            'od_seismic2', 'od_seismic3'
         ]
         self.colormap_combo.addItems(colormaps)
         self.colormap_combo.setCurrentText('gray')  # 默认值为'gray'

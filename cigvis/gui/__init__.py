@@ -8,3 +8,4 @@ Some GUI for simply plotting
 """
 
 from .gui3d import gui3d
+from .gui2d import gui2d

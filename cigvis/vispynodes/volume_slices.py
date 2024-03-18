@@ -9,7 +9,7 @@
 # Distributed under the MIT License. See LICENSE for more info.
 # -----------------------------------------------------------------------------
 
-from typing import List, Callable, Tuple
+from typing import List, Callable, Tuple, Union
 import numpy as np
 from vispy.color import Colormap
 from cigvis import is_line_first
@@ -17,13 +17,13 @@ from cigvis import is_line_first
 from .axis_aligned_image import AxisAlignedImage
 
 
-def volume_slices(volumes: np.ndarray or List,
-                  x_pos: List or int = None,
-                  y_pos: List or int = None,
-                  z_pos: List or int = None,
+def volume_slices(volumes: Union[np.ndarray, List],
+                  x_pos: Union[List, int] = None,
+                  y_pos: Union[List, int] = None,
+                  z_pos: Union[List, int] = None,
                   preproc_funcs: Callable = None,
-                  cmaps: str or Colormap or List = 'grays',
-                  clims: List or Tuple = None,
+                  cmaps: Union[str, Colormap, List] = 'grays',
+                  clims: Union[List, Tuple] = None,
                   interpolation: str = 'linear',
                   method: str = 'auto') -> List[AxisAlignedImage]:
     """ 

@@ -325,3 +325,21 @@ class AxisAlignedImage(scene.visuals.Image):
             if axis_3d == 0: return (self.pos, self.pos)
             elif axis_3d == 1: return (0, self.size[0])
             elif axis_3d == 2: return (0, self.size[1])
+
+    def _set_clipper(self, node, clipper):
+        """
+        To clipper its children
+
+        Assign a clipper that is inherited from a parent node.
+
+        If *clipper* is None, then remove any clippers for *node*.
+        """
+        super()._set_clipper(node, clipper)
+
+        for im in self.children:
+            if isinstance(im, scene.visuals.Image):
+                if node in im._clippers:
+                    im.detach(self._clippers.pop(node))
+                if clipper is not None:
+                    im.attach(clipper)
+                    im._clippers[node] = clipper

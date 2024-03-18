@@ -103,9 +103,9 @@ def get_image_func(volume, axis, idx, prefunc=None):
 
 
 def make_slices(data: np.ndarray,
-                x: List or int = [],
-                y: List or int = [],
-                z: List or int = [],
+                x: Union[List, int] = [],
+                y: Union[List, int] = [],
+                z: Union[List, int] = [],
                 pos: Dict = None) -> Tuple[Dict, Dict]:
     """
     make slices and locations for plotly
