@@ -38,6 +38,7 @@ class LoadBtn(qtw.QPushButton):
     ny = QtCore.pyqtSignal(str)
     vmin = QtCore.pyqtSignal(str)
     vmax = QtCore.pyqtSignal(str)
+    maskItem = QtCore.pyqtSignal(qtw.QListWidgetItem)
 
     def __init__(self, gstates: GlobalState, parent=None):
         super(LoadBtn, self).__init__("Load File", parent)
@@ -109,8 +110,12 @@ class LoadBtn(qtw.QPushButton):
             self.vmin.emit(f'{data.min():.2f}')
             self.vmax.emit(f'{data.max():.2f}')
         else:
-            # TODO:
-            raise NotImplementedError("")
+            item = qtw.QListWidgetItem(Path(filePath).name)
+            paramsWidget = MaskImageParams()
+            paramsWidget.vmin_input.setTextAndEmit(f'{data.min():.2f}')
+            paramsWidget.vmax_input.setTextAndEmit(f'{data.max():.2f}')
+            item.paramsWidget = paramsWidget
+            self.maskItem.emit(item)
 
         self.data.emit(data)  # 发送数据加载完成的信号
 
@@ -216,6 +221,8 @@ class AnnotationWidget(qtw.QWidget):
         self.gstates = gstates
 
         grid_layout = qtw.QGridLayout()
+        grid_layout.setContentsMargins(0, 0, 0, 0)
+        grid_layout.setSpacing(0)
         self.hover_pos = ToggleButton("+")
         self.hover_neg = ToggleButton("-")
         self.hover_reset = qtw.QPushButton("reset")
@@ -235,7 +242,6 @@ class AnnotationWidget(qtw.QWidget):
         self.brush_size.setMinimum(1)
         self.brush_size.setMaximum(100)
         self.brush_size.setValue(10)
-
 
         grid_layout.addWidget(self.hover_btn, 0, 0, 1, 2)
         grid_layout.addWidget(self.hover_pos, 1, 0)
@@ -356,7 +362,9 @@ class ImageParams(BaseWidget):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
 
-        layout = qtw.QVBoxLayout()
+        self.ilayout = qtw.QVBoxLayout()
+        self.ilayout.setContentsMargins(0, 0, 0, 0)
+        self.ilayout.setSpacing(0)
 
         # clim
         clim_layout = qtw.QHBoxLayout()
@@ -377,7 +385,7 @@ class ImageParams(BaseWidget):
         colormap_label = qtw.QLabel('cmap:')
         self.colormap_combo = EditableComboBox()
         colormaps = [
-            'gray', 'seismic', 'Petrel', 'stratum', 'od_seismic1',
+            'gray', 'seismic', 'Petrel', 'stratum', 'jet', 'od_seismic1',
             'od_seismic2', 'od_seismic3'
         ]
         self.colormap_combo.addItems(colormaps)
@@ -400,8 +408,9 @@ class ImageParams(BaseWidget):
             self.interp_combo
         ])
 
-        self.addlayout(layout, [clim_layout, layout2])
-        self.setLayout(layout)
+        sublayouts = [clim_layout, layout2]
+        self.addlayout(self.ilayout, sublayouts)
+        self.setLayout(self.ilayout)
 
     def clear(self):
         self.vmin_input.clear()
@@ -410,16 +419,145 @@ class ImageParams(BaseWidget):
         self.interp_combo.setCurrentText('bilinear')
 
 
-class MaskWidget(qtw.QListWidget):
+class MaskImageParams(ImageParams):
+
+    def __init__(self, updateCallback: callable = None, parent=None):
+        super().__init__(parent)
+        self.updateCallback = updateCallback
+
+        self.colormap_combo.setCurrentText('jet')
+
+        layout3 = qtw.QHBoxLayout()
+        alpha_l = qtw.QLabel('alpha')
+        self.alpha = MyQDoubleSpinBox()
+        self.alpha.setRange(0, 1)
+        self.alpha.setSingleStep(0.05)
+        self.alpha.setValue(0.5)
+        exclude_l = qtw.QLabel('except')
+        self.exclude = EditableComboBox()
+        exclude = ['None', 'min', 'max', 'blow(0)', 'above(1)']
+        self.exclude.addItems(exclude)
+        self.exclude.setCurrentText('None')
+        self.addwidgets(
+            layout3,
+            [alpha_l, self.alpha, exclude_l, self.exclude],
+        )
+
+        self.ilayout.addLayout(layout3)
+
+        self.vmin_input.editingFinished.connect(
+            lambda: self.on_vmin_changed(self.vmin_input.text()))
+        self.vmax_input.editingFinished.connect(
+            lambda: self.on_vmax_changed(self.vmax_input.text()))
+        self.colormap_combo.changed.connect(self.on_cmap_changed)
+        self.interp_combo.currentTextChanged.connect(self.on_interp_changed)
+        self.alpha.changed.connect(self.on_alpha_changed)
+        self.exclude.changed.connect(self.on_except_changed)
+
+    def set_callback(self, updateCallback: callable):
+        self.updateCallback = updateCallback
+        self.on_vmin_changed(self.vmin_input.text())
+        self.on_vmax_changed(self.vmax_input.text())
+        self.on_cmap_changed(self.colormap_combo.currentText())
+        self.on_interp_changed(self.interp_combo.currentText())
+        self.on_alpha_changed(self.alpha.value())
+        self.on_except_changed(self.exclude.currentText())
+
+    def clear(self):
+        super().clear()
+        self.alpha.setValue(0.5)
+
+    def on_vmin_changed(self, text):
+        if self.updateCallback:
+            self.updateCallback('vmin', float(text))
+
+    def on_vmax_changed(self, text):
+        if self.updateCallback:
+            self.updateCallback('vmax', float(text))
+
+    def on_cmap_changed(self, text):
+        if self.updateCallback:
+            self.updateCallback('cmap', text)
+
+    def on_interp_changed(self, text):
+        if self.updateCallback:
+            self.updateCallback('interp', text)
+
+    def on_alpha_changed(self, alpha):
+        if self.updateCallback:
+            self.updateCallback('alpha', float(alpha))
+
+    def on_except_changed(self, text):
+        if self.updateCallback:
+            self.updateCallback('except', text)
+
+
+class MaskWidget(qtw.QWidget):
+    params = QtCore.pyqtSignal(list)
+    deleteIdx = QtCore.pyqtSignal(int)
 
     def __init__(self, parent=None):
-        super(MaskWidget, self).__init__(parent)
-        self.setDragDropMode(self.InternalMove)
-        self.setSelectionMode(self.ExtendedSelection)
-        self.model().rowsMoved.connect(self.emitOrderChangedSignal)
+        super().__init__(parent)
+        self.ilayout = qtw.QVBoxLayout(self)
 
-    def emitOrderChangedSignal(self):
-        self.signals.order_changed.emit()
+        self.listWidget = qtw.QListWidget()
+        self.listWidget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.listWidget.customContextMenuRequested.connect(
+            self.showContextMenu)
+        self.listWidget.setDragDropMode(qtw.QListWidget.InternalMove)
+        self.listWidget.itemClicked.connect(self.showDetails)
+        self.ilayout.addWidget(self.listWidget, 1)
+        self.ilayout.setContentsMargins(0, 0, 0, 0)
+        self.ilayout.setSpacing(0)
+
+        self.currentParamsWidget = None
+
+    def addItem(self, item: qtw.QListWidgetItem):
+        self.listWidget.addItem(item)
+        item.paramsWidget.set_callback(self.updateCallback)
+
+    def removeSelectedItem(self):
+        item = self.listWidget.currentItem()
+        idx = self.listWidget.currentRow()
+        if item:
+            paramsWidget = item.paramsWidget
+            if paramsWidget == self.currentParamsWidget:
+                self.ilayout.removeWidget(paramsWidget)
+                paramsWidget.setParent(None)
+                del paramsWidget
+                self.currentParamsWidget = None
+            self.listWidget.takeItem(self.listWidget.row(item))
+            del item
+            self.deleteIdx.emit(idx)
+
+    def showDetails(self, item):
+        if self.currentParamsWidget is not None:
+            self.ilayout.removeWidget(self.currentParamsWidget)
+            self.currentParamsWidget.hide()
+        self.currentParamsWidget = item.paramsWidget
+        self.ilayout.addWidget(self.currentParamsWidget, 2)  # 参数部分占用更多的空间
+        self.currentParamsWidget.show()
+
+    def showContextMenu(self, position):
+        menu = qtw.QMenu()
+        removeAction = menu.addAction("Delete")
+        action = menu.exec_(self.listWidget.mapToGlobal(position))
+        if action == removeAction:
+            self.removeSelectedItem()
+
+    def clear(self):
+        # 清空所有项目和相关的参数界面
+        while self.listWidget.count() > 0:
+            item = self.listWidget.takeItem(0)
+            if item.paramsWidget:
+                item.paramsWidget.setParent(None)
+                del item.paramsWidget
+            del item  # 显式删除项目
+
+    def updateCallback(self, mode: str, value):
+        assert mode in ['vmin', 'vmax', 'cmap', 'interp', 'alpha', 'except']
+        idx = self.listWidget.currentRow()
+        self.params.emit([idx, mode, value])
 
 
 class ControlP(qtw.QWidget):
@@ -471,14 +609,15 @@ class ControlP(qtw.QWidget):
         self.addwidgets(rowl_layout, [self.save_btn, self.clear_btn])
 
         row_tab = qtw.QHBoxLayout()
-        tab_widget = qtw.QTabWidget()
+        self.tab_widget = qtw.QTabWidget()
         self.base_tab = ImageParams()
-        tab_widget.addTab(self.base_tab, "Base")
+        self.tab_widget.addTab(self.base_tab, "Base")
         self.anno_tab = AnnotationWidget(gstates)
-        tab_widget.addTab(self.anno_tab, "Annotation")
+        self.tab_widget.addTab(self.anno_tab, "Annotation")
         self.mask_tab = MaskWidget()
-        tab_widget.addTab(self.mask_tab, "Masks")
-        row_tab.addWidget(tab_widget)
+        self.tab_widget.addTab(self.mask_tab, "Masks")
+        row_tab.addWidget(self.tab_widget)
+        row_tab.setStretch(0, 1)
 
         self.addlayout(layout, [
             row1_layout,
@@ -501,6 +640,10 @@ class ControlP(qtw.QWidget):
         self.loadBtn.vmax[str].connect(self.set_vmax)
         self.loadfolder.currentPath[str].connect(
             lambda fpath: self.loadBtn.loadData(fpath, check=False))
+        self.loadBtn.maskItem[qtw.QListWidgetItem].connect(
+            self.mask_tab.addItem)
+
+        self.tab_widget.currentChanged.connect(self.tabSelected)
 
     def addwidgets(self, layout, widgets):
         for widget in widgets:
@@ -521,6 +664,14 @@ class ControlP(qtw.QWidget):
             self.base_tab.vmax_input.setTextAndEmit(vmax)
         else:
             pass
+
+    def tabSelected(self, idx):
+        if idx == 2:
+            self.loadRad.radioButtons[1].setChecked(True)
+            self.gstates.loadType = 'mask'
+        else:
+            self.loadRad.radioButtons[0].setChecked(True)
+            self.gstates.loadType = 'base'
 
     def clear(self):
         if self.clear_dim:

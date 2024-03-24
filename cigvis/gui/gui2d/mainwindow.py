@@ -19,6 +19,7 @@ class CentralController(QtCore.QObject):
         self.loadDataConnection()
         self.baseTabConnection()
         self.annotateTabConnection()
+        self.maskTabConnection()
         self.controlP.clear_btn.clicked.connect(self.pCanvas.clear)
         self.controlP.save_btn.clicked.connect(self.pCanvas.save_fig)
 
@@ -53,6 +54,10 @@ class CentralController(QtCore.QObject):
             self.pCanvas.brush_undo)
         self.controlP.anno_tab.brush_size.valueChanged.connect(
             self.pCanvas.set_brush_size)
+
+    def maskTabConnection(self):
+        self.controlP.mask_tab.params[list].connect(self.pCanvas.set_mask_params)
+        self.controlP.mask_tab.deleteIdx[int].connect(self.pCanvas.remove_mask)
 
     def loadDataConnection(self):
         self.controlP.loadBtn.data[np.ndarray].connect(self.pCanvas.set_data)

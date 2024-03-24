@@ -19,7 +19,7 @@ from cigvis import colormap
 
 class ImageMixin:
 
-    def set_data(self, data):
+    def set_base_data(self, data):
         self.data = data
         self.plot()
 
@@ -55,6 +55,99 @@ class ImageMixin:
         if self.baseim:
             self.baseim.set(clim=clim)
             self.draw()
+
+
+class MaskImageMixin:
+
+    def set_mask_data(self, data):
+        if len(self.mask_params) == len(self.masks):
+            self.mask_params.append({
+                'cmap': 'jet',
+                'alpha': 0.5,
+                'except': 'None',
+                'plot': {
+                    'interpolation': 'bilinear'
+                }
+            })
+            cmap = self.set_mask_cmap('jet', 0.5, 'None')
+            self.mask_params[-1]['plot']['cmap'] = cmap
+        self.masks.append(data)
+
+        im = self.axes.imshow(data.T, **self.mask_params[-1]['plot'])
+        self.maskim.append(im)
+        self.draw()
+
+    def set_mask_params(self, params: list):
+        idx, mode, value = params
+        if idx < 0:
+            return
+        if mode == 'vmin':
+            self.mask_params[idx]['plot']['vmin'] = value
+            vmax = self.mask_params[idx]['plot'][
+                'vmax'] if 'vmax' in self.mask_params[idx]['plot'] else None
+            if vmax is not None:
+                clim = [value, vmax]
+                self.maskim[idx].set(clim=clim)
+        elif mode == 'vmax':
+            self.mask_params[idx]['plot']['vmax'] = value
+            vmin = self.mask_params[idx]['plot'][
+                'vmin'] if 'vmin' in self.mask_params[idx]['plot'] else None
+            if vmin is not None:
+                clim = [vmin, value]
+                self.maskim[idx].set(clim=clim)
+        elif mode == 'cmap':
+            self.mask_params[idx]['cmap'] = value
+            cmap = self.set_mask_cmap(
+                value,
+                self.mask_params[idx]['alpha'],
+                self.mask_params[idx]['except'],
+            )
+            self.mask_params[idx]['plot']['cmap'] = cmap
+            self.maskim[idx].set_cmap(cmap)
+
+        elif mode == 'interp':
+            self.mask_params[idx]['plot']['interpolation'] = value
+            self.maskim[idx].set_interpolation(value)
+        elif mode == 'alpha':
+            self.mask_params[idx]['alpha'] = value
+            cmap = self.set_mask_cmap(
+                self.mask_params[idx]['cmap'],
+                value,
+                self.mask_params[idx]['except'],
+            )
+            self.mask_params[idx]['plot']['cmap'] = cmap
+            self.maskim[-1].set_cmap(cmap)
+        elif mode == 'except':
+            self.mask_params[idx]['except'] = value
+            cmap = self.set_mask_cmap(
+                self.mask_params[idx]['cmap'],
+                self.mask_params[idx]['alpha'],
+                value,
+            )
+            self.mask_params[idx]['plot']['cmap'] = cmap
+            self.maskim[-1].set_cmap(cmap)
+
+        self.draw()
+
+    def set_mask_cmap(self, cmap, alpha, excpt: str):
+        if excpt == 'None':
+            cmap = colormap.set_alpha(cmap, alpha, False)
+        elif excpt == 'min':
+            cmap = colormap.set_alpha_except_min(cmap, alpha, False)
+        elif excpt == 'max':
+            cmap = colormap.set_alpha_except_max(cmap, alpha, False)
+        # elif excpt.startswith('blow'):
+        #     l = excpt[5:-1]
+        #     try:
+        #         l = float(l)
+        #     except:
+        #         qtw.QMessageBox.critical(self, "Warn", f"{excpt} not valid")
+        #     cmap = colormap.set_alpha_except_bottom(cmap, alpha, )
+
+        return cmap
+
+    def remove_mask(self, idx):
+        pass
 
 
 class AnnotationMixin:
@@ -202,7 +295,8 @@ class DraggableMixin:
         raise NotImplementedError("Need Implemented in main class")
 
 
-class PlotCanvas(FigureCanvas, DraggableMixin, ImageMixin, AnnotationMixin):
+class PlotCanvas(FigureCanvas, DraggableMixin, ImageMixin, AnnotationMixin,
+                 MaskImageMixin):
 
     def __init__(self, parent=None, width=5, height=4, dpi=100):
         self.fig = Figure(figsize=(width, height), dpi=dpi)
@@ -212,6 +306,7 @@ class PlotCanvas(FigureCanvas, DraggableMixin, ImageMixin, AnnotationMixin):
         super().__init__(self.fig)
         self.setParent(parent)
         self.controlP = self.parent().controlP
+        self.gstates = self.parent().gstates
         self.enableDragging()
         self.mpl_connect('button_press_event', self.on_mouse_press)
         self.mpl_connect('motion_notify_event', self.on_mouse_move)
@@ -238,6 +333,17 @@ class PlotCanvas(FigureCanvas, DraggableMixin, ImageMixin, AnnotationMixin):
         self.scrib_list = []
         self.scribim_list = []
         self.brush_size = 10
+
+        # for mask
+        self.masks = []  # ArrayLike
+        self.maskim = []  # imshow
+        self.mask_params = []  # params
+
+    def set_data(self, data: np.ndarray):
+        if self.gstates.loadType == 'base':
+            self.set_base_data(data)
+        else:
+            self.set_mask_data(data)
 
     def plot(self):
         self.axes.clear()
