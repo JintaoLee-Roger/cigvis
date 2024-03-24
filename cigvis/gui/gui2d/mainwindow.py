@@ -39,6 +39,7 @@ class CentralController(QtCore.QObject):
         self.controlP.anno_tab.pospointS[int].connect(
             self.pCanvas.set_marker_mode)
         self.controlP.anno_tab.boxS[int].connect(self.pCanvas.set_box_mode)
+        self.controlP.anno_tab.brushS[int].connect(self.pCanvas.set_brush_mode)
         self.controlP.anno_tab.hover_reset.clicked.connect(
             self.pCanvas.marker_reset)
         self.controlP.anno_tab.hover_undo.clicked.connect(
@@ -46,6 +47,12 @@ class CentralController(QtCore.QObject):
         self.controlP.anno_tab.box_reset.clicked.connect(
             self.pCanvas.box_reset)
         self.controlP.anno_tab.box_undo.clicked.connect(self.pCanvas.box_undo)
+        self.controlP.anno_tab.brush_reset.clicked.connect(
+            self.pCanvas.brush_reset)
+        self.controlP.anno_tab.brush_undo.clicked.connect(
+            self.pCanvas.brush_undo)
+        self.controlP.anno_tab.brush_size.valueChanged.connect(
+            self.pCanvas.set_brush_size)
 
     def loadDataConnection(self):
         self.controlP.loadBtn.data[np.ndarray].connect(self.pCanvas.set_data)

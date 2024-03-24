@@ -209,6 +209,7 @@ class LoadFolderWidget(qtw.QWidget):
 class AnnotationWidget(qtw.QWidget):
     pospointS = QtCore.pyqtSignal(int)
     boxS = QtCore.pyqtSignal(int)
+    brushS = QtCore.pyqtSignal(int)
 
     def __init__(self, gstates: GlobalState, parent=None):
         super(AnnotationWidget, self).__init__(parent)
@@ -226,6 +227,15 @@ class AnnotationWidget(qtw.QWidget):
 
         self.hover_btn = ToggleButton("Hover")
         self.box_btn = ToggleButton("Box")
+        self.brush_btn = ToggleButton("Brush")
+        self.brush_reset = qtw.QPushButton("reset")
+        self.brush_undo = qtw.QPushButton("undo")
+        size_label = qtw.QLabel('Brush Size')
+        self.brush_size = qtw.QSlider(QtCore.Qt.Horizontal)
+        self.brush_size.setMinimum(1)
+        self.brush_size.setMaximum(100)
+        self.brush_size.setValue(10)
+
 
         grid_layout.addWidget(self.hover_btn, 0, 0, 1, 2)
         grid_layout.addWidget(self.hover_pos, 1, 0)
@@ -237,6 +247,11 @@ class AnnotationWidget(qtw.QWidget):
         grid_layout.addWidget(self.box_add, 1, 2, 1, 2)
         grid_layout.addWidget(self.box_reset, 2, 2)
         grid_layout.addWidget(self.box_undo, 2, 3)
+        grid_layout.addWidget(self.brush_btn, 3, 0, 1, 2)
+        grid_layout.addWidget(self.brush_reset, 3, 2)
+        grid_layout.addWidget(self.brush_undo, 3, 3)
+        grid_layout.addWidget(size_label, 4, 0, 1, 2)
+        grid_layout.addWidget(self.brush_size, 4, 2, 1, 2)
         self.setLayout(grid_layout)
         self.connect_btn()
 
@@ -246,6 +261,7 @@ class AnnotationWidget(qtw.QWidget):
         self.hover_neg.clicked.connect(self.active_marker)
         self.box_btn.clicked.connect(self.active_box)
         self.box_add.clicked.connect(self.active_box)
+        self.brush_btn.clicked.connect(self.active_brush)
 
     def updateToggleState(self, toggledButton, checked):
         # 当一个按钮被切换到 ON，确保另一个按钮是 OFF
@@ -253,15 +269,25 @@ class AnnotationWidget(qtw.QWidget):
             if toggledButton == self.hover_btn:
                 self.box_btn.setChecked(False)
                 self.box_add.setChecked(False)
+                self.brush_btn.setChecked(False)
             elif toggledButton == self.box_btn:
+                self.hover_btn.setChecked(False)
+                self.hover_pos.setChecked(False)
+                self.hover_neg.setChecked(False)
+                self.brush_btn.setChecked(False)
+            elif toggledButton == self.brush_btn:
+                self.box_btn.setChecked(False)
+                self.box_add.setChecked(False)
                 self.hover_btn.setChecked(False)
                 self.hover_pos.setChecked(False)
                 self.hover_neg.setChecked(False)
             elif toggledButton == self.hover_pos:
                 self.hover_neg.setChecked(False)
+                self.brush_btn.setChecked(False)
                 self.hover_btn.setChecked(True)
             elif toggledButton == self.hover_neg:
                 self.hover_pos.setChecked(False)
+                self.brush_btn.setChecked(False)
                 self.hover_btn.setChecked(True)
             elif toggledButton == self.box_add:
                 self.box_btn.setChecked(True)
@@ -271,6 +297,8 @@ class AnnotationWidget(qtw.QWidget):
                 self.hover_neg.setChecked(False)
             elif toggledButton == self.box_btn:
                 self.box_add.setChecked(False)
+            elif toggledButton == self.brush_btn:
+                self.brush_btn.setChecked(False)
 
     def active_marker(self):
         if not self.gstates.dataLoaded:
@@ -282,6 +310,7 @@ class AnnotationWidget(qtw.QWidget):
             return
         else:
             self.boxS.emit(-1)
+            self.brushS.emit(-1)
 
         if self.hover_pos.isChecked():
             self.pospointS.emit(1)
@@ -297,13 +326,29 @@ class AnnotationWidget(qtw.QWidget):
             return
         else:
             self.pospointS.emit(-1)
+            self.brushS.emit(-1)
 
         if self.box_add.isChecked():
             self.boxS.emit(1)
 
+    def active_brush(self):
+        if not self.gstates.dataLoaded:
+            self.brushS.emit(-1)
+            return
+
+        if not self.brush_btn.isChecked():
+            self.brushS.emit(-1)
+            return
+        else:
+            self.pospointS.emit(-1)
+            self.boxS.emit(-1)
+            self.brushS.emit(1)
+
     def clear(self):
         self.box_btn.setChecked(False)
         self.hover_btn.setChecked(False)
+        self.brush_btn.setChecked(False)
+        self.brush_size.setValue(10)
 
 
 class ImageParams(BaseWidget):
