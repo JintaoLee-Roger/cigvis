@@ -10,6 +10,11 @@ from PyQt5 import QtWidgets as qtw
 from PyQt5 import QtCore, QtGui
 import numpy as np
 
+CANVAS_SIZE = (800, 600)  # (width, height)
+
+INT_validator = QtCore.QRegExp(r"^[1-9][0-9]*$")
+FLOAT_validator = QtCore.QRegExp(r"[-+]?[0-9]*\.?[0-9]+")
+
 
 class EditableComboBox(qtw.QComboBox):
     changed = QtCore.pyqtSignal(str)  # 自定义的信号
@@ -40,6 +45,18 @@ class MyQSpinBox(qtw.QSpinBox):
     def keyPressEvent(self, event):
         if event.key() == QtCore.Qt.Key_Return:
             self.changed.emit(self.value())
+        elif event.key() == QtCore.Qt.Key_Up:
+            if self.value() >= self.maximum():
+                return
+            value = self.value() + 1
+            self.setValue(value)
+            self.changed.emit(value)
+        elif event.key() == QtCore.Qt.Key_Down:
+            if self.value() <= self.minimum():
+                return
+            value = self.value() - 1
+            self.setValue(value)
+            self.changed.emit(value)
         else:
             super().keyPressEvent(event)
 
@@ -58,9 +75,29 @@ class MyQDoubleSpinBox(qtw.QDoubleSpinBox):
             super().keyPressEvent(event)
 
 
+class MyQLineEdit(qtw.QLineEdit):
+
+    def setTextAndEmit(self, text):
+        self.setText(text)
+        # 手动调用处理函数
+        self.editingFinished.emit()
+
+
+class UnpickRadioButton(qtw.QRadioButton):
+
+    def __init__(self, title, parent=None):
+        super(UnpickRadioButton, self).__init__(title, parent)
+
+    def mousePressEvent(self, event):
+        # 重写鼠标按下事件，但不调用基类的事件处理，阻止选中状态的改变
+        pass
+
+    def mouseReleaseEvent(self, event):
+        # 重写鼠标释放事件，同样不调用基类的事件处理
+        pass
+
+
 class RadioButtonPanel(qtw.QWidget):
-    # 定义一个信号，将被触发时传递单选按钮的文本
-    selectionChanged = QtCore.pyqtSignal(str)
 
     def __init__(self, names, hori=True, parent=None):
         super(RadioButtonPanel, self).__init__(parent)
@@ -72,7 +109,7 @@ class RadioButtonPanel(qtw.QWidget):
 
         # 创建并添加单选按钮到布局
         for name in names:
-            radioButton = qtw.QRadioButton(name)
+            radioButton = UnpickRadioButton(name)
             self.layout.addWidget(radioButton)
             self.radioButtons.append(radioButton)
             # 连接单选按钮的信号
@@ -87,7 +124,9 @@ class RadioButtonPanel(qtw.QWidget):
         radioButton = self.sender()
         if radioButton.isChecked():
             self.selected = radioButton.text()
-            self.selectionChanged.emit(radioButton.text())
+            for rad in self.radioButtons:
+                if rad != radioButton:
+                    rad.setChecked(False)
 
     def getCurrentSelection(self):
         return self.selected
@@ -107,7 +146,7 @@ class ToggleButton(qtw.QPushButton):
 
     def onToggle(self, checked):
         if self.exclu:
-            parent = self.parent().annot
+            parent = self.parent()
             if parent:
                 parent.updateToggleState(self, checked)
 
@@ -163,3 +202,17 @@ class RectP:
 
     def to_points(self):
         return [self.x0, self.y0, self.x1, self.y1]
+
+
+class BaseWidget(qtw.QWidget):
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+
+    def addwidgets(self, layout, widgets):
+        for widget in widgets:
+            layout.addWidget(widget)
+
+    def addlayout(self, layout, sublayouts):
+        for sublayout in sublayouts:
+            layout.addLayout(sublayout)
