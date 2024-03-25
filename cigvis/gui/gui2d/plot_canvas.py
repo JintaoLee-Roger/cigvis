@@ -43,6 +43,9 @@ class ImageMixin:
         self.params['vmin'] = vmin
         vmax = self.params['vmax'] if 'vmax' in self.params else -vmin
         clim = [vmin, vmax]
+        if vmin > vmax:
+            qtw.QMessageBox.critical(self, "Error", f"vmin > vmax")
+            return
         if self.baseim:
             self.baseim.set(clim=clim)
             self.draw()
@@ -52,6 +55,9 @@ class ImageMixin:
         self.params['vmax'] = vmax
         vmin = self.params['vmin'] if 'vmin' in self.params else -vmax
         clim = [vmin, vmax]
+        if vmin > vmax:
+            qtw.QMessageBox.critical(self, "Error", f"vmax < vmin")
+            return
         if self.baseim:
             self.baseim.set(clim=clim)
             self.draw()
@@ -66,7 +72,7 @@ class MaskImageMixin:
                 'alpha': 0.5,
                 'except': 'None',
                 'plot': {
-                    'interpolation': 'bilinear'
+                    'interpolation': 'nearest'
                 }
             })
             cmap = self.set_mask_cmap('jet', 0.5, 'None')
@@ -79,20 +85,38 @@ class MaskImageMixin:
 
     def set_mask_params(self, params: list):
         idx, mode, value = params
-        if idx < 0:
-            return
+        # print(self.mask_params)
+        if idx < 0 and len(self.mask_params) == len(self.masks):
+            self.mask_params.append({
+                'cmap': 'jet',
+                'alpha': 0.5,
+                'except': 'None',
+                'plot': {
+                    'interpolation': 'nearest'
+                }
+            })
+            cmap = self.set_mask_cmap('jet', 0.5, 'None')
+            self.mask_params[-1]['plot']['cmap'] = cmap
+            # return
+
         if mode == 'vmin':
             self.mask_params[idx]['plot']['vmin'] = value
             vmax = self.mask_params[idx]['plot'][
                 'vmax'] if 'vmax' in self.mask_params[idx]['plot'] else None
-            if vmax is not None:
+            if vmax is not None and len(self.mask_params) == len(self.masks):
+                if value > vmax:
+                    qtw.QMessageBox.critical(self, "Error", f"vmin > vmax")
+                    return
                 clim = [value, vmax]
                 self.maskim[idx].set(clim=clim)
         elif mode == 'vmax':
             self.mask_params[idx]['plot']['vmax'] = value
             vmin = self.mask_params[idx]['plot'][
                 'vmin'] if 'vmin' in self.mask_params[idx]['plot'] else None
-            if vmin is not None:
+            if vmin is not None and len(self.mask_params) == len(self.masks):
+                if vmin > value:
+                    qtw.QMessageBox.critical(self, "Error", f"vmax < vmin")
+                    return
                 clim = [vmin, value]
                 self.maskim[idx].set(clim=clim)
         elif mode == 'cmap':
@@ -103,11 +127,13 @@ class MaskImageMixin:
                 self.mask_params[idx]['except'],
             )
             self.mask_params[idx]['plot']['cmap'] = cmap
-            self.maskim[idx].set_cmap(cmap)
+            if len(self.mask_params) == len(self.masks):
+                self.maskim[idx].set_cmap(cmap)
 
         elif mode == 'interp':
             self.mask_params[idx]['plot']['interpolation'] = value
-            self.maskim[idx].set_interpolation(value)
+            if len(self.mask_params) == len(self.masks):
+                self.maskim[idx].set_interpolation(value)
         elif mode == 'alpha':
             self.mask_params[idx]['alpha'] = value
             cmap = self.set_mask_cmap(
@@ -116,7 +142,8 @@ class MaskImageMixin:
                 self.mask_params[idx]['except'],
             )
             self.mask_params[idx]['plot']['cmap'] = cmap
-            self.maskim[-1].set_cmap(cmap)
+            if len(self.mask_params) == len(self.masks):
+                self.maskim[idx].set_cmap(cmap)
         elif mode == 'except':
             self.mask_params[idx]['except'] = value
             cmap = self.set_mask_cmap(
@@ -125,7 +152,8 @@ class MaskImageMixin:
                 value,
             )
             self.mask_params[idx]['plot']['cmap'] = cmap
-            self.maskim[-1].set_cmap(cmap)
+            if len(self.mask_params) == len(self.masks):
+                self.maskim[idx].set_cmap(cmap)
 
         self.draw()
 
@@ -136,6 +164,11 @@ class MaskImageMixin:
             cmap = colormap.set_alpha_except_min(cmap, alpha, False)
         elif excpt == 'max':
             cmap = colormap.set_alpha_except_max(cmap, alpha, False)
+        else:
+            qtw.QMessageBox.critical(
+                self, "Error",
+                f"The except mode: {excpt} is not supported now")
+            return
         # elif excpt.startswith('blow'):
         #     l = excpt[5:-1]
         #     try:
@@ -147,7 +180,13 @@ class MaskImageMixin:
         return cmap
 
     def remove_mask(self, idx):
-        pass
+        im = self.maskim.pop(idx)
+        im.remove()
+        params = self.mask_params.pop(idx)
+        del params
+        im = self.masks.pop(idx)
+        del im
+        self.draw()
 
 
 class AnnotationMixin:

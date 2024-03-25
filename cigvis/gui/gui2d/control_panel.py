@@ -147,6 +147,7 @@ class LoadFolder(qtw.QPushButton):
 
         flist = list(Path(filePath).glob('*.dat'))
         flist += list(Path(filePath).glob('*.npy'))
+        flist = [f for f in flist if not f.name.startswith('.')]
         flist = _sortfile(flist)
         n = len(flist)
         if n > 0:
@@ -426,6 +427,7 @@ class MaskImageParams(ImageParams):
         self.updateCallback = updateCallback
 
         self.colormap_combo.setCurrentText('jet')
+        self.interp_combo.setCurrentText('nearest')
 
         layout3 = qtw.QHBoxLayout()
         alpha_l = qtw.QLabel('alpha')
@@ -462,10 +464,6 @@ class MaskImageParams(ImageParams):
         self.on_interp_changed(self.interp_combo.currentText())
         self.on_alpha_changed(self.alpha.value())
         self.on_except_changed(self.exclude.currentText())
-
-    def clear(self):
-        super().clear()
-        self.alpha.setValue(0.5)
 
     def on_vmin_changed(self, text):
         if self.updateCallback:
