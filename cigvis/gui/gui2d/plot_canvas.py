@@ -169,13 +169,6 @@ class MaskImageMixin:
                 self, "Error",
                 f"The except mode: {excpt} is not supported now")
             return
-        # elif excpt.startswith('blow'):
-        #     l = excpt[5:-1]
-        #     try:
-        #         l = float(l)
-        #     except:
-        #         qtw.QMessageBox.critical(self, "Warn", f"{excpt} not valid")
-        #     cmap = colormap.set_alpha_except_bottom(cmap, alpha, )
 
         return cmap
 

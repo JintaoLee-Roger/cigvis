@@ -153,6 +153,25 @@ class AxisAlignedImage(scene.visuals.Image):
         self._update_location()
         self.freeze()
 
+    def remove_mask(self, idx):
+        if idx <= 0:
+            return
+        self.unfreeze()
+
+        image = self.overlaid_images.pop(idx)
+        image.parent = None
+        del image
+        image_func = self.image_funcs.pop(idx)
+        del image_func
+
+        # self._update_location()
+        self.freeze()
+
+    def set_visable(self, idx: int, visable=False):
+        if idx <= 0:
+            return
+        self.overlaid_images[idx].visible = visable
+
     @property
     def axis(self):
         """

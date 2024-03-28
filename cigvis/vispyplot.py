@@ -146,7 +146,8 @@ def add_mask(nodes: List,
              cmaps: Union[str, List] = None,
              interpolation: str = 'linear',
              method: str = 'auto',
-             preproc_funcs: Callable = None) -> List:
+             preproc_funcs: Callable = None,
+             **kwargs) -> List:
     """
     Add Mask/Overlay volumes
     

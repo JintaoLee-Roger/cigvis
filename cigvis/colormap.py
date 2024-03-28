@@ -252,6 +252,36 @@ def discrete_cmap(cmap, clim, values):
     return cmap
 
 
+def ramp(cmap, blow=0, up=1, alpha_min=0, alpha_max=1, forvispy=True):
+    """
+    Creates a modified colormap from an existing colormap, with adjustable transparency (alpha) levels.
+    
+    Parameters:
+    - cmap: The original colormap to be modified.
+    - blow (float, optional): The lower bound of the colormap normalization range. Defaults to 0.
+    - up (float, optional): The upper bound of the colormap normalization range. Defaults to 1.
+    - alpha_min (float, optional): The minimum alpha (transparency) value to apply. Defaults to 0.
+    - alpha_max (float, optional): The maximum alpha (transparency) value to apply. Defaults to 1.
+    
+    Returns:
+    - A new colormap with alpha adjusted from alpha_min to alpha_max within the specified range [blow, up].
+    """
+
+    cmap = get_cmap_from_str(cmap)
+    slope = (alpha_max - alpha_min) / (up - blow)
+    N = cmap.N
+    arr = cmap(np.arange(N))
+    istart = int(blow * N)
+    iend = int(up * N)
+    arr[:istart, 3] = alpha_min
+    arr[iend:, 3] = alpha_max
+    arr[istart:iend, 3] = np.arange(iend - istart) / N * slope + alpha_min
+    cmap = ListedColormap(arr)
+    if forvispy:
+        cmap = cmap_to_vispy(cmap)
+    return cmap
+
+
 def set_alpha(cmap, alpha: float, forvispy: bool = True):
     """
     Set the alpha blending value, between 0 (transparent) and 1 (opaque)
