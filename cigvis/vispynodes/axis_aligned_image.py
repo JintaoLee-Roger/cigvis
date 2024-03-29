@@ -9,9 +9,11 @@
 # Distributed under the MIT License. See LICENSE for more info.
 # -----------------------------------------------------------------------------
 
+from typing import Callable, List
 import numpy as np
 from vispy import scene
 from vispy.visuals.transforms import MatrixTransform, STTransform
+import cigvis
 
 
 class AxisAlignedImage(scene.visuals.Image):
@@ -46,7 +48,7 @@ class AxisAlignedImage(scene.visuals.Image):
     """
 
     def __init__(self,
-                 image_funcs,
+                 image_funcs: List[Callable],
                  axis='z',
                  pos=0,
                  limit=None,
@@ -128,6 +130,47 @@ class AxisAlignedImage(scene.visuals.Image):
         self._update_location()
 
         self.freeze()
+
+    def add_mask(self,
+                 vol: np.ndarray,
+                 cmap: str,
+                 clim: List,
+                 interpolation: str,
+                 method: str = 'auto',
+                 preproc_f: Callable = None):
+        self.unfreeze()
+        image_func = get_image_func(self.axis, vol, preproc_f)
+        self.image_funcs.append(image_func)
+
+        self.overlaid_images.append(
+            scene.visuals.Image(
+                parent=self,
+                cmap=cmap,
+                clim=clim,
+                interpolation=interpolation,
+                method=method,
+            ))
+        self._update_location()
+        self.freeze()
+
+    def remove_mask(self, idx):
+        if idx <= 0:
+            return
+        self.unfreeze()
+
+        image = self.overlaid_images.pop(idx)
+        image.parent = None
+        del image
+        image_func = self.image_funcs.pop(idx)
+        del image_func
+
+        # self._update_location()
+        self.freeze()
+
+    def set_visable(self, idx: int, visable=False):
+        if idx <= 0:
+            return
+        self.overlaid_images[idx].visible = visable
 
     @property
     def axis(self):
@@ -325,3 +368,67 @@ class AxisAlignedImage(scene.visuals.Image):
             if axis_3d == 0: return (self.pos, self.pos)
             elif axis_3d == 1: return (0, self.size[0])
             elif axis_3d == 2: return (0, self.size[1])
+
+    def _set_clipper(self, node, clipper):
+        """
+        To clipper its children
+
+        Assign a clipper that is inherited from a parent node.
+
+        If *clipper* is None, then remove any clippers for *node*.
+        """
+        super()._set_clipper(node, clipper)
+
+        for im in self.children:
+            if isinstance(im, scene.visuals.Image):
+                if node in im._clippers:
+                    im.detach(self._clippers.pop(node))
+                if clipper is not None:
+                    im.attach(clipper)
+                    im._clippers[node] = clipper
+
+
+def get_image_func(axis: str, vol: np.ndarray,
+                   preproc_f: Callable) -> Callable:
+    """
+    Parameters
+    ----------
+    axis : str
+        'x' or 'y' or 'z'
+    i_vol : int
+        index of the volumes
+    """
+    line_first = cigvis.is_line_first()
+    shape = list(vol.shape)
+    if not line_first:
+        shape = shape[::-1]
+
+    def slicing_at_axis(pos, get_shape=False):
+        if get_shape:  # just return the shape information
+            if axis == 'x': return shape[1], shape[2]
+            elif axis == 'y': return shape[0], shape[2]
+            elif axis == 'z': return shape[0], shape[1]
+        else:  # will slice the volume and return an np array image
+            pos = int(np.round(pos))
+            # vol = volumes[i_vol]
+            # preproc_f = preproc_funcs[i_vol]
+            if preproc_f is not None:
+                if line_first:
+                    if axis == 'x': return preproc_f(vol[pos, :, :].T)
+                    elif axis == 'y': return preproc_f(vol[:, pos, :].T)
+                    elif axis == 'z': return preproc_f(vol[:, :, pos].T)
+                else:
+                    if axis == 'x': return preproc_f(vol[:, :, pos])
+                    elif axis == 'y': return preproc_f(vol[:, pos, :])
+                    elif axis == 'z': return preproc_f(vol[pos, :, :])
+            else:
+                if line_first:
+                    if axis == 'x': return vol[pos, :, :].T
+                    elif axis == 'y': return vol[:, pos, :].T
+                    elif axis == 'z': return vol[:, :, pos].T
+                else:
+                    if axis == 'x': return vol[:, :, pos]
+                    elif axis == 'y': return vol[:, pos, :]
+                    elif axis == 'z': return vol[pos, :, :]
+
+    return slicing_at_axis

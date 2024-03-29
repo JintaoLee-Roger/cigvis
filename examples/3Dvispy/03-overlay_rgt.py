@@ -32,10 +32,13 @@ sx = np.fromfile(sxp, np.float32).reshape(ni, nx, nt)
 rgt = np.fromfile(uxp, np.float32).reshape(ni, nx, nt)
 
 fg_cmap = colormap.set_alpha('jet', alpha=0.4)
-nodes = cigvis.create_overlay(sx,
-                              rgt,
-                              pos=[[36], [28], [84]],
-                              bg_cmap='gray',
-                              fg_cmap=fg_cmap)
+# nodes = cigvis.create_overlay(sx,
+#                               rgt,
+#                               pos=[[36], [28], [84]],
+#                               bg_cmap='gray',
+#                               fg_cmap=fg_cmap)
+
+nodes = cigvis.create_slices(sx, pos=[[36], [28], [84]], cmap='gray')
+nodes = cigvis.add_mask(nodes, rgt, cmaps=fg_cmap)
 
 cigvis.plot3D(nodes, size=(800, 800), savename='example.png')

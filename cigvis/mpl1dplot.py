@@ -15,7 +15,7 @@ In the future, we will implement some demos that have more
 geophysical features.
 """
 
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Union
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator
@@ -24,11 +24,11 @@ from cigvis import colormap
 ################## For traces plot #############
 
 
-def plot1d(data: np.ndarray or List,
+def plot1d(data: Union[np.ndarray, List],
            dt: float = 1,
            beg: float = 0,
            orient: str = 'v',
-           figsize: Tuple or List = (2, 8),
+           figsize: Union[Tuple, List] = (2, 8),
            title: str = None,
            axis_label: str = None,
            value_label: str = None,
