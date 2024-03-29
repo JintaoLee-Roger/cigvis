@@ -217,7 +217,7 @@ def add_mask(nodes: List,
 
 
 @utils.deprecated(
-    "This function will be removed in the feature version.\nExample:\nnodes=cigvis.create_overlay(bg, [fg1, fg2], fg_cmap=['jet', 'gray']\n==> change to ==>\nnodes=cigvis.create_slices(bg)\nnodes=cigvis.add_mask(nodes, [fg1, fg2], cmaps=['jet', 'gray'])\n",
+    "The code is based on 'vispy' backbend, and this function will be removed in the feature version.\nExample:\nnodes=cigvis.create_overlay(bg, [fg1, fg2], fg_cmap=['jet', 'gray']\n==> change to ==>\nnodes=cigvis.create_slices(bg)\nnodes=cigvis.add_mask(nodes, [fg1, fg2], cmaps=['jet', 'gray'])\n",
     "`cigvis.add_mask`")
 def create_overlay(bg_volume: np.ndarray,
                    fg_volume: np.ndarray,

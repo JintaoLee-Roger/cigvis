@@ -63,14 +63,22 @@ if __name__ == '__main__':
 
     fg_cmap = colormap.set_alpha('jet', 0.6)
     fg_clim = [inter.max() * 0.15, inter.max() * 0.5]
-    nodes = cigvis.create_overlay(seis,
-                                  inter,
-                                  pos=[ni - 2, 25, nt - 2],
-                                  bg_cmap='gray',
-                                  bg_clim=[-2.0, 1.5],
-                                  fg_cmap=fg_cmap,
-                                  fg_clim=fg_clim,
-                                  fg_interpolation='nearest')
+    # nodes = cigvis.create_overlay(seis,
+    #                               inter,
+    #                               pos=[ni - 2, 25, nt - 2],
+    #                               bg_cmap='gray',
+    #                               bg_clim=[-2.0, 1.5],
+    #                               fg_cmap=fg_cmap,
+    #                               fg_clim=fg_clim,
+    #                               fg_interpolation='nearest')
+    nodes = cigvis.create_slices(seis,
+                                 pos=[ni - 2, 25, nt - 2],
+                                 cmap='gray',
+                                 clim=[-2.0, 1.5])
+    nodes = cigvis.add_mask(nodes, inter,
+                            clims=fg_clim,
+                            cmaps=fg_cmap,
+                            interpolation='nearest')
 
     salt = np.memmap(saltp, np.float32, 'c', shape=shape)
     nodes += cigvis.create_bodys(salt, 0.0, 0.0, color='cyan')

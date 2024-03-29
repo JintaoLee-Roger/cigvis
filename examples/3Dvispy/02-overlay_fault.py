@@ -35,11 +35,16 @@ fx = np.fromfile(fxp, np.float32).reshape(ni, nx, nt)
 fg_cmap = colormap.set_alpha_except_min('jet', alpha=1)
 
 # fx is discrete data, set interpolation as 'nearest'
-nodes = cigvis.create_overlay(sx,
-                              fx,
-                              pos=[[36], [28], [84]],
-                              bg_cmap='gray',
-                              fg_cmap=fg_cmap,
-                              fg_interpolation='nearest')
+
+## create_overlay is deprecated
+# nodes = cigvis.create_overlay(sx,
+#                               fx,
+#                               pos=[[36], [28], [84]],
+#                               bg_cmap='gray',
+#                               fg_cmap=fg_cmap,
+#                               fg_interpolation='nearest')
+
+nodes = cigvis.create_slices(sx, pos=[[36], [28], [84]], cmap='gray')
+nodes = cigvis.add_mask(nodes, fx, cmaps=fg_cmap, interpolation='nearest')
 
 cigvis.plot3D(nodes, size=(800, 800), savename='example.png')

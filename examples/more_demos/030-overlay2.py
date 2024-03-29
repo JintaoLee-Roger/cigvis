@@ -20,11 +20,13 @@ def show(bg, fg, fx):
     seismic and RGT
     """
     cmap1 = colormap.set_alpha('jet', 0.5)
-    nodes1 = cigvis.create_overlay(bg,
-                                   fg,
-                                   pos=[[36], [28], [84]],
-                                   bg_cmap='gray',
-                                   fg_cmap=cmap1)
+    # nodes1 = cigvis.create_overlay(bg,
+    #                                fg,
+    #                                pos=[[36], [28], [84]],
+    #                                bg_cmap='gray',
+    #                                fg_cmap=cmap1)
+    nodes1 = cigvis.create_slices(bg, pos=[[36], [28], [84]], cmap='gray')
+    nodes1 = cigvis.add_mask(nodes1, fg, cmaps=cmap1)
 
     cbar1 = cigvis.create_colorbar(cmap='jet',
                                    clim=[fg.min(), fg.max()],
@@ -34,12 +36,14 @@ def show(bg, fg, fx):
     mask RGT 的底部 (mask fg > 120)
     """
     cmap2 = colormap.set_alpha_except_max('jet', 0.5)
-    nodes2 = cigvis.create_overlay(bg,
-                                   fg,
-                                   pos=[[36], [28], [84]],
-                                   bg_cmap='gray',
-                                   fg_clim=[fg.min(), 120],
-                                   fg_cmap=cmap2)
+    # nodes2 = cigvis.create_overlay(bg,
+    #                                fg,
+    #                                pos=[[36], [28], [84]],
+    #                                bg_cmap='gray',
+    #                                fg_clim=[fg.min(), 120],
+    #                                fg_cmap=cmap2)
+    nodes2 = cigvis.create_slices(bg, pos=[[36], [28], [84]], cmap='gray')
+    nodes2 = cigvis.add_mask(nodes2, fg, clims=[fg.min(), 120], cmaps=cmap3)
 
     # set vmax = 150
     cbar2 = cigvis.create_colorbar(cmap='jet',
@@ -51,12 +55,14 @@ def show(bg, fg, fx):
     """
     # Note: set alpha = 1 is the best
     cmap3 = colormap.set_alpha_except_min('jet', 1)
-    nodes3 = cigvis.create_overlay(bg,
-                                   fx,
-                                   pos=[[36], [28], [84]],
-                                   bg_cmap='gray',
-                                   fg_cmap=cmap3,
-                                   fg_interpolation='nearest')
+    # nodes3 = cigvis.create_overlay(bg,
+    #                                fx,
+    #                                pos=[[36], [28], [84]],
+    #                                bg_cmap='gray',
+    #                                fg_cmap=cmap3,
+    #                                fg_interpolation='nearest')
+    nodes3 = cigvis.create_slices(bg, pos=[[36], [28], [84]], cmap='gray')
+    nodes3 = cigvis.add_mask(nodes3, fg, cmaps=cmap3, interpolation='nearest')
 
     values = np.unique(fx).astype(int)
     values = values[1:]
@@ -76,12 +82,17 @@ def show(bg, fg, fx):
     ]
     interp = ['cubic', 'nearest']
     fg_clim = [[fg.min(), 120], [fx.min(), fx.max()]]
-    nodes4 = cigvis.create_overlay(bg, [fg, fx],
-                                   pos=[[36], [28], [84]],
-                                   bg_cmap='gray',
-                                   fg_cmap=cmap4,
-                                   fg_clim=fg_clim,
-                                   fg_interpolation=interp)
+    # nodes4 = cigvis.create_overlay(bg, [fg, fx],
+    #                                pos=[[36], [28], [84]],
+    #                                bg_cmap='gray',
+    #                                fg_cmap=cmap4,
+    #                                fg_clim=fg_clim,
+    #                                fg_interpolation=interp)
+    nodes4 = cigvis.create_slices(bg, pos=[[36], [28], [84]], cmap='gray')
+    nodes4 = cigvis.add_mask(nodes4, [fg, fx],
+                             clims=fg_clim,
+                             cmaps=cmap4,
+                             interpolation=interp)
 
     cbar4 = cigvis.create_colorbar(cmap='jet',
                                    clim=[fg.min(), 120],
@@ -90,7 +101,7 @@ def show(bg, fg, fx):
 
     cigvis.plot3D([nodes1, nodes2, nodes3, nodes4],
                   grid=(2, 2),
-                  size=(1000,700),
+                  size=(1000, 700),
                   cbar_region_ratio=0.18,
                   share=True,
                   savename='example.png')

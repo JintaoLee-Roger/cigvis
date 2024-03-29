@@ -134,6 +134,7 @@ class LoadBtn(qtw.QPushButton):
             paramsWidget.vmin_input.setTextAndEmit(f'{data.min():.2f}')
             paramsWidget.vmax_input.setTextAndEmit(f'{data.max():.2f}')
             item.paramsWidget = paramsWidget
+            item.visible = True # TODO:
             self.maskItem.emit(item)
 
         self.data.emit(data)  # 发送数据加载完成的信号
@@ -266,7 +267,7 @@ class ControlP(qtw.QWidget):
         self.tab_widget = qtw.QTabWidget()
         self.base_tab = ImageParams(interps=INTERPS)
         self.tab_widget.addTab(self.base_tab, "Base")
-        self.mask_tab = MaskWidget(visable_action=True)
+        self.mask_tab = MaskWidget()
         self.tab_widget.addTab(self.mask_tab, "Masks")
         self.horz_tab = HorizonWidget()
         self.tab_widget.addTab(self.horz_tab, "Horiz")

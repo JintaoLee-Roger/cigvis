@@ -35,10 +35,12 @@ def show(bg, fg):
     cmap = colormap.custom_disc_cmap(values, colors)
     cmap = colormap.set_alpha(cmap, 0.5)  # Note:
 
-    nodes1 = cigvis.create_overlay(bg,
-                                   fg,
-                                   fg_cmap=cmap,
-                                   fg_interpolation='nearest')
+    # nodes1 = cigvis.create_overlay(bg,
+    #                                fg,
+    #                                fg_cmap=cmap,
+    #                                fg_interpolation='nearest')
+    nodes1 = cigvis.create_slices(bg)
+    nodes1 = cigvis.add_mask(nodes1, fg, cmaps=cmap, interpolation='nearest')
 
     cbar1 = cigvis.create_colorbar(cmap=cmap,
                                    clim=[fg.min(), fg.max()],
@@ -54,10 +56,12 @@ def show(bg, fg):
     cmap = colormap.custom_disc_cmap(values, colors)
     cmap = colormap.set_alpha_except_min(cmap, 0.5)  # Note:
 
-    nodes2 = cigvis.create_overlay(bg,
-                                   fg,
-                                   fg_cmap=cmap,
-                                   fg_interpolation='nearest')
+    # nodes2 = cigvis.create_overlay(bg,
+    #                                fg,
+    #                                fg_cmap=cmap,
+    #                                fg_interpolation='nearest')
+    nodes2 = cigvis.create_slices(bg)
+    nodes2 = cigvis.add_mask(nodes2, fg, cmaps=cmap, interpolation='nearest')
 
     cbar2 = cigvis.create_colorbar(cmap=cmap,
                                    clim=[fg.min(), fg.max()],
@@ -73,10 +77,12 @@ def show(bg, fg):
     cmap = colormap.custom_disc_cmap(values, colors)
     cmap = colormap.set_alpha_except_min(cmap, 0.5)  # Note:
 
-    nodes3 = cigvis.create_overlay(bg,
-                                   fg,
-                                   fg_cmap=cmap,
-                                   fg_interpolation='nearest')
+    # nodes3 = cigvis.create_overlay(bg,
+    #                                fg,
+    #                                fg_cmap=cmap,
+    #                                fg_interpolation='nearest')
+    nodes3 = cigvis.create_slices(bg)
+    nodes3 = cigvis.add_mask(nodes3, fg, cmaps=cmap, interpolation='nearest')
 
     values = values[1:]
     cbar3 = cigvis.create_colorbar(cmap=cmap,
@@ -93,10 +99,12 @@ def show(bg, fg):
     cmap = colormap.custom_disc_cmap(values, colors)
     cmap = colormap.set_alpha_except_max(cmap, 0.5)  # Note:
 
-    nodes4 = cigvis.create_overlay(bg,
-                                   fg,
-                                   fg_cmap=cmap,
-                                   fg_interpolation='nearest')
+    # nodes4 = cigvis.create_overlay(bg,
+    #                                fg,
+    #                                fg_cmap=cmap,
+    #                                fg_interpolation='nearest')
+    nodes4 = cigvis.create_slices(bg)
+    nodes4 = cigvis.add_mask(nodes4, fg, cmaps=cmap, interpolation='nearest')
 
     values = values[:-1]
     cbar4 = cigvis.create_colorbar(cmap=cmap,
@@ -116,10 +124,12 @@ def show(bg, fg):
                                             clim=[fg.min(), fg.max()],
                                             values=[0, 100])  # Note:
 
-    nodes5 = cigvis.create_overlay(bg,
-                                   fg,
-                                   fg_cmap=cmap,
-                                   fg_interpolation='nearest')
+    # nodes5 = cigvis.create_overlay(bg,
+    #                                fg,
+    #                                fg_cmap=cmap,
+    #                                fg_interpolation='nearest')
+    nodes5 = cigvis.create_slices(bg)
+    nodes5 = cigvis.add_mask(nodes5, fg, cmaps=cmap, interpolation='nearest')
 
     values = values[values != 0]
     values = values[values != 100]

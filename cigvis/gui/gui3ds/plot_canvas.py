@@ -64,7 +64,7 @@ class MaskImageMixin:
         if len(self.mask_params) == len(self.masks):
             self.mask_params.append({
                 'cmaps': 'jet',
-                'interpolation': 'linear',
+                'interpolation': 'nearest',
                 'alpha': 0.5,
                 'excpt': 'None',
             })
@@ -76,7 +76,7 @@ class MaskImageMixin:
         if idx < 0 and len(self.mask_params) == len(self.masks):
             self.mask_params.append({
                 'cmaps': 'jet',
-                'interpolation': 'linear',
+                'interpolation': 'nearest',
                 'alpha': 0.5,
                 'excpt': 'None',
             })
@@ -303,7 +303,7 @@ class PlotCanvas(qtw.QWidget, DraggableMixin, CameraMixin, ImageMixin,
     def init_states(self):
         self.data = None
         self.nodes = []
-        self.params = {'cmap': 'gray', 'interpolation': 'linear'}
+        self.params = {'cmap': 'gray', 'interpolation': 'bilinear'}
 
         self.masks = []
         self.mask_params = []
@@ -344,7 +344,7 @@ class PlotCanvas(qtw.QWidget, DraggableMixin, CameraMixin, ImageMixin,
         self.mask_params.clear()
 
         # init
-        self.params = {'cmap': 'gray', 'interpolation': 'linear'}
+        self.params = {'cmap': 'gray', 'interpolation': 'bilinear'}
 
 
 class CanvasWrapper(VisCanvas):
