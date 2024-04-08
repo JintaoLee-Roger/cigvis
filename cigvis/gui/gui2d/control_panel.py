@@ -18,6 +18,7 @@ class GlobalState(QtCore.QObject):
         self.loadType = 'base'
         self.nx = nx
         self.ny = ny
+        self.transpose = True
 
     def getNXNY(self):
         return self.nx, self.ny
@@ -32,7 +33,7 @@ class LoadBtn(qtw.QPushButton):
     maskItem = QtCore.pyqtSignal(qtw.QListWidgetItem)
 
     def __init__(self, gstates: GlobalState, parent=None):
-        super(LoadBtn, self).__init__("Load File", parent)
+        super(LoadBtn, self).__init__("Load", parent)
         self.gstates = gstates
         self.clicked.connect(self.loadData)
 
@@ -96,6 +97,8 @@ class LoadBtn(qtw.QPushButton):
                 return
             data = np.fromfile(filePath, np.float32).reshape(nx, ny)
 
+        if self.gstates.transpose:
+            data = data.T
         self.gstates.dataLoaded = True  # 标记数据已加载
         if self._is_base():
             self.vmin.emit(f'{data.min():.2f}')
@@ -296,8 +299,9 @@ class ControlP(qtw.QWidget):
 
         row2_layout = qtw.QHBoxLayout()
         self.loadBtn = LoadBtn(gstates, self)
-        self.loadRad = RadioButtonPanel(['base', 'mask'])
-        self.addwidgets(row2_layout, [self.loadBtn, self.loadRad])
+        trans_label = qtw.QLabel("Transpose")
+        self.loadRad = RadioButtonPanel(['on', 'off'])
+        self.addwidgets(row2_layout, [self.loadBtn, trans_label, self.loadRad])
 
         # clear and save
         rowl_layout = qtw.QHBoxLayout()
@@ -346,6 +350,7 @@ class ControlP(qtw.QWidget):
             self.mask_tab.addItem)
 
         self.tab_widget.currentChanged.connect(self.tabSelected)
+        self.loadRad.selectionChanged[str].connect(self.transpose)
 
     def addwidgets(self, layout, widgets):
         for widget in widgets:
@@ -377,11 +382,17 @@ class ControlP(qtw.QWidget):
 
     def tabSelected(self, idx):
         if idx == 2:
-            self.loadRad.radioButtons[1].setChecked(True)
+            # self.loadRad.radioButtons[1].setChecked(True)
             self.gstates.loadType = 'mask'
         else:
-            self.loadRad.radioButtons[0].setChecked(True)
+            # self.loadRad.radioButtons[0].setChecked(True)
             self.gstates.loadType = 'base'
+
+    def transpose(self, text):
+        if text == 'on':
+            self.gstates.transpose = True
+        else:
+            self.gstates.transpose = False
 
     def clear(self):
         if self.clear_dim:
