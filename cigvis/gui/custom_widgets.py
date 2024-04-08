@@ -108,18 +108,20 @@ class UnpickRadioButton(qtw.QRadioButton):
 
 
 class RadioButtonPanel(qtw.QWidget):
+    selectionChanged = QtCore.pyqtSignal(str)
 
-    def __init__(self, names, hori=True, parent=None):
+    def __init__(self, names, picked=True, hori=True, parent=None):
         super(RadioButtonPanel, self).__init__(parent)
         self.names = names
         self.radioButtons = []
+        radio = qtw.QRadioButton if picked else UnpickRadioButton
 
         # 选择布局方向
         self.layout = qtw.QHBoxLayout(self) if hori else qtw.QVBoxLayout(self)
 
         # 创建并添加单选按钮到布局
         for name in names:
-            radioButton = UnpickRadioButton(name)
+            radioButton = radio(name)
             self.layout.addWidget(radioButton)
             self.radioButtons.append(radioButton)
             # 连接单选按钮的信号
@@ -134,6 +136,7 @@ class RadioButtonPanel(qtw.QWidget):
         radioButton = self.sender()
         if radioButton.isChecked():
             self.selected = radioButton.text()
+            self.selectionChanged.emit(self.selected)
             for rad in self.radioButtons:
                 if rad != radioButton:
                     rad.setChecked(False)

@@ -27,6 +27,7 @@ class GlobalState(QtCore.QObject):
         self.nx = nx
         self.ny = ny
         self.nz = nz
+        self.transpose = False
 
     def get_shape(self):
         if (self.nx is None) or (self.ny is None) or (self.nz is None):
@@ -124,6 +125,8 @@ class LoadBtn(qtw.QPushButton):
                 qtw.QMessageBox.critical(self, "Error",
                                          f"Error loading data: {e}")
 
+        if self.gstates.transpose:
+            data = data.T
         self.gstates.dataLoaded = True  # 标记数据已加载
         if self._is_base():
             self.vmin.emit(f'{data.min():.2f}')
@@ -134,7 +137,7 @@ class LoadBtn(qtw.QPushButton):
             paramsWidget.vmin_input.setTextAndEmit(f'{data.min():.2f}')
             paramsWidget.vmax_input.setTextAndEmit(f'{data.max():.2f}')
             item.paramsWidget = paramsWidget
-            item.visible = True # TODO:
+            item.visible = True  # TODO:
             self.maskItem.emit(item)
 
         self.data.emit(data)  # 发送数据加载完成的信号
@@ -191,8 +194,10 @@ class ControlP(qtw.QWidget):
 
         row2_layout = qtw.QHBoxLayout()
         self.loadBtn = LoadBtn(gstates, self)
-        self.loadRad = RadioButtonPanel(['base', 'mask'])
-        self.addwidgets(row2_layout, [self.loadBtn, self.loadRad])
+        trans_label = qtw.QLabel("Transpose")
+        self.loadRad = RadioButtonPanel(['on', 'off'])
+        self.loadRad.radioButtons[1].setChecked(True)
+        self.addwidgets(row2_layout, [self.loadBtn, trans_label, self.loadRad])
 
         # parameters of the camera
         row4_layout = qtw.QHBoxLayout()
@@ -318,13 +323,14 @@ class ControlP(qtw.QWidget):
             self.mask_tab.addItem)
 
         self.tab_widget.currentChanged.connect(self.tabSelected)
+        self.loadRad.selectionChanged[str].connect(self.transpose)
 
     def tabSelected(self, idx):
         if idx == 1:
-            self.loadRad.radioButtons[1].setChecked(True)
+            # self.loadRad.radioButtons[1].setChecked(True)
             self.gstates.loadType = 'mask'
         else:
-            self.loadRad.radioButtons[0].setChecked(True)
+            # self.loadRad.radioButtons[0].setChecked(True)
             self.gstates.loadType = 'base'
 
     def addwidgets(self, layout, widgets):
@@ -371,6 +377,12 @@ class ControlP(qtw.QWidget):
     def update_nz(self, nz):
         if nz:
             self.gstates.nz = int(nz)
+
+    def transpose(self, text):
+        if text == 'on':
+            self.gstates.transpose = True
+        else:
+            self.gstates.transpose = False
 
     def clear(self):
         if self.clear_dim:
