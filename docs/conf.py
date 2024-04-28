@@ -59,7 +59,7 @@ class PNGScraper(object):
 
 
 project = 'cigvis'
-copyright = '2023, Jintao Li'
+copyright = '2024, Jintao Li'
 author = 'Jintao Li and others'
 
 # -- General configuration ---------------------------------------------------
@@ -91,11 +91,11 @@ execute = False
 sphinx_gallery_conf = {
     'examples_dirs': [
         '../examples/3Dvispy', '../examples/2D', '../examples/1D',
-        '../examples/colormap', '../examples/more_demos'
+        '../examples/colormap', '../examples/gui', '../examples/more_demos'
     ],
     'gallery_dirs': [
         'gallery/3Dvispy', 'gallery/2D', 'gallery/1D', 'gallery/colormap',
-        'gallery/more_demos'
+        'gallery/gui', 'gallery/more_demos'
     ],
     'filename_pattern':
     re.escape(os.sep),

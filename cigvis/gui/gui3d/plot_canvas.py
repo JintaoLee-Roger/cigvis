@@ -112,42 +112,50 @@ class MaskImageMixin:
                                     self.mask_params[idx]['interp'], idx)
 
         elif mode == 'cmap':
-            self.mask_params[idx]['cmaps'] = self.set_mask_cmap(
-                value, self.mask_params[idx]['alpha'],
-                self.mask_params[idx]['excpt'])
+            cmap = self.set_mask_cmap(value, self.mask_params[idx]['alpha'],
+                                      self.mask_params[idx]['excpt'])
+            if cmap:
+                self.mask_params[idx]['cmaps'] = cmap
             if len(self.mask_params) == len(self.masks):
                 self.set_mask_attrs('cmap', self.mask_params[idx]['cmaps'],
                                     idx)
 
         elif mode == 'alpha':
             self.mask_params[idx]['alpha'] = float(value)
-            self.mask_params[idx]['cmaps'] = self.set_mask_cmap(
-                self.mask_params[idx]['cmaps'], value,
-                self.mask_params[idx]['excpt'])
+            cmap = self.set_mask_cmap(self.mask_params[idx]['cmaps'], value,
+                                      self.mask_params[idx]['excpt'])
+            if cmap:
+                self.mask_params[idx]['cmaps'] = cmap
             if len(self.mask_params) == len(self.masks):
                 self.set_mask_attrs('cmap', self.mask_params[idx]['cmaps'],
                                     idx)
 
         elif mode == 'except':
             self.mask_params[idx]['excpt'] = value
-            self.mask_params[idx]['cmaps'] = self.set_mask_cmap(
-                self.mask_params[idx]['cmaps'], self.mask_params[idx]['alpha'],
-                value)
+            cmap = self.set_mask_cmap(self.mask_params[idx]['cmaps'],
+                                      self.mask_params[idx]['alpha'], value)
+            if cmap:
+                self.mask_params[idx]['cmaps'] = cmap
             if len(self.mask_params) == len(self.masks):
                 self.set_mask_attrs('cmap', self.mask_params[idx]['cmaps'],
                                     idx)
 
     def set_mask_cmap(self, cmap, alpha, excpt: str = 'None'):
-        if excpt == 'None':
-            cmap = colormap.set_alpha(cmap, alpha)
-        elif excpt == 'min':
-            cmap = colormap.set_alpha_except_min(cmap, alpha)
-        elif excpt == 'max':
-            cmap = colormap.set_alpha_except_max(cmap, alpha)
-        else:
-            qtw.QMessageBox.critical(
-                self, "Error",
-                f"The except mode: {excpt} is not supported now")
+        try:
+            if excpt == 'None':
+                cmap = colormap.set_alpha(cmap, alpha)
+            elif excpt == 'min':
+                cmap = colormap.set_alpha_except_min(cmap, alpha)
+            elif excpt == 'max':
+                cmap = colormap.set_alpha_except_max(cmap, alpha)
+            else:
+                qtw.QMessageBox.critical(
+                    self, "Error",
+                    f"The except mode: {excpt} is not supported now")
+                return
+
+        except Exception as e:
+            qtw.QMessageBox.critical(self, "Error", f"Error colormap: {e}")
             return
 
         return cmap
@@ -155,7 +163,17 @@ class MaskImageMixin:
     def remove_mask(self, idx):
         for node in self.nodes:
             if isinstance(node, AxisAlignedImage):
-                node.remove_mask(idx+1)
+                node.remove_mask(idx + 1)
+
+    def mask_clear(self):
+        for i in range(len(self.masks)):
+            self.remove_mask(0)
+
+        # clear masks
+        for d in self.masks:
+            del d
+        self.masks.clear()
+        self.mask_params.clear()
 
 
 class CameraMixin:
@@ -325,23 +343,17 @@ class PlotCanvas(qtw.QWidget, DraggableMixin, CameraMixin, ImageMixin,
                 setattr(node.overlaid_images[idx + 1], name, value)
 
     def clear(self):
+        self.mask_clear()
+
         # clear nodes
-        for i in range(len(self.masks)):
-            self.remove_mask(i)
         for node in self.nodes:
             node.parent = None
             del node
-        self.nodes = []
+        self.nodes.clear()
 
         # clear data
         del self.data
         self.data = None
-
-        # clear masks
-        for d in self.masks:
-            del d
-        self.masks.clear()
-        self.mask_params.clear()
 
         # init
         self.params = {'cmap': 'gray', 'interpolation': 'bilinear'}
