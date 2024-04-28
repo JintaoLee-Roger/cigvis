@@ -8,6 +8,7 @@ Gallery
   2D/index
   1D/index
   colormap/index
+  gui/index
   more_demos/index
 
 
@@ -32,6 +33,12 @@ colormap
 ----------
 
 See the :doc:`colormap Gallery <colormap/index>` for examples.
+
+
+gui
+----------
+
+See the :doc:`gui Gallery <gui/index>` for examples.
 
 
 More Demos 

@@ -6,6 +6,8 @@ rm -rf gallery/1D
 
 rm -rf gallery/colormap
 
+rm -rf gallery/gui
+
 rm -rf gallery/3Dvispy
 
 rm -rf gallery/more_demos
