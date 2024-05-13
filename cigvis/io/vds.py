@@ -28,7 +28,15 @@ class VDSReader:
     """
 
     def __init__(self, filename) -> None:
-        import openvds
+        try:
+            import openvds
+        except ImportError:
+            error_message = (
+                "Failed to import openvds. Please follow these instructions based on your operating system:\n"
+                "- For Linux or Windows, use: pip3 install openvds\n"
+                "- For macOS, download the appropriate .whl file from 'https://github.com/JintaoLee-Roger/openvds' "
+                "and install it using: pip3 install <filename>.whl")
+            raise ImportError(error_message)
 
         self.vds = openvds.open(filename)
         self.access_manager = openvds.getAccessManager(self.vds)
@@ -122,7 +130,7 @@ class VDSReader:
 
     def min(self) -> float:
         return self.ch_des.getValueRangeMin()
-    
+
     def close(self) -> None:
         self._close(self.vds)
 
@@ -149,7 +157,16 @@ def create_vds_from_array(d: np.ndarray,
     brick_size : int
         brick size, can be one of {32, 64, 128, 256, 512, 1024, 2048}
     """
-    import openvds
+    try:
+        import openvds
+    except ImportError:
+        error_message = (
+            "Failed to import openvds. Please follow these instructions based on your operating system:\n"
+            "- For Linux or Windows, use: pip3 install openvds\n"
+            "- For macOS, download the appropriate .whl file from 'https://github.com/JintaoLee-Roger/openvds' "
+            "and install it using: pip3 install <filename>.whl")
+        raise ImportError(error_message)
+
     if cigvis.is_line_first():
         ni, nx, nt = d.shape
     else:
