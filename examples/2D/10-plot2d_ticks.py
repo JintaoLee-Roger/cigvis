@@ -3,11 +3,11 @@
 # University of Science and Technology of China (USTC).
 # All rights reserved.
 """
-设置坐标轴范围
+Set axis range
 ==================================
 
-将y轴设置为时间轴, 起始为 1s, 间隔 2ms,
-将x轴设置为x坐标, 起始为 4098, 间隔 12.5m
+Set the Y-axis as the time axis, starting at 1s, interval 2ms,
+Set the x-axis to the x-coordinate, starting at 4098 and every 12.5m
 
 .. image:: ../../_static/cigvis/2D/10.png
     :alt: image

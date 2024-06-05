@@ -3,10 +3,10 @@
 # University of Science and Technology of China (USTC).
 # All rights reserved.
 """
-显示 2d 的 slice, rgt
+Showing 2d's slice, rgt
 ================================
 
-可以合理设置cmap来mask一些区域
+You can set the cmap reasonably well to mask some areas
 
 .. image:: ../../_static/cigvis/2D/06.png
     :alt: image

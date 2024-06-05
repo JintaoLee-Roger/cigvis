@@ -1,5 +1,7 @@
 vispy>=0.14.0
 numpy>=1.20.1
+plotly
 scipy
 matplotlib
 scikit-image
+PyQt5

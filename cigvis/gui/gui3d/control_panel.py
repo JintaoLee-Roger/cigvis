@@ -315,6 +315,7 @@ class ControlP(qtw.QWidget):
         self.clear_btn.clicked.connect(self.clear)
         self.loadBtn.nx[str].connect(self.nx_input.setTextAndEmit)
         self.loadBtn.ny[str].connect(self.ny_input.setTextAndEmit)
+        self.loadBtn.nz[str].connect(self.nz_input.setTextAndEmit)
         self.loadBtn.vmin[str].connect(self.base_tab.vmin_input.setTextAndEmit)
         self.loadBtn.vmax[str].connect(self.base_tab.vmax_input.setTextAndEmit)
         self.loadfolder.currentPath[str].connect(

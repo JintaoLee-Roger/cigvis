@@ -1,6 +1,6 @@
 """
-地质体
-===========
+Geologic body
+==============
 
 .. image:: ../../_static/cigvis/more_demos/050.png
     :alt: image

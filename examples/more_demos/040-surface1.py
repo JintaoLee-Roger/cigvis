@@ -1,6 +1,6 @@
 """
-层位(n1, n2)显示
-===================
+Surfaces (n1, n2) are displayed
+================================
 
 .. image:: ../../_static/cigvis/more_demos/040.png
     :alt: image

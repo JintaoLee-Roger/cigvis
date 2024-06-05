@@ -3,8 +3,8 @@
 # University of Science and Technology of China (USTC).
 # All rights reserved.
 """
-显示3D地震数据和3D地质体 (CO2)
-=======================================
+Display 3D seismic data and 3D geological bodies (CO2)
+=======================================================
 
 .. image:: ../../_static/cigvis/3Dvispy/06.png
     :alt: image

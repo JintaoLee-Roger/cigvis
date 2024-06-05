@@ -3,7 +3,7 @@
 # University of Science and Technology of China (USTC).
 # All rights reserved.
 """
-显示2d的 slice, rgt, fault
+show slice, rgt, fault
 ==========================
 
 .. image:: ../../_static/cigvis/2D/02.png

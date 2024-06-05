@@ -3,8 +3,8 @@
 # University of Science and Technology of China (USTC).
 # All rights reserved.
 """
-划分多个canvas, 显示多个3D数据
-========================================
+Divide multiple canvas to display multiple 3D data
+======================================================
 
 .. image:: ../../_static/cigvis/3Dvispy/10.gif
     :alt: image

@@ -3,8 +3,8 @@
 # University of Science and Technology of China (USTC).
 # All rights reserved.
 """
-显示离散的 colorbar, 并设置 mask
-========================================
+Display discrete colorbar, and set mask
+===========================================
 
 .. image:: ../../_static/cigvis/2D/09.png
     :alt: image

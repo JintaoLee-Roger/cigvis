@@ -1,16 +1,6 @@
 """
-三维数据的叠加显示 (离散)
-==========================
-
-注意:
-
-我们并没有为 create_overlay 添加一个alpha参数,
-需要设置透明度设置, 请使用 colormap.set_alpha 之类的
-函数为 colormap 设置 alpha 值
-
-这是因为 overylay 可以叠加多个数据, 当需要mask一些值时,
-需要提供额外的信息, 会增加 overlay 函数的参数量, 让
-overlay 函数更晦涩
+Superimposed display of 3D data (discrete)
+=============================================
 
 .. image:: ../../_static/cigvis/more_demos/020.png
     :alt: image

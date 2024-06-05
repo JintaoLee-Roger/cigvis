@@ -3,10 +3,10 @@
 # University of Science and Technology of China (USTC).
 # All rights reserved.
 """
-显示2d的切片
+Show 2d slices
 ================
 
-cbar 可以设置为 ``cbar=''``, 这将忽略 cbar_label
+cbar can be set to ``cbar=''``, which ignores cbar_label.
 
 .. image:: ../../_static/cigvis/2D/01.png
     :alt: image

@@ -345,11 +345,16 @@ def create_Line_logs(logs, cmap='jet', line_width=8):
     return traces
 
 
-def create_well_logs(**kwargs):
+def create_well_logs(*args, **kwargs):
     """
     use Mesh3D to create tube logs
     """
-    raise NotImplementedError("`create_well_logs` currently not supported in the jupyter, please run it with a .py file") # noqa: E501
+    raise NotImplementedError("`create_well_logs` currently not supported in the jupyter, please run it with a .py file. If you must run in jupyter, please consider use `create_Line_logs`") # noqa: E501
+
+
+def add_mask(*args, **kwargs):
+    raise NotImplementedError("`add_mask` currently not supported in the jupyter, please run it with a .py file. If you must run in jupyter, please consider use `create_overlay`") # noqa: E501
+
 
 
 def create_points(points, color='red', size=3, sym='square'):
@@ -409,6 +414,10 @@ def create_bodys(volume, level, margin: float = None, color='yellow'):
         lightposition=dict(x=100, y=200, z=300))
 
     return [trace]
+
+
+def create_fault_skin(*args, **kwargs):
+    raise NotImplementedError("`add_mask` currently not supported in the jupyter, please run it with a .py file. If you must run in jupyter, please consider use `create_overlay`") # noqa: E501
 
 
 def plot3D(traces, **kwargs):

@@ -3,8 +3,8 @@
 # University of Science and Technology of China (USTC).
 # All rights reserved.
 """
-在3D地震数据体的切片上叠加多个3D数据体 (RGT, fault)
-===================================================
+Overlay multiple 3D data bodies (RGT, fault) on slices of 3D seismic data bodies
+====================================================================================
 
 ``create_overlay`` 的第一个参数是背景(background), 
 第二个参数是叠加的前景(foreground), 其可以包含多个3D数据体

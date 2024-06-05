@@ -3,7 +3,7 @@
 # University of Science and Technology of China (USTC).
 # All rights reserved.
 """
-显示多种地球物理数据
+Displays a variety of geophysical data
 ================================================
 
 .. image:: ../../_static/cigvis/3Dvispy/09.png

@@ -3,10 +3,10 @@
 # University of Science and Technology of China (USTC).
 # All rights reserved.
 """
-地震波信号
+seismogram
 ================
 
-绘制地震记录与台站offset
+Plot seismogram offset with stations
 
 .. image:: ../../_static/cigvis/1D/3.png
     :alt: image

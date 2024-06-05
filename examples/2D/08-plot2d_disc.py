@@ -3,7 +3,7 @@
 # University of Science and Technology of China (USTC).
 # All rights reserved.
 """
-显示离散的 colorbar
+Display discrete colorbar
 ========================================
 
 .. image:: ../../_static/cigvis/2D/08.png

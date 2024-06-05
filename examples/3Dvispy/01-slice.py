@@ -3,8 +3,8 @@
 # University of Science and Technology of China (USTC).
 # All rights reserved.
 """
-显示一个3D数据体 (通过选取几个切片)
-========================================
+Display a 3D volume of data (by selecting several slices)
+============================================================
 
 .. image:: ../../_static/cigvis/3Dvispy/01.png
     :alt: image

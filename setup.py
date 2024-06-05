@@ -5,37 +5,54 @@
 
 import sys
 import os
-import re
 from pathlib import Path
 
 from setuptools import setup, find_packages
 
 if sys.version_info[0] < 3:
-    raise Exception("CIGVis only supports Python 3")
+    raise RuntimeError("CIGVis only supports Python 3")
 
-version = ""
-dir_path = os.path.dirname(os.path.realpath(__file__))
-with open(dir_path + "/VERSION.txt", "r") as file:
-    for line in file:
-        version = line.strip()
-        break
+# package version
+version_path = Path(__file__).parent / "VERSION.txt"
+if not version_path.exists():
+    raise FileNotFoundError("VERSION.txt file not found")
+version = version_path.read_text().strip()
 
 if not version:
-    print("Fatal error: Failed to parse version from VERSION")
-    exit(1)
+    raise RuntimeError("Failed to parse version from VERSION")
+
+# requirements
+requirements_path = Path(__file__).parent / 'requirements.txt'
+if not requirements_path.exists():
+    raise FileNotFoundError("requirements.txt file not found")
+requirements = requirements_path.read_text().splitlines()
 
 package_name = "cigvis"
 
 description = "CIGVis is a tool for geophysical data visualization, " + \
       "which developed by Computational Interpretation Group (CIG)"
 
-setup(name=package_name,
-      version=version,
-      author="Jintao Li, and others",
-      url="https://github.com/JintaoLee-Roger/cigvis",
-      license='MIT',
-      description=description,
-      long_description=Path("README.md").read_text(encoding="utf-8"),
-      long_description_content_type="text/markdown",
-      python_requires=">=3.7",
-      packages=find_packages())
+setup(
+    name=package_name,
+    version=version,
+    author="Jintao Li, and others",
+    author_email="lijintaobt@gmail.com",
+    url="https://github.com/JintaoLee-Roger/cigvis",
+    license='MIT',
+    description=description,
+    long_description=(Path(__file__).parent /
+                      "README.md").read_text(encoding="utf-8"),
+    long_description_content_type="text/markdown",
+    python_requires=">=3.7",
+    packages=find_packages(),
+    install_requires=requirements,
+    classifiers=[
+        "Development Status :: 4 - Beta",
+        "Intended Audience :: Science/Research",
+        "License :: OSI Approved :: MIT License",
+        "Operating System :: OS Independent",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.7",
+        "Topic :: Scientific/Engineering :: Visualization"
+    ],
+)

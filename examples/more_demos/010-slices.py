@@ -1,5 +1,5 @@
 """
-三维数据的显示
+Display of 3D data
 ======================
 
 .. image:: ../../_static/cigvis/more_demos/010.png

@@ -3,8 +3,8 @@
 # University of Science and Technology of China (USTC).
 # All rights reserved.
 """
-将测井轨迹显示为一个tube, 并显示多条测井曲线
-===============================================
+The log track is displayed as a tube and multiple log curves are displayed
+============================================================================
 
 This example demonstrates how to visualize a well
 log with multi traces.

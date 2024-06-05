@@ -3,7 +3,7 @@
 # University of Science and Technology of China (USTC).
 # All rights reserved.
 """
-显示多条曲线
+Display multiple curves
 ==========================
 
 .. image:: ../../_static/cigvis/1D/2.png

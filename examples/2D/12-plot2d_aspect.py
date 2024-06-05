@@ -3,13 +3,13 @@
 # University of Science and Technology of China (USTC).
 # All rights reserved.
 """
-aspect 参数的意义
-======================
+The meaning of ``aspect`` 
+=============================
 
-可以将 aspect 设置为 'equal' (default), 'auto' or float:
-- 'equal' : 保持img的宽高比保持不变
-- 'auto' : 宽高比与设置的figsize有关, 即改变长宽比
-- float number f: 宽高比保持 f = h/w
+The aspect can be set to 'equal' (default), 'auto' or float:
+- 'equal' : Keep aspect ratio of the image unchanged
+- 'auto' : The aspect ratio is related to the set figsize, i.e., changing the aspect ratio
+- float number f: Keep the aspect ratio f = h/w
 
 .. image:: ../../_static/cigvis/2D/12.png
     :alt: image
