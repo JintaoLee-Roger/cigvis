@@ -1,6 +1,6 @@
 """
-测井轨迹和测井曲线
-===================
+Log trajectories and log curves
+=========================================
 
 .. image:: ../../_static/cigvis/more_demos/061.png
     :alt: image

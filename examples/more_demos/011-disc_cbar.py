@@ -1,5 +1,5 @@
 """
-离散的colorbar
+Discrete colorbar
 ======================
 
 .. image:: ../../_static/cigvis/more_demos/011.png

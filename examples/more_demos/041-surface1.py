@@ -1,6 +1,6 @@
 """
-层位(N, 3)显示
-================
+Surfaces (N, 3) displayed
+==========================
 
 .. image:: ../../_static/cigvis/more_demos/041.png
     :alt: image

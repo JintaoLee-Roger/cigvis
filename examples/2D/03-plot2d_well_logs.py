@@ -3,8 +3,8 @@
 # University of Science and Technology of China (USTC).
 # All rights reserved.
 """
-显示2d的 slice, rgt 和 测井曲线
-===============================
+Show slice, rgt and logging curves for 2d
+============================================
 
 .. image:: ../../_static/cigvis/2D/03.png
     :alt: image

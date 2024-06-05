@@ -1,6 +1,6 @@
 """
-三维数据的叠加显示 (连续)
-==========================
+Overlay display of 3D data (continuous)
+===========================================
 
 .. image:: ../../_static/cigvis/more_demos/030.png
     :alt: image
@@ -43,7 +43,7 @@ def show(bg, fg, fx):
     #                                fg_clim=[fg.min(), 120],
     #                                fg_cmap=cmap2)
     nodes2 = cigvis.create_slices(bg, pos=[[36], [28], [84]], cmap='gray')
-    nodes2 = cigvis.add_mask(nodes2, fg, clims=[fg.min(), 120], cmaps=cmap3)
+    nodes2 = cigvis.add_mask(nodes2, fg, clims=[fg.min(), 120], cmaps=cmap2)
 
     # set vmax = 150
     cbar2 = cigvis.create_colorbar(cmap='jet',
@@ -62,7 +62,9 @@ def show(bg, fg, fx):
     #                                fg_cmap=cmap3,
     #                                fg_interpolation='nearest')
     nodes3 = cigvis.create_slices(bg, pos=[[36], [28], [84]], cmap='gray')
-    nodes3 = cigvis.add_mask(nodes3, fg, cmaps=cmap3, interpolation='nearest')
+    nodes3 = cigvis.add_mask(nodes3, [fg, fx],
+                             cmaps=[cmap2, cmap3],
+                             interpolation=['linear', 'nearest'])
 
     values = np.unique(fx).astype(int)
     values = values[1:]

@@ -3,7 +3,7 @@
 # University of Science and Technology of China (USTC).
 # All rights reserved.
 """
-将测井轨迹显示为一个管子 (tube)
+Display log trail as a tube
 =======================================
 
 .. image:: ../../_static/cigvis/3Dvispy/07.png

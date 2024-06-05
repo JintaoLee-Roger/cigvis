@@ -3,8 +3,8 @@
 # University of Science and Technology of China (USTC).
 # All rights reserved.
 """
-使用 subplots 显示多个图像
-===========================
+Displaying multiple images using subplots
+============================================
 
 .. image:: ../../_static/cigvis/2D/05.png
     :alt: image

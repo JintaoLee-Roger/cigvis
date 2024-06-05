@@ -3,10 +3,10 @@
 # University of Science and Technology of China (USTC).
 # All rights reserved.
 """
-显示2d的 slice, rgt fault 和 rgt 的等值线
+Show 2d contours of slice, rgt fault and rgt
 ================================================
 
-使用 skimage.measure.find_countours 计算rgt的等值线
+Use ``skimage.measure.find_countours`` to calculate contours
 
 .. image:: ../../_static/cigvis/2D/07.png
     :alt: image

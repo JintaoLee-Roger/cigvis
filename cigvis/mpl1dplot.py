@@ -102,6 +102,7 @@ def plot1d(data: Union[np.ndarray, List],
 def plot_multi_traces(data,
                       dt=0.002,
                       beg=0,
+                      inter=1.0,
                       c='black',
                       fill_up=None,
                       fill_down=None,
@@ -117,6 +118,8 @@ def plot_multi_traces(data,
     """
     data.shape = (h, n_traces)
     """
+    assert inter <= 1.0 and inter > 0.0
+    inter = 1 - inter
     h, n = data.shape
     r = data.max() - data.min()
     r = r if r != 0 else 1
@@ -136,7 +139,7 @@ def plot_multi_traces(data,
     tick_pos = []
     for i in range(n):
         l = (data[:, i] - data.min()) / r + prev_max
-        prev_max = l.max() if data[:, i].sum() != 0 else prev_max + 1
+        prev_max = l.max() - inter if data[:, i].sum() != 0 else prev_max + 1
         tick_pos.append(l.mean())
         ax.plot(l, y, c=c, lw=lw)
         _fill_traces(ax, l, y, fill_down, fill_up, color=fill_color)

@@ -3,8 +3,8 @@
 # University of Science and Technology of China (USTC).
 # All rights reserved.
 """
-显示3D地震数据和多个层位
-=======================================
+Display 3D seismic data and multiple horizons
+================================================
 
 层位可以是一个 (n1, n2) 大小的 Z 值,
 也可以是 (N, 3) 大小的 N 个点

@@ -3,7 +3,7 @@
 # University of Science and Technology of China (USTC).
 # All rights reserved.
 """
-设置字体
+Set font
 ================
 
 .. image:: ../../_static/cigvis/2D/11.png

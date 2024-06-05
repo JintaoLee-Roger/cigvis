@@ -1,6 +1,6 @@
 """
-测井轨迹
-=============
+logging track
+================
 
 .. image:: ../../_static/cigvis/more_demos/060.png
     :alt: image

@@ -3,8 +3,8 @@
 # University of Science and Technology of China (USTC).
 # All rights reserved.
 """
-显示2d的 水平 slice 和 测井的位置
-==================================
+Shows 2D horizontal slices and log positions
+================================================
 
 .. image:: ../../_static/cigvis/2D/04.png
     :alt: image

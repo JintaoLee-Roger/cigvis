@@ -3,7 +3,7 @@
 # University of Science and Technology of China (USTC).
 # All rights reserved.
 """
-fill 模式
+fill mode
 =======================
 
 This example demonstrates how to plot a 1D trace

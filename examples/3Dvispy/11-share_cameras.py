@@ -3,7 +3,7 @@
 # University of Science and Technology of China (USTC).
 # All rights reserved.
 """
-在多个canvas中, 共享相机参数
+Share camera parameters across multiple canvas
 ================================================
 
 这个可以很方便的实现比较两个数据结果

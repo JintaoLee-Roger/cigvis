@@ -3,11 +3,11 @@
 # University of Science and Technology of China (USTC).
 # All rights reserved.
 """
-在3D地震数据体的切片上叠加断层显示
-=================================================
+Overlaying fault displays on slices of 3D seismic data bodies
+===================================================================
 
-``create_overlay`` 的第一个参数是背景(background), 
-第二个参数是叠加的前景(foreground)
+``create_overlay``: the first parameters is (background), 
+and the second parameters is (foreground)
 
 .. Note::
     foreground 需要合理设置透明度和mask
