@@ -34,7 +34,7 @@ class VDSReader:
             error_message = (
                 "Failed to import openvds. Please follow these instructions based on your operating system:\n"
                 "- For Linux or Windows, use: pip3 install openvds\n"
-                "- For macOS, download the appropriate .whl file from 'https://github.com/JintaoLee-Roger/openvds' "
+                "- For macOS, download the appropriate .whl file from 'https://github.com/JintaoLee-Roger/open-vds' "
                 "and install it using: pip3 install <filename>.whl")
             raise ImportError(error_message)
 
@@ -163,7 +163,7 @@ def create_vds_from_array(d: np.ndarray,
         error_message = (
             "Failed to import openvds. Please follow these instructions based on your operating system:\n"
             "- For Linux or Windows, use: pip3 install openvds\n"
-            "- For macOS, download the appropriate .whl file from 'https://github.com/JintaoLee-Roger/openvds' "
+            "- For macOS, download the appropriate .whl file from 'https://github.com/JintaoLee-Roger/open-vds' "
             "and install it using: pip3 install <filename>.whl")
         raise ImportError(error_message)
 
