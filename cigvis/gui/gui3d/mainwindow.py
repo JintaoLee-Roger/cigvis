@@ -88,6 +88,10 @@ class MyMainWindow(qtw.QMainWindow):
         central_widget.setLayout(self.main_layout)
         self.setCentralWidget(central_widget)
 
+    def keyPressEvent(self, event):
+        if event.key() == QtCore.Qt.Key_Escape:
+            self.close()
+
 
 def gui3d(nx=None, ny=None, nz=None, clear_dim=True):
     app = use_app("pyqt5")

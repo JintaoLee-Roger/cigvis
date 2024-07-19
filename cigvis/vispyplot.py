@@ -195,11 +195,6 @@ def add_mask(nodes: List,
     if not isinstance(preproc_funcs, List):
         preproc_funcs = [preproc_funcs] * len(volumes)
 
-    shape = volumes[0].shape
-    line_first = cigvis.is_line_first()
-    if not line_first:
-        shape = shape[::-1]
-
     for node in nodes:
         if not isinstance(node, AxisAlignedImage):
             continue

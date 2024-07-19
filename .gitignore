@@ -12,6 +12,7 @@ docs/_build
 *.LAS
 .DS_Store
 cpp
+advance/
 
 test*
 data/*
