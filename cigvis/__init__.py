@@ -43,5 +43,6 @@ if injupyter:
 else:
     from .vispyplot import *
 
+from . import viserplot
 from .mpl2dplot import *
 from .mpl1dplot import *
