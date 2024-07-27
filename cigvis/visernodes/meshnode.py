@@ -61,7 +61,7 @@ class MeshNode(trimesh.Trimesh):
         # material = PBRMaterial(doubleSided=True)
         # visual = TextureVisuals()
         # self.visual = visual
-
+        self._vertices = vertices
         self.colored_by = None  # can be 'value', 'vertex', 'face', or 'uniform'
         self._scale = scale
         self._cmap = cmap
@@ -72,6 +72,7 @@ class MeshNode(trimesh.Trimesh):
         self._vertices_values = vertices_values
         self._color = color
         self._name = 'mesh'
+        self._set_color = False
 
         if self._face_colors is not None:
             self.colored_by = 'face'
@@ -88,7 +89,10 @@ class MeshNode(trimesh.Trimesh):
     def set_colors(self):
         if self.server is None:
             return
+        if self._set_color:
+            return
 
+        self._set_color = True
         if self.colored_by == 'value':
             if self.clim is None:
                 self.clim = [
@@ -99,7 +103,7 @@ class MeshNode(trimesh.Trimesh):
             colors = colormap.get_cmap_from_str(self._cmap)(norm(
                 self._vertices_values))
             colors = color_f2i(colors)
-            img, uv = color2textual(colors, self.vertices)
+            img, uv = color2textual(colors, self._vertices)
             self.visual = TextureVisuals(
                 uv,
                 PBRMaterial(
@@ -139,6 +143,7 @@ class MeshNode(trimesh.Trimesh):
         if not isinstance(server, viser.ViserServer):
             raise ValueError("server must be type: viser.ViserServer")
         self._server = server
+        self._set_color = False
         self.update_node()
 
     @property
@@ -148,6 +153,7 @@ class MeshNode(trimesh.Trimesh):
     @cmap.setter
     def cmap(self, cmap):
         self._cmap = cmap
+        self._set_color = False
         self.update_node()
 
     @property
@@ -157,6 +163,7 @@ class MeshNode(trimesh.Trimesh):
     @clim.setter
     def clim(self, clim):
         self._clim = clim
+        self._set_color = False
         self.update_node()
 
     @property
@@ -183,6 +190,9 @@ class MeshNode(trimesh.Trimesh):
     @scale.setter
     def scale(self, scale):
         self._scale = scale
+        self.vertices[:, 0] = self._vertices[:, 0] * self._scale[0]
+        self.vertices[:, 1] = self._vertices[:, 1] * self._scale[1]
+        self.vertices[:, 2] = self._vertices[:, 2] * self._scale[2]
         self.update_node()
 
     def update_node(self):
@@ -194,5 +204,5 @@ class MeshNode(trimesh.Trimesh):
         self.nodes = self.server.scene.add_mesh_trimesh(
             self.name,
             self,
-            self.scale,
+            # self.scale,
         )

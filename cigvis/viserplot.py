@@ -215,19 +215,19 @@ def create_surfaces(surfs: List[np.ndarray],
     return mesh_nodes
 
 
-def plot3D(nodes, **kwargs):
+def plot3D(nodes, axis_scales=[1, 1, 1], **kwargs):
     server = viser.ViserServer()
 
-    scale = 1.0
+    scales = 1.0
     for node in nodes:
         if isinstance(node, VolumeSlice):
-            scale = node.scale
-            break
+            node.update_scale(axis_scales)
+            scales = node.scale
 
     meshid = 0
     for node in nodes:
         if isinstance(node, MeshNode):
-            node.scale = scale
+            node.scale = scales
             node.name = f'mesh{meshid}'
             meshid += 1
         node.server = server

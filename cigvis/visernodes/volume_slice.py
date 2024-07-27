@@ -33,7 +33,15 @@ class VolumeSlice:
         self.pos = pos
         self.cmap = cmap
         self.clim = clim if clim is not None else [volume.min(), volume.max()]
-        self.scale = scale if scale > 0 else 8 / max(volume.shape)
+
+        if isinstance(scale, Union[int, float]):
+            if scale < 0:
+                self.scale = [8 / max(volume.shape)] * 3
+            else:
+                self.scale = [scale] * 3
+        else:
+            self.scale = scale
+
         self.update_node(self.pos)
         self.masks = []
         self.fg_cmaps = []
@@ -53,16 +61,16 @@ class VolumeSlice:
     @property
     def render_width(self):
         if self.axis != 'z':
-            return self.volume.shape[2] * self.scale
+            return self.volume.shape[2] * self.scale[2]
         else:
-            return self.volume.shape[1] * self.scale
+            return self.volume.shape[1] * self.scale[1]
 
     @property
     def render_height(self):
         if self.axis == 'x':
-            return self.volume.shape[1] * self.scale
+            return self.volume.shape[1] * self.scale[1]
         else:
-            return self.volume.shape[0] * self.scale
+            return self.volume.shape[0] * self.scale[0]
 
     @property
     def wxyz(self):
@@ -76,21 +84,14 @@ class VolumeSlice:
     @property
     def position(self):
         ni, nx, nt = self.volume.shape
-        ri = self.volume.shape[0] * self.scale
-        rx = self.volume.shape[1] * self.scale
-        rt = self.volume.shape[2] * self.scale
+        ri = ni * self.scale[0]
+        rx = nx * self.scale[1]
+        rt = nt * self.scale[2]
         if self.axis == 'x':
-            # ni = self.volume.shape[0]
-            # ri = ni * self.scale
-            # return (-ri / 2 + self.pos * ri / (ni - 1), 0, 0)
             return (self.pos * ri / (ni - 1), rx / 2, rt / 2)
         elif self.axis == 'y':
-            # nx = self.volume.shape[1]
-            # rx = nx * self.scale
             return (ri / 2, self.pos * rx / (nx - 1), rt / 2)
         else:
-            # nt = self.volume.shape[2]
-            # rt = nt * self.scale
             return (ri / 2, rx / 2, self.pos * rt / (nt - 1))
 
     def to_img(self):
@@ -154,7 +155,10 @@ class VolumeSlice:
         self.update_node(self.pos)
 
     def update_scale(self, scale):
-        self.scale = scale
+        if isinstance(scale, Union[int, float]):
+            scale = [scale] * 3
+        self.scale = [s * x for s, x in zip(scale, self.scale)]
+
         self.update_node(self.pos)
 
     def add_mask(self, vol, cmap: str, clim: List = None):
