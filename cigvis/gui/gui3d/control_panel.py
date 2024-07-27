@@ -108,12 +108,12 @@ class LoadBtn(qtw.QPushButton):
                 elif filePath.endswith('.npy'):
                     data = np.load(filePath)
                 else:
-                    # data = np.memmap(filePath,
-                    #                  np.float32,
-                    #                  'c',
-                    #                  shape=(nx, ny, nz))
-                    data = np.fromfile(filePath,
-                                       np.float32).reshape(nx, ny, nz)
+                    data = np.memmap(filePath,
+                                     np.float32,
+                                     'c',
+                                     shape=(nx, ny, nz))
+                    # data = np.fromfile(filePath,
+                    #                    np.float32).reshape(nx, ny, nz)
                 if not self._is_base():
                     nxc, nyc, nzc = data.shape
                     if (nxc != nx) or (nyc != ny) or (nzc != nz):

@@ -4,6 +4,7 @@ from cigvis import colormap
 import matplotlib.pyplot as plt
 import viser
 
+
 def arrs2img(bg, cmap, clim, masks, fg_cmaps, fg_clims):
     """
     merge serveral arrays into one image
@@ -32,8 +33,8 @@ class VolumeSlice:
         self.pos = pos
         self.cmap = cmap
         self.clim = clim if clim is not None else [volume.min(), volume.max()]
-        self.scale = scale if scale > 0 else max(volume.shape) / 8
-        self.update_nodes(self.pos)
+        self.scale = scale if scale > 0 else 8 / max(volume.shape)
+        self.update_node(self.pos)
         self.masks = []
         self.fg_cmaps = []
         self.fg_clims = []
@@ -47,21 +48,21 @@ class VolumeSlice:
         if not isinstance(server, viser.ViserServer):
             raise ValueError("server must be type: viser.ViserServer")
         self._server = server
-        self.update_nodes(self.pos)
+        self.update_node(self.pos)
 
     @property
     def render_width(self):
         if self.axis != 'z':
-            return self.volume.shape[2] / self.scale
+            return self.volume.shape[2] * self.scale
         else:
-            return self.volume.shape[1] / self.scale
+            return self.volume.shape[1] * self.scale
 
     @property
     def render_height(self):
         if self.axis == 'x':
-            return self.volume.shape[1] / self.scale
+            return self.volume.shape[1] * self.scale
         else:
-            return self.volume.shape[0] / self.scale
+            return self.volume.shape[0] * self.scale
 
     @property
     def wxyz(self):
@@ -74,18 +75,23 @@ class VolumeSlice:
 
     @property
     def position(self):
+        ni, nx, nt = self.volume.shape
+        ri = self.volume.shape[0] * self.scale
+        rx = self.volume.shape[1] * self.scale
+        rt = self.volume.shape[2] * self.scale
         if self.axis == 'x':
-            ni = self.volume.shape[0]
-            ri = ni / self.scale
-            return (-ri / 2 + self.pos * ri / (ni - 1), 0, 0)
+            # ni = self.volume.shape[0]
+            # ri = ni * self.scale
+            # return (-ri / 2 + self.pos * ri / (ni - 1), 0, 0)
+            return (self.pos * ri / (ni - 1), rx / 2, rt / 2)
         elif self.axis == 'y':
-            nx = self.volume.shape[1]
-            rx = nx / self.scale
-            return (0, -rx / 2 + self.pos * rx / (nx - 1), 0)
+            # nx = self.volume.shape[1]
+            # rx = nx * self.scale
+            return (ri / 2, self.pos * rx / (nx - 1), rt / 2)
         else:
-            nt = self.volume.shape[2]
-            rt = nt / self.scale
-            return (0, 0, -rt / 2 + self.pos * rt / (nt - 1))
+            # nt = self.volume.shape[2]
+            # rt = nt * self.scale
+            return (ri / 2, rx / 2, self.pos * rt / (nt - 1))
 
     def to_img(self):
         if self.axis == 'x':
@@ -102,14 +108,14 @@ class VolumeSlice:
                        self.fg_clims)
         return img
 
-    def update_nodes(self, pos):
+    def update_node(self, pos):
         if self.server is None:
             return
-        startt = time.perf_counter()
+        # startt = time.perf_counter()
         self.pos = int(pos)
         self._check_bound()
         img = self.to_img()
-        midt = time.perf_counter()
+        # midt = time.perf_counter()
         self.nodes = self.server.scene.add_image(
             self.axis,
             img,
@@ -119,10 +125,10 @@ class VolumeSlice:
             wxyz=self.wxyz,
             position=self.position,
         )
-        endt = time.perf_counter()
-        print(
-            f"update_nodes:{(midt - startt)*1000:.3f}ms, {(endt - midt)*1000:.3f}ms"
-        )
+        # endt = time.perf_counter()
+        # print(
+        #     f"update_node:{(midt - startt)*1000:.3f}ms, {(endt - midt)*1000:.3f}ms"
+        # )
 
     @property
     def limit(self):
@@ -141,15 +147,15 @@ class VolumeSlice:
 
     def update_cmap(self, cmap):
         self.cmap = cmap
-        self.update_nodes(self.pos)
+        self.update_node(self.pos)
 
     def update_clim(self, clim):
         self.clim = clim
-        self.update_nodes(self.pos)
+        self.update_node(self.pos)
 
     def update_scale(self, scale):
         self.scale = scale
-        self.update_nodes(self.pos)
+        self.update_node(self.pos)
 
     def add_mask(self, vol, cmap: str, clim: List = None):
         assert vol.shape == self.volume.shape
@@ -158,5 +164,4 @@ class VolumeSlice:
             clim = [vol.min(), vol.max()]
         self.fg_cmaps.append(cmap)
         self.fg_clims.append(clim)
-        self.update_nodes(self.pos)
-
+        self.update_node(self.pos)

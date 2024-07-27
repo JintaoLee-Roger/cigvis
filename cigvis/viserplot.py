@@ -2,10 +2,14 @@ import time
 
 from typing import List, Dict, Tuple, Union
 import matplotlib.pyplot as plt
-from cigvis import colormap
 import numpy as np
 import viser
-from cigvis.visernodes import VolumeSlice
+
+import cigvis
+from cigvis import colormap
+from cigvis.visernodes import VolumeSlice, MeshNode
+import cigvis.utils as utils
+from cigvis.utils import surfaceutils
 
 
 def create_slices(volume: np.ndarray,
@@ -45,9 +49,9 @@ def add_mask(nodes: List,
     if not isinstance(volumes, List):
         volumes = [volumes]
 
-    # for volume in volumes:
-    #     # TODO: check shape as same as base image
-    #     utils.check_mmap(volume)
+    for volume in volumes:
+        # TODO: check shape as same as base image
+        utils.check_mmap(volume)
 
     if clims is None:
         clims = [[v.min(), v.max()] for v in volumes]
@@ -74,10 +78,158 @@ def add_mask(nodes: List,
     return nodes
 
 
-def plot3D(nodes):
+def create_surfaces(surfs: List[np.ndarray],
+                    volume: np.ndarray = None,
+                    value_type: str = 'depth',
+                    clim: List = None,
+                    cmap: str = 'jet',
+                    alpha: float = 1,
+                    shape: Union[Tuple, List] = None,
+                    interp: bool = False,
+                    step1=1,
+                    step2=1,
+                    **kwargs) -> List:
+    """
+    create a surfaces node
+
+    Parameters
+    ----------
+    surfs : List or array-like
+        the surface position, which can be an array (one surface) or 
+        List (multi-surfaces). Each surf can be a (n1, n2)/(n1, n2, 2) 
+        array or (N, 3)/(N, 4) array, such as
+        >>> surf.shape = (n1, n2) # surf[i, j] means z pos at x=i, y=j
+        # surf[i, j, 0] means z pos at x=i, y=j
+        # surf[i, j, 1] means value for plotting at pos (i, j, surf[i, j])
+        >>> surf.shape = (n1, n2, 2)
+        # surf[i, j, 1:] means rgb or rgba color at pos (i, j, surf[i, j])
+        >>> surf.shape = (n1, n2, 4) or (n1, n2, 5)
+        >>> surf.shape = (N, 3) # surf[i, :] means i-th point position
+        # surf[i, :3] means i-th point position
+        # surf[i, 3] means i-th point's value for plotting
+        >>> surf.shape = (N, 4)
+        # surf[i, 3:] means i-th point color in rgb or rgba format
+        >>> surf.shape = (N, 6) or (N, 7)
+    volume : array-like
+        3D array, values when surf_color is 'amp'
+    value_type : str
+        'depth' or 'amp', show z or amplitude, amplitude can be values in volume or
+        values or colors
+    clim : List
+        [vmin, vmax] of surface volumes
+    cmap : str or Colormap
+        cmap for surface
+    alpha : float
+        opactity of the surfaces
+    shape : List or Tuple
+        If surf's shape is like (N, 3) or (N, 4), shape must be specified,
+        if surf's shape is like (n1, n2) or (n1, n2, 2), shape will be ignored
+    
+    kwargs : Dict
+        parameters for vispy.scene.visuals.Mesh
+    """
+    utils.check_mmap(volume)
+    utils.check_mmap(surfs)
+    line_first = cigvis.is_line_first()
+    method = kwargs.get('method', 'cubic')
+    fill = kwargs.get('fill', -1)
+    anti_rot = kwargs.get('anti_rot', True)
+
+    # add surface
+    if not isinstance(surfs, List):
+        surfs = [surfs]
+
+    surfaces = []
+    values = []
+    colors = []
+    for surf in surfs:
+        if surf.ndim == 3:
+            s, v, c = surfaceutils.preproc_surf_array3(surf, value_type)
+        elif surf.ndim == 2:
+            if surf.shape[1] > 7:
+                s, v, c = surfaceutils.preproc_surf_array2(
+                    surf, volume, value_type)
+            else:
+                assert volume is not None or shape is not None
+                if shape is None:
+                    shape = volume.shape[:2] if line_first else volume.shape[1:]
+                s, v, c = surfaceutils.preproc_surf_pos(
+                    surf, shape, volume, value_type, interp, method, fill)
+        else:
+            raise RuntimeError('Invalid shape')
+        surfaces.append(s)
+        values.append(v)
+        colors.append(c)
+
+    if value_type == 'depth':
+        values = surfaces
+
+    if clim is None and value_type == 'amp':
+        vmin = min([np.nanmin(s) for s in values])
+        vmax = max([np.nanmax(s) for s in values])
+        clim = [vmin, vmax]
+    elif clim is None and value_type == 'depth':
+        vmin = min([s[s >= 0].min() for s in values])
+        vmax = max([s[s >= 0].max() for s in values])
+        clim = [vmin, vmax]
+
+    cmap = colormap.get_cmap_from_str(cmap)
+    if alpha < 1:
+        cmap = colormap.set_alpha(cmap, alpha, False)
+
+    mesh_nodes = []
+    for s, v, c in zip(surfaces, values, colors):
+        mask = np.logical_or(s < 0, np.isnan(s))
+        vertices, faces = surfaceutils.get_vertices_and_faces(
+            s, mask, anti_rot=anti_rot, step1=step1, step2=step2)
+        mask = mask[::step1, ::step2]
+        if v is not None:
+            v = v[::step1, ::step2]
+            v = v[~mask].flatten()
+        if c is not None:
+            channel = c.shape[-1]
+            c = c[::step1, ::step2, ...]
+            c = c[~mask].flatten().reshape(-1, channel)
+
+        mesh_kwargs = {} # TODO:
+
+        if kwargs.get('color', None) is not None:
+            v = None
+            c = None
+        if c is not None:
+            v = None
+
+        mesh = MeshNode(vertices=vertices,
+                        faces=faces,
+                        face_colors=None,
+                        vertex_colors=c,
+                        vertices_values=v,
+                        **mesh_kwargs)
+
+        if v is not None and c is None and kwargs.get('color', None) is None:
+            mesh.cmap = cmap
+            mesh.clim = clim
+
+        mesh_nodes.append(mesh)
+
+    return mesh_nodes
+
+
+def plot3D(nodes, **kwargs):
     server = viser.ViserServer()
 
+    scale = 1.0
     for node in nodes:
+        if isinstance(node, VolumeSlice):
+            scale = node.scale
+            break
+
+    meshid = 0
+    for node in nodes:
+        if isinstance(node, MeshNode):
+            node.scale = scale
+            node.name = f'mesh{meshid}'
+            meshid += 1
         node.server = server
 
     @server.on_client_connect
@@ -87,9 +239,18 @@ def plot3D(nodes):
     server.scene.set_up_direction((0.0, 0.0, -1.0))
 
     with server.gui.add_folder("slices pos"):
-        nodex = [node for node in nodes if node.axis == 'x'][0]
-        nodey = [node for node in nodes if node.axis == 'y'][0]
-        nodez = [node for node in nodes if node.axis == 'z'][0]
+        nodex = [
+            node for node in nodes
+            if isinstance(node, VolumeSlice) and node.axis == 'x'
+        ][0]
+        nodey = [
+            node for node in nodes
+            if isinstance(node, VolumeSlice) and node.axis == 'y'
+        ][0]
+        nodez = [
+            node for node in nodes
+            if isinstance(node, VolumeSlice) and node.axis == 'z'
+        ][0]
         guix = server.gui.add_slider(
             'x',
             min=0,
@@ -97,7 +258,7 @@ def plot3D(nodes):
             step=1,
             initial_value=nodex.pos,
         )
-        guix.on_update(lambda _: nodex.update_nodes(guix.value))
+        guix.on_update(lambda _: nodex.update_node(guix.value))
         guiy = server.gui.add_slider(
             'y',
             min=0,
@@ -105,7 +266,7 @@ def plot3D(nodes):
             step=1,
             initial_value=nodey.pos,
         )
-        guiy.on_update(lambda _: nodey.update_nodes(guiy.value))
+        guiy.on_update(lambda _: nodey.update_node(guiy.value))
         guiz = server.gui.add_slider(
             'z',
             min=0,
@@ -113,7 +274,7 @@ def plot3D(nodes):
             step=1,
             initial_value=nodez.pos,
         )
-        guiz.on_update(lambda _: nodez.update_nodes(guiz.value))
+        guiz.on_update(lambda _: nodez.update_node(guiz.value))
 
     vmin = nodes[0].volume.min()
     vmax = nodes[0].volume.max()
@@ -159,5 +320,10 @@ def plot3D(nodes):
         )
         guicmap.on_update(lambda _: update_cmap(guicmap.value))
 
-    while True:
-        time.sleep(0.1)
+    try:
+        while True:
+            time.sleep(0.1)
+    except KeyboardInterrupt:
+        server.stop()
+        del server
+        print("Execution interrupted")
