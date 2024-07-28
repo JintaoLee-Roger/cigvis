@@ -34,13 +34,16 @@ class VolumeSlice:
         self.cmap = cmap
         self.clim = clim if clim is not None else [volume.min(), volume.max()]
 
+        self.init_scale = [8 / max(volume.shape)] * 3
+
         if isinstance(scale, Union[int, float]):
             if scale < 0:
-                self.scale = [8 / max(volume.shape)] * 3
+                self.scale = [1] * 3
             else:
                 self.scale = [scale] * 3
         else:
             self.scale = scale
+        self.scale = [s * x for s, x in zip(self.scale, self.init_scale)]
 
         self.update_node(self.pos)
         self.masks = []
@@ -157,7 +160,7 @@ class VolumeSlice:
     def update_scale(self, scale):
         if isinstance(scale, Union[int, float]):
             scale = [scale] * 3
-        self.scale = [s * x for s, x in zip(scale, self.scale)]
+        self.scale = [s * x for s, x in zip(scale, self.init_scale)]
 
         self.update_node(self.pos)
 

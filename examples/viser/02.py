@@ -13,11 +13,8 @@ Display 3D seismic data and multiple horizons
 
 # sphinx_gallery_thumbnail_path = '_static/cigvis/3Dvispy/05.png'
 
-from matplotlib import pyplot as plt
 import numpy as np
-from cigvis import viserplot, colormap
-from cigvis.visernodes import MeshNode
-from cigvis.utils import surfaceutils
+from cigvis import viserplot
 
 sxp = 'data/co2/sx.dat'
 sfp1 = 'data/co2/mh21.dat'
@@ -31,12 +28,13 @@ sf2 = np.fromfile(sfp2, np.float32).reshape(ni, nx)
 nodes = viserplot.create_slices(sx, cmap='gray')
 
 # show amplitude
-nodes += viserplot.create_surfaces([sf1, sf2],
-                                volume=sx,
-                                value_type='amp',
-                                cmap='gray',
-                                clim=[sx.min(), sx.max()],
-                                )
+nodes += viserplot.create_surfaces(
+    [sf1, sf2],
+    volume=sx,
+    value_type='amp',
+    cmap='gray',
+    clim=[sx.min(), sx.max()],
+)
 
 # # add two points
 # nodes += viserplot.create_points(np.array([[70, 50, 158], [20, 100, 80]]), r=3)

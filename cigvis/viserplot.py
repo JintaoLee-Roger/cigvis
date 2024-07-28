@@ -191,7 +191,7 @@ def create_surfaces(surfs: List[np.ndarray],
             c = c[::step1, ::step2, ...]
             c = c[~mask].flatten().reshape(-1, channel)
 
-        mesh_kwargs = {} # TODO:
+        mesh_kwargs = {}  # TODO:
 
         if kwargs.get('color', None) is not None:
             v = None
@@ -216,18 +216,20 @@ def create_surfaces(surfs: List[np.ndarray],
 
 
 def plot3D(nodes, axis_scales=[1, 1, 1], **kwargs):
-    server = viser.ViserServer()
+    server = viser.ViserServer(label='cigvis-viser')
 
-    scales = 1.0
+    # update scale of slices
+    init_scale = -1
     for node in nodes:
         if isinstance(node, VolumeSlice):
+            init_scale = node.init_scale
             node.update_scale(axis_scales)
-            scales = node.scale
 
+    # update scale of meshes
     meshid = 0
     for node in nodes:
         if isinstance(node, MeshNode):
-            node.scale = scales
+            node.scale = [s * x for s, x in zip(init_scale, axis_scales)]
             node.name = f'mesh{meshid}'
             meshid += 1
         node.server = server
@@ -238,6 +240,7 @@ def plot3D(nodes, axis_scales=[1, 1, 1], **kwargs):
 
     server.scene.set_up_direction((0.0, 0.0, -1.0))
 
+    # gui slices slibers to control slices position
     with server.gui.add_folder("slices pos"):
         nodex = [
             node for node in nodes
@@ -276,6 +279,7 @@ def plot3D(nodes, axis_scales=[1, 1, 1], **kwargs):
         )
         guiz.on_update(lambda _: nodez.update_node(guiz.value))
 
+    # gui to control slices clim and cmap
     vmin = nodes[0].volume.min()
     vmax = nodes[0].volume.max()
     step = (vmax - vmin) / 100
@@ -284,11 +288,13 @@ def plot3D(nodes, axis_scales=[1, 1, 1], **kwargs):
         if vmin >= vmax:
             return
         for node in nodes:
-            node.update_clim([vmin, vmax])
+            if hasattr(node, 'update_clim'):
+                node.update_clim([vmin, vmax])
 
     def update_cmap(cmap):
         for node in nodes:
-            node.update_cmap(cmap)
+            if hasattr(node, 'update_cmap'):
+                node.update_cmap(cmap)
 
     with server.gui.add_folder("paramters"):
         guivmin = server.gui.add_slider(
@@ -319,6 +325,47 @@ def plot3D(nodes, axis_scales=[1, 1, 1], **kwargs):
             initial_value='gray',
         )
         guicmap.on_update(lambda _: update_cmap(guicmap.value))
+
+
+    # gui to control aspect
+    def update_scale(scale):
+        for node in nodes:
+            if isinstance(node, VolumeSlice):
+                node.update_scale(scale)
+            elif isinstance(node, MeshNode):
+                node.scale = [s * x for s, x in zip(init_scale, scale)]
+
+    with server.gui.add_folder('Aspect'):
+        gui_scalex = server.gui.add_slider(
+            'scale_x',
+            min=0.25,
+            max=2.5,
+            step=0.25,
+            initial_value=1,
+        )
+
+        gui_scaley = server.gui.add_slider(
+            'scale_y',
+            min=0.25,
+            max=2.5,
+            step=0.25,
+            initial_value=1,
+        )
+
+        gui_scalez = server.gui.add_slider(
+            'scale_z',
+            min=0.1,
+            max=3,
+            step=0.1,
+            initial_value=1,
+        )
+
+        gui_scalex.on_update(lambda _: update_scale(
+            [gui_scalex.value, gui_scaley.value, gui_scalez.value]))
+        gui_scaley.on_update(lambda _: update_scale(
+            [gui_scalex.value, gui_scaley.value, gui_scalez.value]))
+        gui_scalez.on_update(lambda _: update_scale(
+            [gui_scalex.value, gui_scaley.value, gui_scalez.value]))
 
     try:
         while True:
