@@ -47,9 +47,23 @@ import warnings
 from typing import List, Tuple, Union, Dict
 import copy
 import numpy as np
-import plotly.graph_objects as go
-from skimage.measure import marching_cubes
-from skimage import transform
+from cigvis import ExceptionWrapper
+try:
+    import plotly.graph_objects as go
+except BaseException as e:
+    go = ExceptionWrapper(e)
+    warnings.warn(
+        "plotly is not installed, please install it by `pip install plotly`")
+
+try:
+    from skimage.measure import marching_cubes
+    from skimage import transform
+except BaseException as e:
+    marching_cubes = ExceptionWrapper(e)
+    transform = ExceptionWrapper(e)
+    warnings.warn(
+        "skimage is not installed, please install it by `pip install scikit-image`"
+    )
 
 import cigvis
 from cigvis import colormap
@@ -349,12 +363,15 @@ def create_well_logs(*args, **kwargs):
     """
     use Mesh3D to create tube logs
     """
-    raise NotImplementedError("`create_well_logs` currently not supported in the jupyter, please run it with a .py file. If you must run in jupyter, please consider use `create_Line_logs`") # noqa: E501
+    raise NotImplementedError(
+        "`create_well_logs` currently not supported in the jupyter, please run it with a .py file. If you must run in jupyter, please consider use `create_Line_logs`"
+    )  # noqa: E501
 
 
 def add_mask(*args, **kwargs):
-    raise NotImplementedError("`add_mask` currently not supported in the jupyter, please run it with a .py file. If you must run in jupyter, please consider use `create_overlay`") # noqa: E501
-
+    raise NotImplementedError(
+        "`add_mask` currently not supported in the jupyter, please run it with a .py file. If you must run in jupyter, please consider use `create_overlay`"
+    )  # noqa: E501
 
 
 def create_points(points, color='red', size=3, sym='square'):
@@ -417,7 +434,9 @@ def create_bodys(volume, level, margin: float = None, color='yellow'):
 
 
 def create_fault_skin(*args, **kwargs):
-    raise NotImplementedError("`add_mask` currently not supported in the jupyter, please run it with a .py file. If you must run in jupyter, please consider use `create_overlay`") # noqa: E501
+    raise NotImplementedError(
+        "`add_mask` currently not supported in the jupyter, please run it with a .py file. If you must run in jupyter, please consider use `create_overlay`"
+    )  # noqa: E501
 
 
 def plot3D(traces, **kwargs):

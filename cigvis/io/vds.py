@@ -110,6 +110,11 @@ class VDSReader:
                     start_idx[i] = k
                     end_idx[i] = k + 1
                 elif isinstance(k, slice):
+                    if not (k.step is None or k.step == 1):
+                        raise IndexError(
+                            f"only support step is 1, while got a step {k.step} in the {i}th dimension"
+                        )
+
                     start_idx[i] = k.start or 0
                     end_idx[i] = k.stop or self.shape[i]
 

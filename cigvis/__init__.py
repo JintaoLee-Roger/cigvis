@@ -29,6 +29,32 @@ progress). The 3D visualization component is heavily based on the code from
 and has been further developed upon this foundation.
 """
 
+
+class ExceptionWrapper:
+    """
+    Copy from `trimesh.exceptions.ExceptionWrapper`
+
+    Create a dummy object which will raise an exception when attributes
+    are accessed (i.e. when used as a module) or when called (i.e.
+    when used like a function)
+
+    For soft dependencies we want to survive failing to import but
+    we would like to raise an appropriate error when the functionality is
+    actually requested so the user gets an easily debuggable message.
+    """
+
+    def __init__(self, exception):
+        self.exception = exception
+
+    def __getattribute__(self, *args, **kwargs):
+        if args[0] == "__class__":
+            return None.__class__
+        raise super().__getattribute__("exception")
+
+    def __call__(self, *args, **kwargs):
+        raise super().__getattribute__("exception")
+
+
 import sys
 from .config import *
 from . import io
@@ -43,6 +69,10 @@ if injupyter:
 else:
     from .vispyplot import *
 
-from . import viserplot
+try:
+    from . import viserplot
+except BaseException as E:
+    viserplot = ExceptionWrapper(E)
+
 from .mpl2dplot import *
 from .mpl1dplot import *
