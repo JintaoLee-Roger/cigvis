@@ -352,7 +352,10 @@ class PlotCanvas(qtw.QWidget, DraggableMixin, CameraMixin, ImageMixin,
         self.nodes.clear()
 
         # clear data
-        del self.data
+        try:
+            self.data.close()
+        except:
+            del self.data
         self.data = None
 
         # init

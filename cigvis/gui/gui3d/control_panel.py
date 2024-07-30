@@ -107,6 +107,14 @@ class LoadBtn(qtw.QPushButton):
                     data = cigvis.io.VDSReader(filePath)
                 elif filePath.endswith('.npy'):
                     data = np.load(filePath)
+
+                elif filePath.endswith('.sgy') or filePath.endswith('.segy') or filePath.endswith('.Sgy'):
+                    try:
+                        from cigsegy import SegyNP
+                    except:
+                        raise ImportError("to load SEG-Y file, install cigsegy first")
+                    data = SegyNP(filePath)
+
                 else:
                     data = np.memmap(filePath,
                                      np.float32,
@@ -420,6 +428,7 @@ def _get_dim_from_filename(fname: str, return_int: bool = True):
     - xxx.vds, i.e., VDS file
     - fname_{x}_{y}_{z}.sufix, e.g., fname_200_500_128.dat
     - xxx.npy, i.e., numpy file
+    - xxx.sgy, i.e., SEG-Y file, need install cigsegy
     """
     if fname.endswith(".vds"):
         vds = cigvis.io.VDSReader(fname)
@@ -441,6 +450,20 @@ def _get_dim_from_filename(fname: str, return_int: bool = True):
             return shape
         else:
             return str(shape[0]), str(shape[1]), str(shape[2])
+
+    elif fname.endswith('.sgy') or fname.endswith('.segy') or fname.endswith('.Sgy'):
+        try:
+            from cigsegy import SegyNP
+            d = SegyNP(fname)
+            shape = d.shape
+        except:
+            return False
+
+        if return_int:
+            return shape
+        else:
+            return str(shape[0]), str(shape[1]), str(shape[2])
+
 
     pattern1 = r'\w+\_h(\d+)x(\d+)x(\d+)'
     pattern2 = r'\w+\_(\d+)\_(\d+)\_(\d+)'
