@@ -31,7 +31,7 @@ def create_slices(volume: np.ndarray,
     assert isinstance(pos, Dict)
 
     if clim is None:
-        clim = [volume.min(), volume.max()]
+        clim = [np.nanmin(volume), np.nanmax(volume)]
 
     nodes = []
     for axis, p in pos.items():
@@ -42,7 +42,7 @@ def create_slices(volume: np.ndarray,
 
 
 def add_mask(nodes: List,
-             volumes: Union[List[np.ndarray], np.ndarray],
+             volumes: Union[List, np.ndarray],
              clims: Union[List, Tuple] = None,
              cmaps: Union[str, List] = None,
              **kwargs) -> List:
@@ -54,7 +54,7 @@ def add_mask(nodes: List,
         utils.check_mmap(volume)
 
     if clims is None:
-        clims = [[v.min(), v.max()] for v in volumes]
+        clims = [[np.nanmin(v), np.nanmax(v)] for v in volumes]
     if not isinstance(clims[0], (List, Tuple)):
         clims = [clims]
 
@@ -280,8 +280,8 @@ def plot3D(nodes, axis_scales=[1, 1, 1], **kwargs):
         guiz.on_update(lambda _: nodez.update_node(guiz.value))
 
     # gui to control slices clim and cmap
-    vmin = nodes[0].volume.min()
-    vmax = nodes[0].volume.max()
+    vmin = np.nanmin(nodes[0].volume)
+    vmax = np.nanmax(nodes[0].volume)
     step = (vmax - vmin) / 100
 
     def update_clim(vmin, vmax):

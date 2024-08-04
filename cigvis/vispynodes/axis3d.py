@@ -90,7 +90,7 @@ class BoxLine(Compound):
                  color='black',
                  width=1,
                  antialias=True):
-        if isinstance(expand, (float, int)):
+        if isinstance(expand, (np.floating, np.integer)):
             expand = [expand] * 3
         assert len(expand) == 3
         assert len(shape) == 3

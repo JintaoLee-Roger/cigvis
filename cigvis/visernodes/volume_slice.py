@@ -5,19 +5,6 @@ import matplotlib.pyplot as plt
 import viser
 
 
-def arrs2img(bg, cmap, clim, masks, fg_cmaps, fg_clims):
-    """
-    merge serveral arrays into one image
-    """
-    if masks is not None and isinstance(masks, List) and len(masks) > 0:
-        return colormap.blend_multiple(bg, masks, cmap, fg_cmaps, clim,
-                                       fg_clims)
-    else:
-        norm = plt.Normalize(vmin=clim[0], vmax=clim[1])
-        out = colormap.get_cmap_from_str(cmap)(norm(bg))
-        return out[:, :, :3]
-
-
 class VolumeSlice:
 
     def __init__(self,
@@ -36,7 +23,7 @@ class VolumeSlice:
 
         self.init_scale = [8 / max(volume.shape)] * 3
 
-        if isinstance(scale, Union[int, float]):
+        if isinstance(scale, (int, float)):
             if scale < 0:
                 self.scale = [1] * 3
             else:
@@ -108,8 +95,7 @@ class VolumeSlice:
             bg = self.volume[:, :, self.pos]
             fg = [mask[:, :, self.pos] for mask in self.masks]
 
-        img = arrs2img(bg, self.cmap, self.clim, fg, self.fg_cmaps,
-                       self.fg_clims)
+        img = colormap.arrs_to_image([bg]+fg, [self.cmap]+self.fg_cmaps, [self.clim] + self.fg_clims, True)
         return img
 
     def update_node(self, pos):
@@ -158,7 +144,7 @@ class VolumeSlice:
         self.update_node(self.pos)
 
     def update_scale(self, scale):
-        if isinstance(scale, Union[int, float]):
+        if isinstance(scale, (int, float)):
             scale = [scale] * 3
         self.scale = [s * x for s, x in zip(scale, self.init_scale)]
 

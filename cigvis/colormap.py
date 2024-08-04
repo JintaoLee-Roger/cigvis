@@ -21,6 +21,7 @@ from matplotlib.colors import ListedColormap, LinearSegmentedColormap
 from matplotlib.colors import Colormap as mplColormap
 import matplotlib.colors as mcolors
 import numpy as np
+import warnings
 
 from vispy.color import Colormap as vispyColormap
 from vispy.color import get_colormap as get_vispycmap
@@ -28,21 +29,60 @@ from vispy.color import get_colormap as get_vispycmap
 from .customcmap import *
 
 
+def arrs_to_image(arr, cmap, clim, as_uint8=False):
+
+    def _to_image(arr, cmap, clim):
+        norm = plt.Normalize(vmin=clim[0], vmax=clim[1])
+        cmap = get_cmap_from_str(cmap)
+        img = cmap(norm(arr))
+        return img
+
+    if not isinstance(arr, List):
+        arr = [arr]
+    if not isinstance(cmap, List):
+        cmap = [cmap]
+    if not isinstance(clim[0], List):
+        clim = [clim]
+    if len(arr) != len(cmap) or len(arr) != len(clim):
+        raise RuntimeError("(len(arr) != len(cmap)) or (len(arr) != len(clim))")
+
+    out = _to_image(arr[0], cmap[0], clim[0])
+    for i in range(1, len(arr)):
+        img = _to_image(arr[i], cmap[i], clim[i])
+
+        bgRGB = out[:, :, :3]
+        fgRGB = img[:, :, :3]
+
+        bgA = out[:, :, 3]
+        fgA = img[:, :, 3]
+
+        # a for foreground, b for background
+        # alpha_o = alpha_a + alpha_b * (1 - alpha_a)
+        # C_o = (C_a * alpha_a + C_b * alpha_b * (1 - alpha_a)) / alpha_o
+        outA = fgA + bgA * (1 - fgA)
+        outA = np.clip(outA, 1e-10, None)  # avoid divide zero
+        outRGB = (fgRGB * fgA[..., np.newaxis] + bgRGB * bgA[..., np.newaxis] *
+                  (1 - fgA[..., np.newaxis])) / outA[..., np.newaxis]
+
+        out = np.dstack((outRGB, outA))
+
+    if as_uint8:
+        out = (out * 255).astype(np.uint8)
+    return out
+
+
 def blend_two_arrays(bg, fg, bg_cmap, fg_cmap, bg_clim, fg_clim):
     """
     blend two arrays using their cmap
     """
-    if isinstance(bg_cmap, str):
-        bg_cmap = get_cmap_from_str(bg_cmap)
-    if isinstance(fg_cmap, str):
-        fg_cmap = get_cmap_from_str(fg_cmap)
-    norm1 = plt.Normalize(vmin=bg_clim[0], vmax=bg_clim[1])
-    norm2 = plt.Normalize(vmin=fg_clim[0], vmax=fg_clim[1])
-    arr1_rgba = bg_cmap(norm1(bg))
-    arr2_rgba = fg_cmap(norm2(fg))
 
-    alpha = arr2_rgba[:, :, 3][..., None]
-    out = arr1_rgba[:, :, :3] * (1 - alpha) + arr2_rgba[:, :, :3] * alpha
+    warnings.warn(
+        "`blend_two_arrays` is deprecated and will be removed in a future version. Please use `arrs_to_image` instead."
+        " e.g., `arrs_to_image([bg, fg], [bg_cmap, fg_cmap], [bg_clim, fg_clim])`",
+        DeprecationWarning,
+        stacklevel=2)
+
+    out = arrs_to_image([bg, fg], [bg_cmap, fg_cmap], [bg_clim, fg_clim])
 
     return out
 
@@ -50,16 +90,13 @@ def blend_two_arrays(bg, fg, bg_cmap, fg_cmap, bg_clim, fg_clim):
 def blend_multiple(bg, fg, bg_cmap, fg_cmap, bg_clim, fg_clim):
     """
     """
-    out = blend_two_arrays(bg, fg[0], bg_cmap, fg_cmap[0], bg_clim, fg_clim[0])
+    warnings.warn(
+        "`blend_multiple` is deprecated and will be removed in a future version. Please use `arrs_to_image` instead."
+        " e.g., `arrs_to_image([bg, fg[0], ...], [bg_cmap, fg_cmap[0], ...], [bg_clim, fg_clim[0], ...])`",
+        DeprecationWarning,
+        stacklevel=2)
 
-    for i in range(len(fg) - 1):
-        norm = plt.Normalize(vmin=fg_clim[i + 1][0], vmax=fg_clim[i + 1][1])
-        cmap = fg_cmap[i + 1]
-        if isinstance(cmap, str):
-            cmap = get_cmap_from_str(cmap)
-        arr_rgba = cmap(norm(fg[i + 1]))
-        alpha = arr_rgba[:, :, 3][..., None]
-        out = out * (1 - alpha) + arr_rgba[:, :, :3] * alpha
+    out = arrs_to_image([bg] + fg, [bg_cmap] + fg_cmap, [bg_clim] + fg_clim)
 
     return out
 

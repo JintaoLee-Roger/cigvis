@@ -280,7 +280,7 @@ def plot1_with_fill(y,
         else:
             raise ValueError("Invalid input of y2")
 
-    if isinstance(y2, (float, int)):
+    if isinstance(y2, (np.floating, np.integer)):
         y2 = np.array([y2] * x.size)
     if isinstance(y2, List):
         y2 = np.array(y2)

@@ -258,9 +258,8 @@ def create_overlay(bg_volume: np.ndarray,
             bs = bg_slices[dim][j]
             plotlyutils.verifyshape(bs.shape, shape, dim)
             fs = [fg[dim][j] for fg in fg_slices]
-            colors = colormap.blend_multiple(bs, fs, bg_cmap, fg_cmap, bg_clim,
-                                             fg_clim)
-            colors = np.round(colors * 255).reshape(-1, 3)
+            colors = colormap.arrs_to_image([bs]+fs, [bg_cmap]+fg_cmap, [bg_clim]+fg_clim, True).reshape(-1, 4)
+            # colors = np.round(colors * 255).reshape(-1, 3)
             cplotly = [f'rgb({x[0]}, {x[1]}, {x[2]})' for x in colors]
 
             traces.append(
@@ -442,7 +441,7 @@ def create_fault_skin(*args, **kwargs):
 def plot3D(traces, **kwargs):
 
     size = kwargs.get('size', (900, 900))
-    size = (size, size) if isinstance(size, int) else size
+    size = (size, size) if isinstance(size, np.integer) else size
 
     scene = plotlyutils.make_3Dscene(**kwargs)
 

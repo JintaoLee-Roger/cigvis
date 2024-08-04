@@ -38,8 +38,7 @@ labl_sf = cigvis.utils.surfaceutils.interp_surf(labl, sf, order=1)
 # set a colormap for foreground, i.e., label
 labl_cmap = colormap.set_alpha_except_min('jet', 0.5, False)
 # blending two array into a color array, whose shape is (ni, nx, 3)
-colors = colormap.blend_two_arrays(seis_sf, labl_sf, 'Petrel', labl_cmap,
-                                   [seis.min(), seis.max()], [0, 1])
+colors = colormap.arrs_to_image([seis_sf, labl_sf], ['Petrel', labl_cmap], [[seis.min(), seis.max()], [0, 1]])
 # concatenate the surface pos and the correspanding colors, (ni, nx, 4)
 sfc = np.concatenate([sf[:, :, np.newaxis], colors], axis=2)
 

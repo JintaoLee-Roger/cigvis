@@ -141,7 +141,7 @@ def create_slices(volume: np.ndarray,
 
 
 def add_mask(nodes: List,
-             volumes: Union[List[np.ndarray], np.ndarray],
+             volumes: Union[List, np.ndarray],
              clims: Union[List, Tuple] = None,
              cmaps: Union[str, List] = None,
              interpolation: str = 'linear',

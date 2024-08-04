@@ -131,9 +131,9 @@ def make_slices(data: np.ndarray,
 
     slices = {'x': [], 'y': [], 'z': []}
     if pos is None:
-        x = [x] if isinstance(x, int) else x
-        y = [y] if isinstance(y, int) else y
-        z = [z] if isinstance(z, int) else z
+        x = [x] if isinstance(x, np.integer) else x
+        y = [y] if isinstance(y, np.integer) else y
+        z = [z] if isinstance(z, np.integer) else z
 
         pos = {'x': x, 'y': y, 'z': z}
 
