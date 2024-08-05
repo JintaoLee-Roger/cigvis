@@ -83,7 +83,7 @@ class VDSReader:
             return data.transpose()
 
     def _process_keys(self, key) -> List:
-        if isinstance(key, np.integer):
+        if isinstance(key, (int, np.integer)):
             if key < 0:
                 key += self.shape[0]
             if key < 0 or key >= self.shape[0]:
@@ -104,7 +104,7 @@ class VDSReader:
             for i, k in enumerate(key):
                 if k is None:
                     continue
-                if isinstance(k, np.integer):
+                if isinstance(k, (int, np.integer)):
                     if k < 0:
                         k += self.shape[i]
                     start_idx[i] = k
@@ -152,9 +152,9 @@ class VDSReader:
 
     def __array_function__(self, func, types, args, kwargs):
         if func is np.nanmin:
-            return self.min(*args, **kwargs)
+            return self.min()
         elif func is np.nanmax:
-            return self.max(*args, **kwargs)
+            return self.max()
         raise NotImplementedError(f"Function {func} is not implemented for SegyNP")
 
 

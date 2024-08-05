@@ -89,7 +89,7 @@ class FixedImage(scene.visuals.Image):
         assert axis in ['x', 'y', 'z']
         self.axis = axis
 
-        if isinstance(pos, np.integer):
+        if isinstance(pos, (int, np.integer)):
             if axis == 'x':
                 self.pos = (pos, 0, 0)
             elif axis == 'y':

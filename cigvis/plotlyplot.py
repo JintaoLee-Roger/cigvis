@@ -121,7 +121,7 @@ def create_slices(volume: np.ndarray,
     assert isinstance(pos, Dict)
 
     if clim is None:
-        clim = [volume.min(), volume.max()]
+        clim = [np.nanmin(volume), np.nanmax(volume)]
     vmin, vmax = clim
 
     slices, pos = plotlyutils.make_slices(volume, pos=pos)
@@ -214,9 +214,9 @@ def create_overlay(bg_volume: np.ndarray,
     assert isinstance(pos, Dict)
 
     if bg_clim is None:
-        bg_clim = [bg_volume.min(), bg_volume.max()]
+        bg_clim = [np.nanmin(bg_volume), np.nanmax(bg_volume)]
     if fg_clim is None:
-        fg_clim = [[v.min(), v.max()] for v in fg_volume]
+        fg_clim = [[np.nanmin(v), np.nanmax(v)] for v in fg_volume]
     if not isinstance(fg_clim[0], (List, Tuple)):
         fg_clim = [fg_clim]
 
@@ -441,7 +441,7 @@ def create_fault_skin(*args, **kwargs):
 def plot3D(traces, **kwargs):
 
     size = kwargs.get('size', (900, 900))
-    size = (size, size) if isinstance(size, np.integer) else size
+    size = (size, size) if isinstance(size, (int, np.integer)) else size
 
     scene = plotlyutils.make_3Dscene(**kwargs)
 

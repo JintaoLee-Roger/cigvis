@@ -121,7 +121,7 @@ def create_slices(volume: np.ndarray,
     assert isinstance(pos, Dict)
 
     if clim is None:
-        clim = [volume.min(), volume.max()]
+        clim = [np.nanmin(volume), np.nanmax(volume)]
     cmap = colormap.cmap_to_vispy(cmap)
 
     nodes = volume_slices(volume,
@@ -179,7 +179,7 @@ def add_mask(nodes: List,
         utils.check_mmap(volume)
 
     if clims is None:
-        clims = [[v.min(), v.max()] for v in volumes]
+        clims = [[np.nanmin(v), np.nanmax(v)] for v in volumes]
     if not isinstance(clims[0], (List, Tuple)):
         clims = [clims]
 
@@ -294,9 +294,9 @@ def create_overlay(bg_volume: np.ndarray,
     assert isinstance(pos, Dict)
 
     if bg_clim is None:
-        bg_clim = [bg_volume.min(), bg_volume.max()]
+        bg_clim = [np.nanmin(bg_volume), np.nanmax(bg_volume)]
     if fg_clim is None:
-        fg_clim = [[v.min(), v.max()] for v in fg_volume]
+        fg_clim = [[np.nanmin(v), np.nanmax(v)] for v in fg_volume]
     if not isinstance(fg_clim[0], (List, Tuple)):
         fg_clim = [fg_clim]
 

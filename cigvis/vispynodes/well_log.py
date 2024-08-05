@@ -135,7 +135,7 @@ def make_triangle_tube(points: np.ndarray,
         tangents, normals, binormals = _frenet_frames(points, False)
     segments = len(points) - 1
 
-    if not isinstance(radius, (np.floating, np.integer)):
+    if not isinstance(radius, (float, int, np.number)):
         radius = np.array(radius).reshape(1, -1, 1)
     points = points[np.newaxis, ...]
     normals = normals[np.newaxis, ...]

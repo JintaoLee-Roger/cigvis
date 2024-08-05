@@ -158,6 +158,6 @@ def _process_args(volumes: Union[np.ndarray, List],
                     + "time, cmap=(cmin, cmax) is recommended.",
                     UserWarning,
                     stacklevel=2)
-            clims[i_vol] = (vol.min(), vol.max())
+            clims[i_vol] = (np.nanmin(vol), np.nanmax(vol))
 
     return volumes, preproc_funcs, cmaps, clims, interpolation, n_vol, shape
