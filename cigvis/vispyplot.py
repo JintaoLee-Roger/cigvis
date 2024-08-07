@@ -67,6 +67,7 @@ def create_slices(volume: np.ndarray,
                   clim: List = None,
                   cmap: str = 'Petrel',
                   interpolation: str = 'cubic',
+                  texture_format=None,
                   return_cbar: bool = False,
                   **kwargs) -> List:
     """
@@ -90,6 +91,10 @@ def create_slices(volume: np.ndarray,
     interpolation : str
         interpolation method. If the values of the volume is discrete, we recommand 
         set as 'nearest'
+    texture_format : None or 'auto',
+        if use None, the NaNs will be clip to clim[1],
+        and if use 'auto', the NaNs will be discarded, i.e., transparent
+    
     return_cbar : bool
         return a colorbar
 
@@ -130,7 +135,8 @@ def create_slices(volume: np.ndarray,
                           pos['z'],
                           cmaps=cmap,
                           clims=clim,
-                          interpolation=interpolation)
+                          interpolation=interpolation,
+                          texture_format=texture_format)
 
     if return_cbar:
         cbar_kwargs = vispyutils.get_valid_kwargs('colorbar', **kwargs)
@@ -146,6 +152,7 @@ def add_mask(nodes: List,
              cmaps: Union[str, List] = None,
              interpolation: str = 'linear',
              method: str = 'auto',
+             texture_format: str = 'auto',
              preproc_funcs: Callable = None,
              **kwargs) -> List:
     """
@@ -204,8 +211,9 @@ def add_mask(nodes: List,
                 cmaps[i],
                 clims[i],
                 interpolation[i],
-                method,
-                preproc_funcs[i],
+                method=method,
+                texture_format=texture_format,
+                preproc_f=preproc_funcs[i],
             )
 
     return nodes
