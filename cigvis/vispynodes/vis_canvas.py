@@ -85,6 +85,9 @@ class VisCanvas(scene.SceneCanvas, EventMixin, LightMixin):
         axis_scales: Tuple = (1.0, 1.0, 1.0),
         auto_range: bool = True,
 
+        # for light
+        change_light: bool = True,
+
         # for save
         savedir: str = './',
         title: str = 'Seismic3D',
@@ -115,6 +118,8 @@ class VisCanvas(scene.SceneCanvas, EventMixin, LightMixin):
             zoom_factor = 1
         self.zoom_factor = zoom_factor
         self.share = share
+
+        self.change_light = change_light
 
         axis_scales = list(axis_scales)
         for i, r in enumerate(cigvis.is_axis_reversed()):
@@ -180,8 +185,6 @@ class VisCanvas(scene.SceneCanvas, EventMixin, LightMixin):
             for view, nodes in zip(self.view, self.nodes.values()):
                 self._attach_light(view, nodes)
         else:
-            # pass
-            # for view in self.view:
             self._attach_light_share(self.view[-1], self.nodes)
 
         self.freeze()

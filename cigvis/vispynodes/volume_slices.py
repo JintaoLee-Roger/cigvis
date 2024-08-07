@@ -28,7 +28,8 @@ def volume_slices(volumes: Union[np.ndarray, List],
                   cmaps: Union[str, Colormap, List] = 'grays',
                   clims: Union[List, Tuple] = None,
                   interpolation: str = 'linear',
-                  method: str = 'auto') -> List[AxisAlignedImage]:
+                  method: str = 'auto',
+                  texture_format=None) -> List[AxisAlignedImage]:
     """ 
     Acquire a list of slices in the form of AxisAlignedImage.
     The list can be attached to a VisCanvas to visualize the volume
@@ -103,7 +104,8 @@ def volume_slices(volumes: Union[np.ndarray, List],
                                               cmaps=cmaps,
                                               clims=clims,
                                               interpolation=interpolation,
-                                              method=method)
+                                              method=method,
+                                              texture_format=texture_format)
 
                 slices_list.append(image_node)
 
