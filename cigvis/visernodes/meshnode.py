@@ -3,10 +3,14 @@ from numpy.typing import ArrayLike
 import viser
 import numpy as np
 import matplotlib.pyplot as plt
+
 from cigvis import colormap
+from cigvis.meshs.surfaces import arbline2mesh
+
 import trimesh
 from trimesh.visual.material import PBRMaterial
 from trimesh.visual import TextureVisuals
+
 from PIL import Image
 
 
@@ -51,19 +55,24 @@ class MeshNode(trimesh.Trimesh):
         vertex_colors: Optional[ArrayLike] = None,
         color=(90, 200, 255),
         vertices_values: Optional[ArrayLike] = None,
-        scale: Optional[float] = 1.0,
+        scale=-1,
         cmap: Optional[str] = 'jet',
         clim: Optional[ArrayLike] = None,
         **kwargs,
     ):
         super().__init__(vertices=vertices, faces=faces, **kwargs)
 
-        # material = PBRMaterial(doubleSided=True)
-        # visual = TextureVisuals()
-        # self.visual = visual
         self._vertices = vertices
         self.colored_by = None  # can be 'value', 'vertex', 'face', or 'uniform'
-        self._scale = scale
+
+        if scale < 0:
+            rx = vertices[:, 0].max() - vertices[:, 0].min()
+            ry = vertices[:, 1].max() - vertices[:, 1].min()
+            rz = vertices[:, 2].max() - vertices[:, 2].min()
+            self._scale = [1 / max([rx, ry, rz])] * 3
+        else:
+            self._scale = [scale] * 3
+
         self._cmap = cmap
         self._clim = clim
         self._server: viser.ViserServer = None
@@ -87,52 +96,7 @@ class MeshNode(trimesh.Trimesh):
             self.colored_by = 'uniform'
 
     def set_colors(self):
-        if self.server is None:
-            return
-        if self._set_color:
-            return
-
-        self._set_color = True
-        if self.colored_by == 'value':
-            if self.clim is None:
-                self.clim = [
-                    self._vertices_values.min(),
-                    self._vertices_values.max()
-                ]
-            norm = plt.Normalize(vmin=self.clim[0], vmax=self.clim[1])
-            colors = colormap.get_cmap_from_str(self._cmap)(norm(
-                self._vertices_values))
-            colors = color_f2i(colors)
-            img, uv = color2textual(colors, self._vertices)
-            self.visual = TextureVisuals(
-                uv,
-                PBRMaterial(
-                    roughnessFactor=0.4,
-                    baseColorFactor=[110, 110, 110, 255],
-                    metallicFactor=.4,
-                    baseColorTexture=img,
-                    doubleSided=True,
-                ))
-            return
-
-        elif self.colored_by == 'vertex':
-            self.visual.vertex_colors = self._vertex_colors
-        elif self.colored_by == 'face':
-            self.visual.face_colors = self._face_colors
-        elif self.colored_by == 'uniform':
-            self.visual.vertex_colors = np.tile(
-                self._color,
-                (self.vertices.shape[0], 1),
-            )
-        self._set_visual()
-
-    def _set_visual(self):
-        self.visual = self.visual.to_texture()
-        self.visual.material = self.visual.material.to_pbr()
-        self.visual.material.doubleSided = True
-        self.visual.material.roughnessFactor = 0.4
-        self.visual.material.metallicFactor = 0.6
-        self.visual.material.baseColorFactor = [100, 100, 100, 255]
+        pass
 
     @property
     def server(self):
@@ -204,5 +168,133 @@ class MeshNode(trimesh.Trimesh):
         self.nodes = self.server.scene.add_mesh_trimesh(
             self.name,
             self,
-            # self.scale,
         )
+
+
+class SurfaceNode(MeshNode):
+
+    def __init__(
+        self,
+        vertices: Optional[ArrayLike] = None,
+        faces: Optional[ArrayLike] = None,
+        face_colors: Optional[ArrayLike] = None,
+        vertex_colors: Optional[ArrayLike] = None,
+        color=(90, 200, 255),
+        vertices_values: Optional[ArrayLike] = None,
+        scale: Optional[float] = 1.0,
+        cmap: Optional[str] = 'jet',
+        clim: Optional[ArrayLike] = None,
+        **kwargs,
+    ):
+        super().__init__(
+            vertices=vertices,
+            faces=faces,
+            face_colors=face_colors,
+            vertex_colors=vertex_colors,
+            color=color,
+            vertices_values=vertices_values,
+            scale=scale,
+            cmap=cmap,
+            clim=clim,
+            **kwargs,
+        )
+
+    def set_colors(self):
+        if self.server is None:
+            return
+        if self._set_color:
+            return
+
+        self._set_color = True
+        if self.colored_by == 'value':
+            if self.clim is None:
+                self.clim = [
+                    self._vertices_values.min(),
+                    self._vertices_values.max()
+                ]
+            norm = plt.Normalize(vmin=self.clim[0], vmax=self.clim[1])
+            colors = colormap.get_cmap_from_str(self._cmap)(norm(
+                self._vertices_values))
+            colors = color_f2i(colors)
+            # self.visual.vertex_colors = colors
+            img, uv = color2textual(colors, self._vertices)
+            self.visual = TextureVisuals(
+                uv,
+                PBRMaterial(
+                    roughnessFactor=0.4,
+                    baseColorFactor=[110, 110, 110, 255],
+                    metallicFactor=.4,
+                    baseColorTexture=img,
+                    doubleSided=True,
+                ))
+            return
+
+        elif self.colored_by == 'vertex':
+            self.visual.vertex_colors = self._vertex_colors
+        elif self.colored_by == 'face':
+            self.visual.face_colors = self._face_colors
+        elif self.colored_by == 'uniform':
+            self.visual.vertex_colors = np.tile(
+                self._color,
+                (self.vertices.shape[0], 1),
+            )
+        self._set_visual()
+
+    def _set_visual(self):
+        self.visual = self.visual.to_texture()
+        self.visual.material = self.visual.material.to_pbr()
+        self.visual.material.doubleSided = True
+        self.visual.material.roughnessFactor = 0.4
+        self.visual.material.metallicFactor = 0.4
+        self.visual.material.baseColorFactor = [110, 110, 110, 255]
+
+
+class ArbLineNode(MeshNode):
+
+    def __init__(
+        self,
+        path,
+        data,
+        scale=-1,
+        cmap: Optional[str] = 'jet',
+        clim: Optional[ArrayLike] = None,
+        vstep=1,
+        **kwargs,
+    ):
+        self.nl, self.nt = data.shape
+        assert len(path) == self.nl
+
+        vertices, faces = arbline2mesh(path, self.nt, False, vstep=vstep)
+        super().__init__(
+            vertices=vertices,
+            faces=faces,
+            scale=scale,
+            cmap=cmap,
+            clim=clim,
+            **kwargs,
+        )
+        self.data = data
+
+    def set_colors(self):
+        if self.server is None:
+            return
+        if self._set_color:
+            return
+
+        self._set_color = True
+        if self.clim is None:
+            self.clim = [np.nanmin(self.data), np.nanmax(self.data)]
+
+        norm = plt.Normalize(vmin=self.clim[0], vmax=self.clim[1])
+        colors = colormap.get_cmap_from_str(self._cmap)(norm(self.data))
+        colors = color_f2i(colors)
+        self.visual.vertex_colors = colors.reshape(-1, 4)
+        self._set_visual()
+
+    def _set_visual(self):
+        self.visual = self.visual.to_texture()
+        self.visual.material = self.visual.material.to_pbr()
+        self.visual.material.doubleSided = True
+        self.visual.material.roughnessFactor = 0.4
+        self.visual.material.metallicFactor = 0.2
+        self.visual.material.baseColorFactor = [100, 100, 100, 255]

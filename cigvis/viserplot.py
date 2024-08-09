@@ -7,7 +7,11 @@ import viser
 
 import cigvis
 from cigvis import colormap
-from cigvis.visernodes import VolumeSlice, MeshNode
+from cigvis.visernodes import (
+    VolumeSlice,
+    SurfaceNode,
+    MeshNode,
+)
 import cigvis.utils as utils
 from cigvis.utils import surfaceutils
 
@@ -199,12 +203,12 @@ def create_surfaces(surfs: List[np.ndarray],
         if c is not None:
             v = None
 
-        mesh = MeshNode(vertices=vertices,
-                        faces=faces,
-                        face_colors=None,
-                        vertex_colors=c,
-                        vertices_values=v,
-                        **mesh_kwargs)
+        mesh = SurfaceNode(vertices=vertices,
+                           faces=faces,
+                           face_colors=None,
+                           vertex_colors=c,
+                           vertices_values=v,
+                           **mesh_kwargs)
 
         if v is not None and c is None and kwargs.get('color', None) is None:
             mesh.cmap = cmap
@@ -219,11 +223,20 @@ def plot3D(nodes, axis_scales=[1, 1, 1], **kwargs):
     server = viser.ViserServer(label='cigvis-viser')
 
     # update scale of slices
+    draw_slices = False
     init_scale = -1
     for node in nodes:
         if isinstance(node, VolumeSlice):
             init_scale = node.init_scale
             node.update_scale(axis_scales)
+            draw_slices = True
+
+    if init_scale == -1: # no slices # TODO: for other types, Well logs?
+        init_scale = 100
+        for node in nodes:
+            if isinstance(node, MeshNode):
+                init_scale = min(min(node.scale), init_scale)
+        init_scale = [init_scale] * 3
 
     # update scale of meshes
     meshid = 0
@@ -238,6 +251,11 @@ def plot3D(nodes, axis_scales=[1, 1, 1], **kwargs):
     def _(client: viser.ClientHandle):
         client.camera.fov = -5
 
+        # TODO: move the origin (0, 0, 0) to the top
+        # def _(camera):
+        # client.camera.position = (3, 3, 3)
+
+    server.scene.add_frame('f', position=(-3, -3, -3))
     server.scene.set_up_direction((0.0, 0.0, -1.0))
 
     # gui slices slibers to control slices position
@@ -245,44 +263,53 @@ def plot3D(nodes, axis_scales=[1, 1, 1], **kwargs):
         nodex = [
             node for node in nodes
             if isinstance(node, VolumeSlice) and node.axis == 'x'
-        ][0]
+        ]
         nodey = [
             node for node in nodes
             if isinstance(node, VolumeSlice) and node.axis == 'y'
-        ][0]
+        ]
         nodez = [
             node for node in nodes
             if isinstance(node, VolumeSlice) and node.axis == 'z'
-        ][0]
-        guix = server.gui.add_slider(
-            'x',
-            min=0,
-            max=nodex.limit[1] - 1,
-            step=1,
-            initial_value=nodex.pos,
-        )
-        guix.on_update(lambda _: nodex.update_node(guix.value))
-        guiy = server.gui.add_slider(
-            'y',
-            min=0,
-            max=nodey.limit[1] - 1,
-            step=1,
-            initial_value=nodey.pos,
-        )
-        guiy.on_update(lambda _: nodey.update_node(guiy.value))
-        guiz = server.gui.add_slider(
-            'z',
-            min=0,
-            max=nodez.limit[1] - 1,
-            step=1,
-            initial_value=nodez.pos,
-        )
-        guiz.on_update(lambda _: nodez.update_node(guiz.value))
+        ]
+        if len(nodex) > 0:
+            nodex = nodex[0]
+            guix = server.gui.add_slider(
+                'x',
+                min=0,
+                max=nodex.limit[1] - 1,
+                step=1,
+                initial_value=nodex.pos,
+            )
+            guix.on_update(lambda _: nodex.update_node(guix.value))
+        
+        if len(nodey) > 0:
+            nodey = nodey[0]
+            guiy = server.gui.add_slider(
+                'y',
+                min=0,
+                max=nodey.limit[1] - 1,
+                step=1,
+                initial_value=nodey.pos,
+            )
+            guiy.on_update(lambda _: nodey.update_node(guiy.value))
+
+        if len(nodez) > 0:
+            nodez = nodez[0]
+            guiz = server.gui.add_slider(
+                'z',
+                min=0,
+                max=nodez.limit[1] - 1,
+                step=1,
+                initial_value=nodez.pos,
+            )
+            guiz.on_update(lambda _: nodez.update_node(guiz.value))
 
     # gui to control slices clim and cmap
-    vmin = np.nanmin(nodes[0].volume)
-    vmax = np.nanmax(nodes[0].volume)
-    step = (vmax - vmin) / 100
+    if draw_slices:
+        vmin = np.nanmin(nodes[0].volume)
+        vmax = np.nanmax(nodes[0].volume)
+        step = (vmax - vmin) / 100
 
     def update_clim(vmin, vmax):
         if vmin >= vmax:
@@ -296,36 +323,36 @@ def plot3D(nodes, axis_scales=[1, 1, 1], **kwargs):
             if hasattr(node, 'update_cmap'):
                 node.update_cmap(cmap)
 
-    with server.gui.add_folder("paramters"):
-        guivmin = server.gui.add_slider(
-            'vmin',
-            min=vmin,
-            max=vmax,
-            step=step,
-            initial_value=nodes[0].clim[0],
-        )
+    if draw_slices:
+        with server.gui.add_folder("paramters"):
+            guivmin = server.gui.add_slider(
+                'vmin',
+                min=vmin,
+                max=vmax,
+                step=step,
+                initial_value=nodes[0].clim[0],
+            )
 
-        guivmax = server.gui.add_slider(
-            'vmax',
-            min=vmin,
-            max=vmax,
-            step=step,
-            initial_value=nodes[0].clim[1],
-        )
+            guivmax = server.gui.add_slider(
+                'vmax',
+                min=vmin,
+                max=vmax,
+                step=step,
+                initial_value=nodes[0].clim[1],
+            )
 
-        guivmin.on_update(lambda _: update_clim(guivmin.value, guivmax.value))
-        guivmax.on_update(lambda _: update_clim(guivmin.value, guivmax.value))
+            guivmin.on_update(lambda _: update_clim(guivmin.value, guivmax.value))
+            guivmax.on_update(lambda _: update_clim(guivmin.value, guivmax.value))
 
-        guicmap = server.gui.add_dropdown(
-            'cmap',
-            options=[
-                'gray', 'seismic', 'Petrel', 'stratum', 'jet', 'od_seismic1',
-                'od_seismic2', 'od_seismic3'
-            ],
-            initial_value='gray',
-        )
-        guicmap.on_update(lambda _: update_cmap(guicmap.value))
-
+            guicmap = server.gui.add_dropdown(
+                'cmap',
+                options=[
+                    'gray', 'seismic', 'Petrel', 'stratum', 'jet', 'od_seismic1',
+                    'od_seismic2', 'od_seismic3'
+                ],
+                initial_value='gray',
+            )
+            guicmap.on_update(lambda _: update_cmap(guicmap.value))
 
     # gui to control aspect
     def update_scale(scale):
