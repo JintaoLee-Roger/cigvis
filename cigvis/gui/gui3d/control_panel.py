@@ -107,22 +107,24 @@ class LoadBtn(qtw.QPushButton):
                 if filePath.endswith('.vds'):
                     data = cigvis.io.VDSReader(filePath)
                 elif filePath.endswith('.npy'):
-                    data = np.load(filePath)
+                    if nx * ny * nz > 1024*1024*1024: # 4GB limit # HACK: to check? pass it from outside?
+                        data = np.load(filePath, mmap_mode='c')
+                    else:
+                        data = np.load(filePath)
 
-                elif filePath.endswith('.sgy') or filePath.endswith('.segy') or filePath.endswith('.Sgy'):
+                elif filePath.endswith('.sgy') or filePath.endswith('.segy') or filePath.endswith('.Sgy'): # yapf: disable
                     try:
                         from cigsegy import SegyNP
                     except:
-                        raise ImportError("to load SEG-Y file, install cigsegy first")
+                        qtw.QMessageBox.critical(self, "Error", f"Error loading data: {e}. \nTo load SEG-Y file, please install cigsegy via `pip install cigsegy`") # yapf: disable
+                        return
                     data = SegyNP(filePath)
 
                 else:
-                    data = np.memmap(filePath,
-                                     np.float32,
-                                     'c',
-                                     shape=(nx, ny, nz))
-                    # data = np.fromfile(filePath,
-                    #                    np.float32).reshape(nx, ny, nz)
+                    if nx * ny * nz > 1024*1024*1024: # 4GB limit # HACK: to check? pass it from outside?
+                        data = np.memmap(filePath, np.float32, 'c', shape=(nx, ny, nz)) # yapf: disable
+                    else:
+                        data = np.fromfile(filePath, np.float32).reshape(nx, ny, nz) # yapf: disable
                 if not self._is_base():
                     nxc, nyc, nzc = data.shape
                     if (nxc != nx) or (nyc != ny) or (nzc != nz):
@@ -131,8 +133,8 @@ class LoadBtn(qtw.QPushButton):
                             f"Mask image's shape must be same as base image, but base is ({nx}, {ny}, {nz}), mask is ({nxc}, {nyc}, {nzc})") # yapf: disable
                         return
             except Exception as e:
-                qtw.QMessageBox.critical(self, "Error",
-                                         f"Error loading data: {e}")
+                qtw.QMessageBox.critical(self, "Error", f"Error loading data: {e}") # yapf: disable
+                return
 
         if self.gstates.transpose:
             data = data.T
