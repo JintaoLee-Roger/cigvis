@@ -4,6 +4,7 @@ import numpy as np
 from cigvis import colormap
 import matplotlib.pyplot as plt
 import viser
+from cigvis.utils import utils
 
 
 class VolumeSlice:
@@ -20,7 +21,7 @@ class VolumeSlice:
         self.axis = axis
         self.pos = pos
         self.cmap = cmap
-        self.clim = clim if clim is not None else [np.nanmin(volume), np.nanmax(volume)]
+        self.clim = clim if clim is not None else [utils.nmin(volume), utils.nmax(volume)]
 
         self.init_scale = [8 / max(volume.shape)] * 3
 
@@ -155,7 +156,7 @@ class VolumeSlice:
         assert vol.shape == self.volume.shape
         self.masks.append(vol)
         if clim is None:
-            clim = [np.nanmin(vol), np.nanmax(vol)]
+            clim = [utils.nmin(vol), utils.nmax(vol)]
         self.fg_cmaps.append(cmap)
         self.fg_clims.append(clim)
         self.update_node(self.pos)

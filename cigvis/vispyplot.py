@@ -126,7 +126,7 @@ def create_slices(volume: np.ndarray,
     assert isinstance(pos, Dict)
 
     if clim is None:
-        clim = [np.nanmin(volume), np.nanmax(volume)]
+        clim = [utils.nmin(volume), utils.nmax(volume)]
     cmap = colormap.cmap_to_vispy(cmap)
 
     nodes = volume_slices(volume,
@@ -186,7 +186,7 @@ def add_mask(nodes: List,
         utils.check_mmap(volume)
 
     if clims is None:
-        clims = [[np.nanmin(v), np.nanmax(v)] for v in volumes]
+        clims = [[utils.nmin(v), utils.nmax(v)] for v in volumes]
     if not isinstance(clims[0], (List, Tuple)):
         clims = [clims]
 
@@ -302,9 +302,9 @@ def create_overlay(bg_volume: np.ndarray,
     assert isinstance(pos, Dict)
 
     if bg_clim is None:
-        bg_clim = [np.nanmin(bg_volume), np.nanmax(bg_volume)]
+        bg_clim = [utils.nmin(bg_volume), utils.nmax(bg_volume)]
     if fg_clim is None:
-        fg_clim = [[np.nanmin(v), np.nanmax(v)] for v in fg_volume]
+        fg_clim = [[utils.nmin(v), utils.nmax(v)] for v in fg_volume]
     if not isinstance(fg_clim[0], (List, Tuple)):
         fg_clim = [fg_clim]
 
@@ -485,8 +485,8 @@ def create_surfaces(surfs: List[np.ndarray],
         values = surfaces
 
     if clim is None and value_type == 'amp':
-        vmin = min([np.nanmin(s) for s in values])
-        vmax = max([np.nanmax(s) for s in values])
+        vmin = min([utils.nmin(s) for s in values])
+        vmax = max([utils.nmax(s) for s in values])
         clim = [vmin, vmax]
     elif clim is None and value_type == 'depth':
         vmin = min([s[s >= 0].min() for s in values])
@@ -654,8 +654,8 @@ def create_Line_logs(logs: Union[List, np.ndarray],
 
     if clim is None:
         clim = [
-            min([np.nanmin(v) for v in values]),
-            max([np.nanmax(v) for v in values])
+            min([utils.nmin(v) for v in values]),
+            max([utils.nmax(v) for v in values])
         ]
 
     log_nodes = []
@@ -732,8 +732,8 @@ def create_well_logs(points: np.ndarray,
         values[values == null_value] = np.nan
 
     if clim is None:
-        clim = [[np.nanmin(values[:, i]),
-                 np.nanmax(values[:, i])] for i in range(nlogs)]
+        clim = [[utils.nmin(values[:, i]),
+                 utils.nmax(values[:, i])] for i in range(nlogs)]
 
     mintube = radius_tube
     if not cyclinder:
@@ -749,8 +749,8 @@ def create_well_logs(points: np.ndarray,
     radius = []
 
     def _cal_radius(v, r):
-        return r[0] + (v - np.nanmin(v)) / (np.nanmax(v) -
-                                            np.nanmin(v)) * (r[1] - r[0])
+        return r[0] + (v - utils.nmin(v)) / (utils.nmax(v) -
+                                            utils.nmin(v)) * (r[1] - r[0])
 
     # tube radius and colors
     if cyclinder:

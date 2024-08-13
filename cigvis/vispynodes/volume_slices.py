@@ -13,6 +13,7 @@ from typing import List, Callable, Tuple, Union
 import numpy as np
 from vispy.color import Colormap
 from cigvis import is_line_first
+from cigvis.utils import utils
 
 
 from .axis_aligned_image import AxisAlignedImage, get_image_func
@@ -160,6 +161,6 @@ def _process_args(volumes: Union[np.ndarray, List],
                     + "time, cmap=(cmin, cmax) is recommended.",
                     UserWarning,
                     stacklevel=2)
-            clims[i_vol] = (np.nanmin(vol), np.nanmax(vol))
+            clims[i_vol] = (utils.nmin(vol), utils.nmax(vol))
 
     return volumes, preproc_funcs, cmaps, clims, interpolation, n_vol, shape

@@ -35,7 +35,7 @@ def create_slices(volume: np.ndarray,
     assert isinstance(pos, Dict)
 
     if clim is None:
-        clim = [np.nanmin(volume), np.nanmax(volume)]
+        clim = [utils.nmin(volume), utils.nmax(volume)]
 
     nodes = []
     for axis, p in pos.items():
@@ -58,7 +58,7 @@ def add_mask(nodes: List,
         utils.check_mmap(volume)
 
     if clims is None:
-        clims = [[np.nanmin(v), np.nanmax(v)] for v in volumes]
+        clims = [[utils.nmin(v), utils.nmax(v)] for v in volumes]
     if not isinstance(clims[0], (List, Tuple)):
         clims = [clims]
 
@@ -169,8 +169,8 @@ def create_surfaces(surfs: List[np.ndarray],
         values = surfaces
 
     if clim is None and value_type == 'amp':
-        vmin = min([np.nanmin(s) for s in values])
-        vmax = max([np.nanmax(s) for s in values])
+        vmin = min([utils.nmin(s) for s in values])
+        vmax = max([utils.nmax(s) for s in values])
         clim = [vmin, vmax]
     elif clim is None and value_type == 'depth':
         vmin = min([s[s >= 0].min() for s in values])
@@ -307,8 +307,8 @@ def plot3D(nodes, axis_scales=[1, 1, 1], **kwargs):
 
     # gui to control slices clim and cmap
     if draw_slices:
-        vmin = np.nanmin(nodes[0].volume)
-        vmax = np.nanmax(nodes[0].volume)
+        vmin = utils.nmin(nodes[0].volume)
+        vmax = utils.nmax(nodes[0].volume)
         step = (vmax - vmin) / 100
 
     def update_clim(vmin, vmax):

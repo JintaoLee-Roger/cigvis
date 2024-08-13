@@ -121,7 +121,7 @@ def create_slices(volume: np.ndarray,
     assert isinstance(pos, Dict)
 
     if clim is None:
-        clim = [np.nanmin(volume), np.nanmax(volume)]
+        clim = [utils.nmin(volume), utils.nmax(volume)]
     vmin, vmax = clim
 
     slices, pos = plotlyutils.make_slices(volume, pos=pos)
@@ -214,9 +214,9 @@ def create_overlay(bg_volume: np.ndarray,
     assert isinstance(pos, Dict)
 
     if bg_clim is None:
-        bg_clim = [np.nanmin(bg_volume), np.nanmax(bg_volume)]
+        bg_clim = [utils.nmin(bg_volume), utils.nmax(bg_volume)]
     if fg_clim is None:
-        fg_clim = [[np.nanmin(v), np.nanmax(v)] for v in fg_volume]
+        fg_clim = [[utils.nmin(v), utils.nmax(v)] for v in fg_volume]
     if not isinstance(fg_clim[0], (List, Tuple)):
         fg_clim = [fg_clim]
 

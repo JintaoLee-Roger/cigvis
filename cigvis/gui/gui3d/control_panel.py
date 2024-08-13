@@ -9,6 +9,7 @@ from PyQt5 import QtWidgets as qtw
 from PyQt5 import QtCore, QtGui
 from pathlib import Path
 import cigvis
+from cigvis.utils import utils
 
 from cigvis.gui.custom_widgets import *
 
@@ -137,13 +138,13 @@ class LoadBtn(qtw.QPushButton):
             data = data.T
         self.gstates.dataLoaded = True  # 标记数据已加载
         if self._is_base():
-            self.vmin.emit(f'{data.min():.2f}')
-            self.vmax.emit(f'{data.max():.2f}')
+            self.vmin.emit(f'{utils.nmin(data):.2f}')
+            self.vmax.emit(f'{utils.nmax(data):.2f}')
         else:
             item = qtw.QListWidgetItem(Path(filePath).name)
             paramsWidget = MaskImageParams(interps=INTERPS)
-            paramsWidget.vmin_input.setTextAndEmit(f'{data.min():.2f}')
-            paramsWidget.vmax_input.setTextAndEmit(f'{data.max():.2f}')
+            paramsWidget.vmin_input.setTextAndEmit(f'{utils.nmin(data):.2f}')
+            paramsWidget.vmax_input.setTextAndEmit(f'{utils.nmax(data):.2f}')
             item.paramsWidget = paramsWidget
             item.visible = True  # TODO:
             self.maskItem.emit(item)

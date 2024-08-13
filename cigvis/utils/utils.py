@@ -48,3 +48,44 @@ def deprecated(custom_message=None, replacement=None):
         return new_func
 
     return decorator
+
+
+def mmap_min(d: np.ndarray):
+    if isinstance(d, np.memmap):
+        if d.ndim < 3:
+            return np.nanmin(d)
+        else:
+            ni = d.shape[0]
+            if ni < 10:
+                return np.nanmin(d)
+            m1 = np.nanmin(d[:5])
+            m2 = np.nanmin(d[-5:])
+            m3 = np.nanmin(d[ni//2-2:ni//2+3])
+            return min([m1, m2, m3])
+
+def mmap_max(d: np.ndarray):
+    if isinstance(d, np.memmap):
+        if d.ndim < 3:
+            return np.nanmax(d)
+        else:
+            ni = d.shape[0]
+            if ni < 10:
+                return np.nanmax(d)
+            m1 = np.nanmax(d[:5])
+            m2 = np.nanmax(d[-5:])
+            m3 = np.nanmax(d[ni//2-2:ni//2+3])
+            return max([m1, m2, m3])
+
+
+
+def nmin(d):
+    if isinstance(d, np.memmap):
+        return mmap_min(d)
+    else:
+        return np.nanmin(d)
+
+def nmax(d):
+    if isinstance(d, np.memmap):
+        return mmap_max(d)
+    else:
+        return np.nanmax(d)
