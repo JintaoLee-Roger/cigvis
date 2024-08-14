@@ -39,6 +39,7 @@ from vispy.scene.visuals import Mesh, Line
 import vispy
 from vispy.gloo.util import _screenshot
 from scipy.ndimage import gaussian_filter
+from skimage.measure import marching_cubes
 
 import cigvis
 from cigvis import colormap
@@ -579,7 +580,6 @@ def create_bodys(volume: np.ndarray,
         volume[:, volume.shape[1] - 1, :] = margin
         volume[:, :, volume.shape[2] - 1] = margin
 
-    from skimage.measure import marching_cubes
     # marching_cubes in skimage is more faster
     # F3 demo, salt body, skimage: 3.04s, vispy: 21.44s
     verts, faces, normals, values = marching_cubes(volume, level)

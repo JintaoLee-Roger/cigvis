@@ -43,8 +43,11 @@ class ExceptionWrapper:
     actually requested so the user gets an easily debuggable message.
     """
 
-    def __init__(self, exception):
-        self.exception = exception
+    def __init__(self, e, custom=''):
+        if custom:
+            self.exception = type(e)(f"{e.args[0]}\n\t{custom}", *e.args[1:])
+        else:
+            self.exception = e
 
     def __getattribute__(self, *args, **kwargs):
         if args[0] == "__class__":
@@ -72,7 +75,10 @@ else:
 try:
     from . import viserplot
 except BaseException as E:
-    viserplot = ExceptionWrapper(E)
+    viserplot = ExceptionWrapper(
+        E,
+        "run `pip install \"cigvis[viser]\"` or run `pip install \"cigvis[all]\"` to install the dependencies"
+    )
 
 from .mpl2dplot import *
 from .mpl1dplot import *

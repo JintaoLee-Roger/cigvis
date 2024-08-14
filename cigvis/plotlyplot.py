@@ -51,19 +51,13 @@ from cigvis import ExceptionWrapper
 try:
     import plotly.graph_objects as go
 except BaseException as e:
-    go = ExceptionWrapper(e)
-    warnings.warn(
-        "plotly is not installed, please install it by `pip install plotly`")
-
-try:
-    from skimage.measure import marching_cubes
-    from skimage import transform
-except BaseException as e:
-    marching_cubes = ExceptionWrapper(e)
-    transform = ExceptionWrapper(e)
-    warnings.warn(
-        "skimage is not installed, please install it by `pip install scikit-image`"
+    go = ExceptionWrapper(
+        e,
+        "run `pip install \"cigvis[plotly]\"` or run `pip install \"cigvis[all]\"` to enable jupyter support"
     )
+
+from skimage.measure import marching_cubes
+from skimage import transform
 
 import cigvis
 from cigvis import colormap

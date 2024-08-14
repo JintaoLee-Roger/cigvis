@@ -1,17 +1,24 @@
 from typing import Optional
 from numpy.typing import ArrayLike
-import viser
 import numpy as np
 import matplotlib.pyplot as plt
 
-from cigvis import colormap
+from cigvis import colormap, ExceptionWrapper
 from cigvis.meshs.surfaces import arbline2mesh
 
-import trimesh
-from trimesh.visual.material import PBRMaterial
-from trimesh.visual import TextureVisuals
-
-from PIL import Image
+try:
+    import viser
+    import trimesh
+    from trimesh.visual.material import PBRMaterial
+    from trimesh.visual import TextureVisuals
+    from PIL import Image
+except BaseException as E:
+    message = "run `pip install \"cigvis[viser]\"` or run `pip install \"cigvis[all]\"` to enable viser"
+    viser = ExceptionWrapper(E, message)
+    trimesh = ExceptionWrapper(E, message)
+    PBRMaterial = ExceptionWrapper(E, message)
+    TextureVisuals = ExceptionWrapper(E, message)
+    Image = ExceptionWrapper(E, message)
 
 
 def color_f2i(colors: ArrayLike):
@@ -75,7 +82,7 @@ class MeshNode(trimesh.Trimesh):
 
         self._cmap = cmap
         self._clim = clim
-        self._server: viser.ViserServer = None
+        self._server = None # viser.ViserServer
         self._face_colors = face_colors
         self._vertex_colors = vertex_colors
         self._vertices_values = vertices_values

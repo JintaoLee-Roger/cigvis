@@ -1,10 +1,15 @@
 from typing import List, Dict, Tuple, Union
 import time
 import numpy as np
-from cigvis import colormap
+from cigvis import colormap, ExceptionWrapper
 import matplotlib.pyplot as plt
-import viser
 from cigvis.utils import utils
+
+try:
+    import viser
+except BaseException as E:
+    message = "run `pip install \"cigvis[viser]\"` or run `pip install \"cigvis[all]\"` to enable viser"
+    viser = ExceptionWrapper(E, message)
 
 
 class VolumeSlice:
@@ -16,12 +21,14 @@ class VolumeSlice:
                  cmap='gray',
                  clim=None,
                  scale=-1):
-        self._server: viser.ViserServer = None
+        self._server = None # viser.ViserServer
         self.volume = volume
         self.axis = axis
         self.pos = pos
         self.cmap = cmap
-        self.clim = clim if clim is not None else [utils.nmin(volume), utils.nmax(volume)]
+        self.clim = clim if clim is not None else [
+            utils.nmin(volume), utils.nmax(volume)
+        ]
 
         self.init_scale = [8 / max(volume.shape)] * 3
 
@@ -97,7 +104,8 @@ class VolumeSlice:
             bg = self.volume[:, :, self.pos]
             fg = [mask[:, :, self.pos] for mask in self.masks]
 
-        img = colormap.arrs_to_image([bg]+fg, [self.cmap]+self.fg_cmaps, [self.clim] + self.fg_clims, True)
+        img = colormap.arrs_to_image([bg] + fg, [self.cmap] + self.fg_cmaps,
+                                     [self.clim] + self.fg_clims, True)
         return img
 
     def update_node(self, pos):
