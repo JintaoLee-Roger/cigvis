@@ -23,22 +23,19 @@ and the second parameters is (foreground)
 import numpy as np
 import cigvis
 from cigvis import colormap
+from pathlib import Path
+root = Path(__file__).resolve().parent.parent.parent
 
-sxp = '../../data/rgt/sx.dat'
-uxp = '../../data/rgt/ux.dat'
+sxp = root / 'data/rgt/sx.dat'
+uxp = root / 'data/rgt/ux.dat'
 ni, nx, nt = 128, 128, 128
 
 sx = np.fromfile(sxp, np.float32).reshape(ni, nx, nt)
 rgt = np.fromfile(uxp, np.float32).reshape(ni, nx, nt)
 
 fg_cmap = colormap.set_alpha('jet', alpha=0.4)
-# nodes = cigvis.create_overlay(sx,
-#                               rgt,
-#                               pos=[[36], [28], [84]],
-#                               bg_cmap='gray',
-#                               fg_cmap=fg_cmap)
-
 nodes = cigvis.create_slices(sx, pos=[[36], [28], [84]], cmap='gray')
 nodes = cigvis.add_mask(nodes, rgt, cmaps=fg_cmap)
+nodes += cigvis.create_colorbar_from_nodes(nodes, 'RGT', select='mask')
 
-cigvis.plot3D(nodes, size=(800, 800), savename='example.png')
+cigvis.plot3D(nodes, size=(750, 600), savename='example.png')

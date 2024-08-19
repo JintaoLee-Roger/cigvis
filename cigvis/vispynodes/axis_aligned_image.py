@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # -----------------------------------------------------------------------------
-# Copyright (c) 2023, modified by Jintao Li.
+# Copyright (c) 2024, modified by Jintao Li.
 # Computational and Interpretation Group (CIG),
 # University of Science and Technology of China (USTC)
 #
@@ -55,7 +55,8 @@ class AxisAlignedImage(scene.visuals.Image):
                  cmaps=['grays'],
                  clims=None,
                  interpolation=['linear'],
-                 method='auto'):
+                 method='auto',
+                 texture_format=None):
 
         assert clims is not None, 'clim must be specified explicitly.'
 
@@ -68,7 +69,8 @@ class AxisAlignedImage(scene.visuals.Image):
             cmap=cmaps[0],
             clim=clims[0],
             interpolation=interpolation[0],
-            method=method)
+            method=method,
+            texture_format=texture_format)
         self.unfreeze()
 
         self.ids = f'{axis}{pos}'
@@ -83,7 +85,8 @@ class AxisAlignedImage(scene.visuals.Image):
                 cmap=cmaps[i_img],
                 clim=clims[i_img],
                 interpolation=interpolation[i_img],
-                method=method)
+                method=method,
+                texture_format=texture_format)
             self.overlaid_images.append(overlaid_image)
 
         # Set GL state. Must check depth test, otherwise weird in 3D.
@@ -137,6 +140,7 @@ class AxisAlignedImage(scene.visuals.Image):
                  clim: List,
                  interpolation: str,
                  method: str = 'auto',
+                 texture_format: str = 'auto',
                  preproc_f: Callable = None):
         self.unfreeze()
         image_func = get_image_func(self.axis, vol, preproc_f)
@@ -149,6 +153,7 @@ class AxisAlignedImage(scene.visuals.Image):
                 clim=clim,
                 interpolation=interpolation,
                 method=method,
+                texture_format=texture_format,
             ))
         self._update_location()
         self.freeze()
@@ -312,6 +317,10 @@ class AxisAlignedImage(scene.visuals.Image):
             self.pos = int(np.round(self.pos))
         else:
             self.pos = pos
+            if self.pos < self.limit[0]:
+                self.pos = self.limit[0]
+            if self.pos > self.limit[1]:
+                self.pos = self.limit[1]
 
         # Update the transformation in order to move to new location.
         self.transform.reset()

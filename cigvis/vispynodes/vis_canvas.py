@@ -14,12 +14,13 @@ from typing import Dict, List, Tuple, Union
 from vispy import scene
 
 import cigvis
-from .xyz_axis import XYZAxis
+from .indicator import XYZAxis, NorthPointer
+from .axis3d import Axis3D
 from .colorbar import Colorbar
-from .canvas_mixin import EventMixin, LightMixin
+from .canvas_mixin import EventMixin, LightMixin, AxisMixin
 
 
-class VisCanvas(scene.SceneCanvas, EventMixin, LightMixin):
+class VisCanvas(scene.SceneCanvas, EventMixin, LightMixin, AxisMixin):
     """
     A canvas that automatically draw all contents in a 3D seismic
     visualization scene, which may include 3D seismic volume slices, axis
@@ -85,6 +86,9 @@ class VisCanvas(scene.SceneCanvas, EventMixin, LightMixin):
         axis_scales: Tuple = (1.0, 1.0, 1.0),
         auto_range: bool = True,
 
+        # for light
+        change_light: bool = True,
+
         # for save
         savedir: str = './',
         title: str = 'Seismic3D',
@@ -115,6 +119,8 @@ class VisCanvas(scene.SceneCanvas, EventMixin, LightMixin):
             zoom_factor = 1
         self.zoom_factor = zoom_factor
         self.share = share
+
+        self.change_light = change_light
 
         axis_scales = list(axis_scales)
         for i, r in enumerate(cigvis.is_axis_reversed()):
@@ -180,8 +186,6 @@ class VisCanvas(scene.SceneCanvas, EventMixin, LightMixin):
             for view, nodes in zip(self.view, self.nodes.values()):
                 self._attach_light(view, nodes)
         else:
-            # pass
-            # for view in self.view:
             self._attach_light_share(self.view[-1], self.nodes)
 
         self.freeze()
@@ -281,16 +285,22 @@ class VisCanvas(scene.SceneCanvas, EventMixin, LightMixin):
                 node.name = k + f'-{i}'
                 view.add(node)
 
-            if isinstance(node, XYZAxis):
+            if isinstance(node, (XYZAxis, NorthPointer)):
                 # Set the parent to view, instead of view.scene,
                 # so that this legend will stay at its location on
                 # the canvas, and won't rotate away.
                 node.parent = view
                 node.canvas_size = self.size
                 self.events.resize.connect(node.on_resize)
-                node.highlight.parent = view
+                if hasattr(node, 'highlight'):
+                    node.highlight.parent = view
+                if isinstance(node, NorthPointer):
+                    node.loc = (80, self.size[1] - 80)
                 node._update_axis()
                 self.events.mouse_move.connect(node.on_mouse_move)
+
+            if isinstance(node, Axis3D) and node.auto_change:
+                self._change_pos(view, node)
 
         if self.auto_range:
             view.camera.set_range()
@@ -328,7 +338,23 @@ class VisCanvas(scene.SceneCanvas, EventMixin, LightMixin):
         """
         link all cameras
         """
-
         for view in self.view[:-1]:
             view.camera.link(self.view[-1].camera)
 
+    def add_node(self, node):
+        """
+        Add a node to the canvas.
+        NOTE: this function is valid only when one canvas, i.e., self.nrows and self.ncols are both 1
+        """
+        if self.nrows != 1 or self.ncols != 1:
+            raise ValueError(
+                "This function is valid only when one canvas, i.e., self.nrows and self.ncols are both 1"
+            )
+
+        self.unfreeze()
+        node.name = '0-0'
+        self.nodes['0,0'].append(node)
+        self.view[0].add(node)
+        if hasattr(node, 'shading_filter'):
+            node.shading_filter.light_dir = self.view[0].camera.transform.map(self.initial_light_dir)[:3] # yapf: disable
+        self.freeze()

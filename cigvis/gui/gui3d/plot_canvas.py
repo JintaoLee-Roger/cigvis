@@ -4,9 +4,9 @@
 # All rights reserved.
 
 from pathlib import Path
-from cigvis.vispynodes import VisCanvas, AxisAlignedImage
 import cigvis
 from cigvis import colormap
+from cigvis.vispynodes import VisCanvas, AxisAlignedImage, SurfaceNode
 from PyQt5 import QtWidgets as qtw
 
 
@@ -80,6 +80,7 @@ class MaskImageMixin:
                 'alpha': 0.5,
                 'excpt': 'None',
             })
+            return
 
         if mode == 'vmin':
             vmin = float(value)
@@ -164,16 +165,116 @@ class MaskImageMixin:
         for node in self.nodes:
             if isinstance(node, AxisAlignedImage):
                 node.remove_mask(idx + 1)
+        d = self.masks.pop(idx)
+        del d
 
     def mask_clear(self):
         for i in range(len(self.masks)):
-            self.remove_mask(0)
+            self.remove_mask(0)  # HACK: 0?
 
         # clear masks
-        for d in self.masks:
-            del d
         self.masks.clear()
         self.mask_params.clear()
+
+
+class HorizonMixin:
+
+    def set_horz_data(self, data):
+        if len(self.horz_params) == len(self.horzs):
+            self.horz_params.append({
+                'values': 'depth',
+                'cmaps': 'jet',
+                'offset': [0, 0, 0],
+                'interval': [1, 1, 1],
+            })
+        self.horzs.append(data)
+        node = SurfaceNode(data, self.data, **self.horz_params[-1])
+        self.horz_nodes.append(node)
+        self.canvas.add_node(node)
+
+    def set_horz_params(self, params):
+        idx, mode, value = params
+        if idx < 0 and len(self.horz_params) == len(self.horzs):
+            self.horz_params.append({
+                'values': 'depth',
+                'cmaps': 'jet',
+                'offset': [0, 0, 0],
+                'interval': [1, 1, 1],
+            })
+            return
+
+        if mode == 'coord':
+            self.horz_params[idx]['offset'] = value[0]
+            self.horz_params[idx]['interval'] = value[1]
+            if len(self.horz_params) == len(self.horzs):
+                self.horz_nodes[idx].update_offset_and_interval(
+                    value[0], value[1])
+        elif mode == 'value_type':
+            value = value.strip()
+            update = False if self.horz_params[idx]['values'] == value else True
+            if not update:
+                return
+            if len(self.horz_params) == len(self.horzs):
+                if value == 'depth':
+                    self.horz_nodes[idx].values = ['depth']
+                    self.horz_nodes[idx]._cmaps = [
+                        self.horz_params[idx]['cmaps']
+                    ]
+                    self.horz_nodes[idx].clims = None
+                elif value == 'amp':
+                    self.horz_nodes[idx].update_colors_by_slice_node(self.nodes, [self.data] + self.masks) # yapf: disable
+                else:
+                    try:
+                        if ',' in value and value[0] != '[' and value[
+                                -1] != ']':
+                            value = [v for v in value.split(',') if v.strip()]
+                            if len(value) == 1:
+                                value = value[0]
+                            elif len(value) == 2:
+                                value = (value[0], float(value[1]))
+                        if value[0] == '[' and value[-1] == ']' and value.count(
+                                ',') >= 2 and value.count(',') <= 3:
+                            value = value[1:-1]
+                            value = tuple([
+                                float(v) for v in value.split(',')
+                                if v.strip()
+                            ])
+                        self.horz_nodes[idx].values = [value]
+                        self.horz_nodes[idx].process_values()
+                    except Exception as e:
+                        qtw.QMessageBox.critical(self, "Error",
+                                                 f"Error value type: {e}")
+                        return
+            self.horz_params[idx]['values'] = value
+
+        elif mode == 'cmap':
+            update = False if self.horz_params[idx]['cmaps'] == value else True
+            if not update:
+                return
+            try:
+                if len(self.horz_params) == len(self.horzs):
+                    self.horz_nodes[idx].cmaps = [value]
+            except Exception as e:
+                qtw.QMessageBox.critical(self, "Error", f"Error colormap: {e}")
+                return
+            self.horz_params[idx]['cmaps'] = value
+
+    def remove_horz(self, idx):
+        node = self.horz_nodes.pop(idx)
+        node.parent = None
+        del node
+        hz = self.horzs.pop(idx)
+        del hz
+        param = self.horz_params.pop(idx)
+        del param
+
+    def horz_clear(self):
+        for i in range(len(self.horzs)):
+            self.remove_horz(0)
+
+        self.horz_nodes.clear()
+        self.horzs.clear()
+        self.horz_params.clear()
 
 
 class CameraMixin:
@@ -300,7 +401,7 @@ class DraggableMixin:
 
 
 class PlotCanvas(qtw.QWidget, DraggableMixin, CameraMixin, ImageMixin,
-                 MaskImageMixin):
+                 MaskImageMixin, HorizonMixin):
 
     def __init__(self, *args, parent=None, **kwargs):
         super().__init__(parent)
@@ -323,14 +424,22 @@ class PlotCanvas(qtw.QWidget, DraggableMixin, CameraMixin, ImageMixin,
         self.nodes = []
         self.params = {'cmap': 'gray', 'interpolation': 'bilinear'}
 
+        # mask
         self.masks = []
         self.mask_params = []
+
+        # horiz
+        self.horzs = []
+        self.horz_params = []
+        self.horz_nodes = []
 
     def set_data(self, data):
         if self.gstates.loadType == 'base':
             self.set_base_data(data)
-        else:
+        elif self.gstates.loadType == 'mask':
             self.set_mask_data(data)
+        elif self.gstates.loadType == 'horz':
+            self.set_horz_data(data)
 
     def set_attrs(self, name, value, types=AxisAlignedImage):
         for node in self.nodes:
@@ -343,6 +452,8 @@ class PlotCanvas(qtw.QWidget, DraggableMixin, CameraMixin, ImageMixin,
                 setattr(node.overlaid_images[idx + 1], name, value)
 
     def clear(self):
+        # print(self.masks)
+        self.horz_clear()
         self.mask_clear()
 
         # clear nodes
@@ -352,7 +463,10 @@ class PlotCanvas(qtw.QWidget, DraggableMixin, CameraMixin, ImageMixin,
         self.nodes.clear()
 
         # clear data
-        del self.data
+        try:
+            self.data.close()
+        except:
+            del self.data
         self.data = None
 
         # init
@@ -363,6 +477,13 @@ class CanvasWrapper(VisCanvas):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.change_light = True
+
+    def update_light(self, text):
+        if text == 'on':
+            self.change_light = True
+        else:
+            self.change_light = False
 
     def update_camera(self, azimuth, elevation, fov):
         self.azimuth = azimuth

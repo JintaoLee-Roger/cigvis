@@ -37,7 +37,18 @@ To install via PyPI, use
 
 .. code-block:: bash
 
+    # Minimal installation
     pip install cigvis
+
+    # include plotly 
+    pip install "cigvis[plotly]"
+
+    # include viser
+    pip install "cigvis[viser]"
+
+    # install all dependencies
+    pip install "cigvis[all]"
+
 
 
 For local installation, clone the repository from GitHub and then install it using pip:
@@ -45,7 +56,19 @@ For local installation, clone the repository from GitHub and then install it usi
 .. code-block:: bash
 
     git clone https://github.com/JintaoLee-Roger/cigvis.git
+
+    # Minimal installation
     pip install -e .
+
+    # include plotly 
+    pip install -e ".[plotly]"
+
+    # include viser
+    pip install -e ".[viser]"
+
+    # install all dependencies
+    pip install -e ".[all]"
+
 
 
 Core Features

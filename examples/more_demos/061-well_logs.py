@@ -12,6 +12,9 @@ Log trajectories and log curves
 
 import numpy as np
 import cigvis
+from pathlib import Path
+
+root = Path(__file__).resolve().parent.parent.parent
 
 
 def show(sx, points, values, null_value):
@@ -77,9 +80,9 @@ def show(sx, points, values, null_value):
 
 
 if __name__ == '__main__':
-    sxp = '../../data/co2/sx.dat'
-    lxp = '../../data/co2/lx.dat'
-    lasp = '../../data/cb23.las'
+    sxp = root / 'data/co2/sx.dat'
+    lxp = root / 'data/co2/lx.dat'
+    lasp = root / 'data/cb23.las'
     ni, nx, nt = 192, 192, 240
 
     sx = np.memmap(sxp, np.float32, 'c', shape=(ni, nx, nt))

@@ -16,8 +16,10 @@ Display log trail as a tube
 
 import numpy as np
 import cigvis
+from pathlib import Path
+root = Path(__file__).resolve().parent.parent.parent
 
-sxp = '../../data/co2/sx.dat'
+sxp = root / 'data/co2/sx.dat'
 ni, nx, nt = 192, 192, 240
 
 sx = np.fromfile(sxp, np.float32).reshape(ni, nx, nt)

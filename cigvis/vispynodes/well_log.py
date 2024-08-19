@@ -47,7 +47,9 @@ class WellLog(Compound):
                  colors,
                  index=None,
                  tube_points=16,
-                 mode='triangles'):
+                 mode='triangles',
+                 cmap=None,
+                 clim=None):
         assert tube_points > 2
         assert points.ndim == 2 and points.shape[1] == 3
 
@@ -67,6 +69,8 @@ class WellLog(Compound):
             index = np.array(index)[:len(radius) - 1]
             assert max(index) < tube_points and min(index) >= 0
 
+        self._cmap = cmap
+        self._clim = clim
         tangents, normals, binormals = _frenet_frames(points, False)
 
         # tube mesh
@@ -118,6 +122,22 @@ class WellLog(Compound):
 
         return radius
 
+    @property
+    def cmap(self):
+        return self._cmap
+
+    @cmap.setter
+    def cmap(self, cmap):
+        self._cmap = cmap
+
+    @property
+    def clim(self):
+        return self._clim
+
+    @clim.setter
+    def clim(self, clim):
+        self._clim = clim
+
 
 def make_triangle_tube(points: np.ndarray,
                        radius,
@@ -135,7 +155,7 @@ def make_triangle_tube(points: np.ndarray,
         tangents, normals, binormals = _frenet_frames(points, False)
     segments = len(points) - 1
 
-    if not isinstance(radius, (float, int)):
+    if not isinstance(radius, (float, int, np.number)):
         radius = np.array(radius).reshape(1, -1, 1)
     points = points[np.newaxis, ...]
     normals = normals[np.newaxis, ...]

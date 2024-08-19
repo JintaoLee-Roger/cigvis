@@ -85,7 +85,7 @@ def valid_kwargs(ktype):
             'size', 'bgcolor', 'visual_nodes', 'grid', 'share',
             'cbar_region_ratio', 'scale_factor', 'center', 'fov',
             'azimuth', 'elevation', 'zoom_factor', 'axis_scales', 'auto_range',
-            'savedir', 'title'
+            'savedir', 'title', 'change_light'
         ]
         return seiscanvas_kwargs
     elif ktype == 'line':

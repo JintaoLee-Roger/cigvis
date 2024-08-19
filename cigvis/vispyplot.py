@@ -33,30 +33,40 @@ from cigvis.vispynodes import (
     Colorbar,
     WellLog,
     XYZAxis,
+    SurfaceNode,
+    ArbLineNode,
+    Axis3D,
+    NorthPointer,
 )
 
 from vispy.scene.visuals import Mesh, Line
 import vispy
 from vispy.gloo.util import _screenshot
 from scipy.ndimage import gaussian_filter
+from skimage.measure import marching_cubes
 
 import cigvis
 from cigvis import colormap
 from cigvis.utils import surfaceutils
 from cigvis.utils import vispyutils
 import cigvis.utils as utils
+from cigvis.meshs import surface2mesh
 
 __all__ = [
     "create_slices",
     "add_mask",
     "create_overlay",
     "create_colorbar",
+    "create_colorbar_from_nodes",
     "create_surfaces",
+    "set_surface_color_by_slices_nodes",
     "create_bodys",
     "create_Line_logs",
     "create_well_logs",
     "create_points",
     "create_fault_skin",
+    "create_arbitrary_line",
+    "create_axis",
     "plot3D",
     "run",
 ]
@@ -67,6 +77,7 @@ def create_slices(volume: np.ndarray,
                   clim: List = None,
                   cmap: str = 'Petrel',
                   interpolation: str = 'cubic',
+                  texture_format=None,
                   return_cbar: bool = False,
                   **kwargs) -> List:
     """
@@ -90,6 +101,10 @@ def create_slices(volume: np.ndarray,
     interpolation : str
         interpolation method. If the values of the volume is discrete, we recommand 
         set as 'nearest'
+    texture_format : None or 'auto',
+        if use None, the NaNs will be clip to clim[1],
+        and if use 'auto', the NaNs will be discarded, i.e., transparent
+    
     return_cbar : bool
         return a colorbar
 
@@ -121,7 +136,7 @@ def create_slices(volume: np.ndarray,
     assert isinstance(pos, Dict)
 
     if clim is None:
-        clim = [volume.min(), volume.max()]
+        clim = [utils.nmin(volume), utils.nmax(volume)]
     cmap = colormap.cmap_to_vispy(cmap)
 
     nodes = volume_slices(volume,
@@ -130,7 +145,8 @@ def create_slices(volume: np.ndarray,
                           pos['z'],
                           cmaps=cmap,
                           clims=clim,
-                          interpolation=interpolation)
+                          interpolation=interpolation,
+                          texture_format=texture_format)
 
     if return_cbar:
         cbar_kwargs = vispyutils.get_valid_kwargs('colorbar', **kwargs)
@@ -141,11 +157,12 @@ def create_slices(volume: np.ndarray,
 
 
 def add_mask(nodes: List,
-             volumes: Union[List[np.ndarray], np.ndarray],
+             volumes: Union[List, np.ndarray],
              clims: Union[List, Tuple] = None,
              cmaps: Union[str, List] = None,
              interpolation: str = 'linear',
              method: str = 'auto',
+             texture_format: str = 'auto',
              preproc_funcs: Callable = None,
              **kwargs) -> List:
     """
@@ -179,7 +196,7 @@ def add_mask(nodes: List,
         utils.check_mmap(volume)
 
     if clims is None:
-        clims = [[v.min(), v.max()] for v in volumes]
+        clims = [[utils.nmin(v), utils.nmax(v)] for v in volumes]
     if not isinstance(clims[0], (List, Tuple)):
         clims = [clims]
 
@@ -195,11 +212,6 @@ def add_mask(nodes: List,
     if not isinstance(preproc_funcs, List):
         preproc_funcs = [preproc_funcs] * len(volumes)
 
-    shape = volumes[0].shape
-    line_first = cigvis.is_line_first()
-    if not line_first:
-        shape = shape[::-1]
-
     for node in nodes:
         if not isinstance(node, AxisAlignedImage):
             continue
@@ -209,8 +221,9 @@ def add_mask(nodes: List,
                 cmaps[i],
                 clims[i],
                 interpolation[i],
-                method,
-                preproc_funcs[i],
+                method=method,
+                texture_format=texture_format,
+                preproc_f=preproc_funcs[i],
             )
 
     return nodes
@@ -299,9 +312,9 @@ def create_overlay(bg_volume: np.ndarray,
     assert isinstance(pos, Dict)
 
     if bg_clim is None:
-        bg_clim = [bg_volume.min(), bg_volume.max()]
+        bg_clim = [utils.nmin(bg_volume), utils.nmax(bg_volume)]
     if fg_clim is None:
-        fg_clim = [[v.min(), v.max()] for v in fg_volume]
+        fg_clim = [[utils.nmin(v), utils.nmax(v)] for v in fg_volume]
     if not isinstance(fg_clim[0], (List, Tuple)):
         fg_clim = [fg_clim]
 
@@ -392,18 +405,220 @@ def create_colorbar(cmap,
     return cbar
 
 
+def create_colorbar_from_nodes(nodes,
+                               label_str='',
+                               select='auto',
+                               idx=0,
+                               idx2=0,
+                               **kwargs):
+    """
+    nodes : List
+        List of nodes
+    select : str
+        One of 'auto', 'last', 'slices', 'mask', 'surface', 'logs', 'fault_skin', 'line_logs'.
+        If 'auto', select 'mask' > 'surface' > 'slices' > 'logs' > 'line_logs' > 'mesh'.
+        If 'last', select the node[-1]
+    idx : int
+        If there are multiple `select` nodes, select the idx-th node. If only one, ignore this parameter.
+    idx2 : int
+        If there are multiple `cmap` and `clim` for a node, select the idx2-th cmap and clim. If only one, ignore this parameters.
+        This parameter is only used when select is 'surface' and 'logs'
+    """
+    # fmt: off
+    assert len(nodes) > 0, "there is no node, len(nodes) == 0"
+    if select == 'auto':
+        if any([isinstance(node, AxisAlignedImage) and len(node.overlaid_images) > 1 for node in nodes]):
+            select = 'mask'
+        elif any([isinstance(node, SurfaceNode) for node in nodes]):
+            select = 'surface'
+        elif any([isinstance(node, AxisAlignedImage) for node in nodes]):
+            select = 'slices'
+        elif any([isinstance(node, WellLog) for node in nodes]):
+            select = 'logs'
+        elif any([isinstance(node, Line) for node in nodes]):
+            select = 'line_logs'
+        elif any([isinstance(node, Mesh) for node in nodes]):
+            select = 'mesh'
+        else:
+            raise ValueError("No valid nodes")
+    elif select == 'fault_skin':
+        select = 'mesh'
+
+    assert select in ['last', 'mask', 'surface', 'slices', 'logs', 'line_logs', 'mesh']
+    cmap = None
+    clim = None
+    if select == 'mask' or (select == 'last' and isinstance(nodes[-1], AxisAlignedImage) and len(nodes[-1].overlaid_images) > 1):
+        if select != 'last':
+            node = [node for node in nodes if isinstance(node, AxisAlignedImage)]
+            if len(node) == 0 or len(node[0].overlaid_images) == 1:
+                raise ValueError(f"No valid nodes, {len(node)} AxisAlignedImage or no mask")
+            if len(node[0].overlaid_images) == 2:
+                idx = 0
+            elif len(node[0].overlaid_images) <= idx + 1:
+                raise ValueError(f"idx error, there are only {len(node[0].overlaid_images)-1} mask, but got idx = {idx}")
+        else:
+            node = [nodes[-1]]
+        cmap = node[0].overlaid_images[idx + 1].cmap
+        clim = node[0].overlaid_images[idx + 1].clim
+    elif select == 'surface' or (select == 'last' and isinstance(nodes[-1], SurfaceNode)):
+        if select != 'last':
+            node = [node for node in nodes if isinstance(node, SurfaceNode)]
+            if len(node) == 0:
+                raise ValueError("No valid nodes, no SurfaceNode")
+            if len(node) == 1:
+                idx = 0
+            if len(node) <= idx:
+                raise ValueError(f"idx error, there are only {len(node)} SurfaceNode, but got idx = {idx}")
+        else:
+            node = [nodes[-1]]
+            idx = 0
+        if len(node[idx].cmaps) == 1:
+            idx2 = 0
+        if len(node[idx].cmaps) <= idx2:
+            raise ValueError(f"idx2 error, there are only {len(node[idx].cmaps)} cmaps for the SurfaceNode, but got idx = {idx2}")
+        cmap = node[idx].cmaps[idx2]
+        clim = node[idx].clims[idx2]
+    elif select == 'slices' or (select == 'last' and isinstance(nodes[-1], AxisAlignedImage) and len(nodes[-1].overlaid_images) == 1):
+        if select != 'last':
+            node = [node for node in nodes if isinstance(node, AxisAlignedImage)]
+            if len(node) == 0:
+                raise ValueError("No valid nodes, no AxisAlignedImage")
+        else:
+            node = [nodes[-1]]
+        cmap = node[0].overlaid_images[0].cmap
+        clim = node[0].overlaid_images[0].clim
+    elif select == 'logs' or (select == 'last' and isinstance(nodes[-1], WellLog)):
+        if select != 'last':
+            node = [node for node in nodes if isinstance(node, WellLog)]
+            if len(node) == 0:
+                raise ValueError("No valid nodes, no WellLog")
+            if len(node) == 1:
+                idx = 0
+            if len(node) <= idx:
+                raise ValueError(f"idx error, there are only {len(node)} WellLog, but got idx = {idx}")
+        else:
+            node = [nodes[-1]]
+        if len(node[idx].cmap) == 1:
+            idx2 = 0
+        if len(node[idx].cmap) <= idx2:
+            raise ValueError(f"idx2 error, there are only {len(node[idx].cmap)} cmaps for the SurfaceNode, but got idx = {idx2}")
+        cmap = node[idx].cmap[idx2]
+        clim = node[idx].clim[idx2]
+    else:
+        if select != 'last':
+            raise ValueError(f"select: {select} not support now")
+        else:
+            raise ValueError(f"last node is {type(nodes[-1])}, which is not support now")
+    # fmt: on
+
+    cbar = Colorbar(cmap=cmap, clim=clim, label_str=label_str, **kwargs)
+    return [cbar]
+
+
+def set_surface_color_by_slices_nodes(nodes, volumes):
+    if not isinstance(volumes, (List, Tuple)):
+        volumes = [volumes]
+    alignImage = [node for node in nodes if isinstance(node, AxisAlignedImage)]
+    surfNode = [node for node in nodes if isinstance(node, SurfaceNode)]
+    if len(surfNode) == 0:
+        raise ValueError("The `nodes` don't contain `SurfaceNode`")
+    if len(alignImage) == 0:
+        raise ValueError("The `nodes` don't contain `AxisAlignedImage`, that means no slice and mask") # yapf: disable
+    alignImage = alignImage[0]
+    if len(alignImage.overlaid_images) != len(volumes):
+        raise ValueError(f"A slice contains {len(alignImage.overlaid_images)} image (base + masks), but got {len(volumes)} volumes") # yapf: disable
+
+    for node in surfNode:
+        node.update_colors_by_slice_node([surfNode], volumes)
+
+    return nodes
+
+
 def create_surfaces(surfs: List[np.ndarray],
                     volume: np.ndarray = None,
                     value_type: str = 'depth',
                     clim: List = None,
                     cmap: str = 'jet',
-                    alpha: float = 1,
                     shape: Union[Tuple, List] = None,
                     interp: bool = False,
-                    return_cbar: bool = False,
                     step1=1,
                     step2=1,
                     **kwargs) -> List:
+    """
+    create a surfaces node
+
+    Parameters
+    ----------
+    surfs : List or array-like
+        the surface position, which can be an array (one surface) or 
+        List (multi-surfaces). Each surf can be a (n1, n2)
+        array or (N, 3) array, such as
+        >>> surf.shape = (n1, n2) # surf[i, j] means z pos at x=i, y=j
+        >>> surf.shape = (N, 3) # surf[i, :] means i-th point position
+    volume : array-like
+        3D array, values when surf_color is 'amp'
+    value_type : List of str or ArrayLike
+        'depth' for showing z, 'amp' for displaying amplitude of volume, 
+        or an array-like for values
+    clim : List
+        [vmin, vmax] of surface volumes
+    cmap : str or Colormap
+        cmap for surface
+    shape : List or Tuple
+        If surf's shape is like (N, 3), shape must be specified,
+        if surf's shape is like (n1, n2), shape will be ignored
+    """
+    utils.check_mmap(volume)
+
+    # add surface
+    if not isinstance(surfs, List):
+        surfs = [surfs]
+
+    if any([sf.ndim > 2 for sf in surfs]):
+        warnings.warn("The usage of surfs with ndim > 2, i.e., combining the color matrix (or value) directly with the surf, has been deprecated since version v0.1.0 and will be completely removed in version v0.0.9. We recommend placing the value or color matrix inside value_type. Please refer to `examples/3Dvispy/12-surf-overlay.py` for guidance.", DeprecationWarning, stacklevel=2) # yapf: disable
+        surfs = surfs[0] if len(surfs) == 1 else surfs
+        return _create_surfaces_old(surfs, volume, value_type, clim, cmap, 1, shape, interp, step1=step1, step2=step2, **kwargs) # yapf: disable
+
+    if isinstance(value_type, str):
+        value_type = [value_type] * len(surfs)
+    if not isinstance(value_type, List):
+        value_type = [value_type]
+    if len(surfs) == 1 and len(value_type) > 1:
+        value_type = [value_type]
+    assert len(value_type) == len(surfs)
+
+    if not isinstance(clim, List):
+        clim = [clim] * len(surfs)
+    if isinstance(clim, List) and not isinstance(clim[0], List):
+        clim = [clim] * len(surfs)
+    if len(surfs) == 1 and len(clim) > 1:
+        clim = [clim]
+    if not isinstance(cmap, List):
+        cmap = [cmap] * len(surfs)
+    if len(surfs) == 1 and len(cmap) > 1:
+        cmap = [cmap]
+
+    nodes = []
+    for i in range(len(surfs)):
+        node = SurfaceNode(surfs[i], volume, value_type[i], clim[i], cmap[i],
+                           shape, step1, step2, **kwargs)
+        nodes.append(node)
+
+    return nodes
+
+
+def _create_surfaces_old(surfs: List[np.ndarray],
+                         volume: np.ndarray = None,
+                         value_type: str = 'depth',
+                         clim: List = None,
+                         cmap: str = 'jet',
+                         alpha: float = 1,
+                         shape: Union[Tuple, List] = None,
+                         interp: bool = False,
+                         return_cbar: bool = False,
+                         step1=1,
+                         step2=1,
+                         **kwargs) -> List:
     """
     create a surfaces node
 
@@ -482,8 +697,8 @@ def create_surfaces(surfs: List[np.ndarray],
         values = surfaces
 
     if clim is None and value_type == 'amp':
-        vmin = min([np.nanmin(s) for s in values])
-        vmax = max([np.nanmax(s) for s in values])
+        vmin = min([utils.nmin(s) for s in values])
+        vmax = max([utils.nmax(s) for s in values])
         clim = [vmin, vmax]
     elif clim is None and value_type == 'depth':
         vmin = min([s[s >= 0].min() for s in values])
@@ -497,8 +712,13 @@ def create_surfaces(surfs: List[np.ndarray],
     mesh_nodes = []
     for s, v, c in zip(surfaces, values, colors):
         mask = np.logical_or(s < 0, np.isnan(s))
-        vertices, faces = surfaceutils.get_vertices_and_faces(
-            s, mask, anti_rot=anti_rot, step1=step1, step2=step2)
+        vertices, faces = surface2mesh(
+            s,
+            mask,
+            anti_rot=anti_rot,
+            step1=step1,
+            step2=step2,
+        )
         mask = mask[::step1, ::step2]
         if v is not None:
             v = v[::step1, ::step2]
@@ -576,7 +796,6 @@ def create_bodys(volume: np.ndarray,
         volume[:, volume.shape[1] - 1, :] = margin
         volume[:, :, volume.shape[2] - 1] = margin
 
-    from skimage.measure import marching_cubes
     # marching_cubes in skimage is more faster
     # F3 demo, salt body, skimage: 3.04s, vispy: 21.44s
     verts, faces, normals, values = marching_cubes(volume, level)
@@ -651,8 +870,8 @@ def create_Line_logs(logs: Union[List, np.ndarray],
 
     if clim is None:
         clim = [
-            min([np.nanmin(v) for v in values]),
-            max([np.nanmax(v) for v in values])
+            min([utils.nmin(v) for v in values]),
+            max([utils.nmax(v) for v in values])
         ]
 
     log_nodes = []
@@ -729,8 +948,8 @@ def create_well_logs(points: np.ndarray,
         values[values == null_value] = np.nan
 
     if clim is None:
-        clim = [[np.nanmin(values[:, i]),
-                 np.nanmax(values[:, i])] for i in range(nlogs)]
+        clim = [[utils.nmin(values[:, i]),
+                 utils.nmax(values[:, i])] for i in range(nlogs)]
 
     mintube = radius_tube
     if not cyclinder:
@@ -746,8 +965,7 @@ def create_well_logs(points: np.ndarray,
     radius = []
 
     def _cal_radius(v, r):
-        return r[0] + (v - np.nanmin(v)) / (np.nanmax(v) -
-                                            np.nanmin(v)) * (r[1] - r[0])
+        return r[0] + (v - utils.nmin(v)) / (utils.nmax(v) - utils.nmin(v)) * (r[1] - r[0]) # yapf: disable
 
     # tube radius and colors
     if cyclinder:
@@ -762,12 +980,13 @@ def create_well_logs(points: np.ndarray,
 
     # line radius and colors
     for i in range(1, nlogs):
-        colors[i] = colormap.get_colors_from_cmap(cmap[i], clim[i], values[:,
-                                                                           i])
+        colors[i] = colormap.get_colors_from_cmap(cmap[i], clim[i], values[:, i]) # yapf: disable
         r = _cal_radius(values[:, i], radius_line)
         radius.append(r)
 
     node = WellLog(points, radius, colors, index, tube_points, mode)
+    node.cmap = cmap
+    node.clim = clim
 
     return [node]
 
@@ -864,6 +1083,124 @@ def create_fault_skin(skin_dir,
     return [node]
 
 
+def create_arbitrary_line(path=None,
+                          anchor=None,
+                          data=None,
+                          volume=None,
+                          nodes=None,
+                          cmap='gray',
+                          clim=None,
+                          hstep=1,
+                          vstep=1,
+                          **kwargs):
+    """
+    Create an arbitrary line mesh node. 
+    You can pass one of `path` or `anchor` to define the arbitrary line path in X-Y pane.
+    You also need to pass one of `data` or `volume` to define arbitrary line values, and if `data` is None, will interpolate from `volume`.
+    To show the arbitrary line, you need pass `cmap`, `clim` to define the colors. 
+    You can also pass `nodes`, we will use the `cmap` and `clim` of AxisAlignedImage in `nodes` to define the colors, and the `cmap`, `clim` will be ignore.
+
+    Parameters
+    ----------
+    path : array-like
+        The path of the arbitrary line, shape is like (N, 2)
+    anchor : array-like
+        The anchor of the arbitrary line, shape is like (m, 2), this can be view as the turning endpoints of a folded line. 
+        We will interpolate the path between the anchor points.
+    data : array-like
+        The values of the arbitrary line, shape is like (N, nt)
+    volume : array-like
+        The 3D volume, shape is like (ni, nx, nt), if data is None, will interpolate from volume
+    nodes : List
+        The nodes to get the `cmap` and `clim` to define the colors
+    cmap : str
+        The colormap for the arbitrary line
+    clim : List
+        The clim for the arbitrary line
+    hstep : int
+        The horizontal step for the vertices of the arbitrary line mesh
+    vstep : int
+        The vertical step for the vertices of the arbitrary line mesh
+    """
+    # TODO: when passing `nodes`, can set multiple data (i.e., base image and mask)?
+    if nodes is not None:
+        node = [n for n in nodes if isinstance(n, AxisAlignedImage)]
+        if len(node) == 0:
+            warnings.warn(
+                "The passed nodes don't contain `AxisAlignedImage`, so the `cmap` and `clim` will be used",
+                UserWarning)
+        else:
+            cmap = node[0].overlaid_images[0].cmap
+            clim = node[0].overlaid_images[0].clim
+    return [ArbLineNode(path, anchor, data, volume, cmap, clim, hstep, vstep, **kwargs)] # yapf: disable
+
+
+def create_axis(
+    shape,
+    mode='box',
+    axis_pos=[3, 3, 1],
+    north_direction=None,
+    tick_nums=7,
+    ticks_font_size=18,
+    labels_font_size=20,
+    intervals=[1, 1, 1],
+    starts=[0, 0, 0],
+    axis_labels=['Inline', 'Xline', 'Time'],
+    north_scale=2,
+    **kwargs,
+):
+    """
+    3D axis with ticks and labels.
+
+    Parameters
+    ------------
+    shape : tuple
+        The bound of the 3D world
+    mode : str
+        The mode of the axis, 'box' or 'axis'
+    axis_pos : list or str
+        Which axis to show ticks? axis_pos can be set as 'auto' or a List. If is a List,
+        for each axis, it can be 0, 1, 2, 3, 
+        representing the starting point of the ticks along the axis.
+        0: For 'x' axis -> (0, 0, 0), for 'y' axis -> (0, 0, 0), for 'z' axis -> (0, 0, 0)
+        1: For 'x' axis -> (0, 0, nz), for 'y' axis -> (0, 0, nz), for 'z' axis -> (0, ny, 0)
+        2: For 'x' axis -> (0, ny, 0), for 'y' axis -> (nx, 0, 0), for 'z' axis -> (nx, 0, 0)
+        3: For 'x' axis -> (0, ny, nz), for 'y' axis -> (nx, 0, nz), for 'z' axis -> (nx, ny, 0)
+    north_direction : list
+        The direction of the north, if not None, will create a `NorthPointer`
+    tick_nums : int
+        The number of ticks on each axis
+    ticks_font_size : int
+        The font size of the ticks
+    labels_font_size : int
+        The font size of the labels
+    intervals : list
+        The sample intervals of the axis
+    starts : list
+        The first sample of the axis
+    samplings : list[np.ndarray]
+        The sample points of the axis, default is None
+    axis_labels : list
+        The labels of the axis
+    """
+    axis = Axis3D(shape,
+                  mode,
+                  axis_pos,
+                  tick_nums,
+                  ticks_font_size,
+                  labels_font_size,
+                  intervals,
+                  starts,
+                  axis_labels=axis_labels,
+                  **kwargs)
+    nodes = [axis]
+    if north_direction is not None:
+        assert len(north_direction) == 2
+        nodes.append(NorthPointer(north_direction, north_scale))
+
+    return nodes
+
+
 def plot3D(nodes: List,
            grid: Tuple = None,
            share: bool = False,
@@ -922,16 +1259,45 @@ def plot3D(nodes: List,
     cbar_list = []
     if isinstance(nodes, Dict):
         for k, v in nodes.items():
-            cbar_list += [n for n in v if isinstance(n, Colorbar)]
+            cbars = [(i, n) for i, n in enumerate(v)
+                     if isinstance(n, Colorbar)]
+            if len(cbars) > 1:
+                warnings.warn(
+                    "only support one colorbar in each subcanvas, so we select the last one"
+                )
+                out = [nodes[k].pop(i[0])
+                       for i in cbars[:-1]]  # remove the other cbars
+            if len(cbars) > 0:
+                cbars = [cbars[-1][1]]
+                cbar_list += cbars
             if xyz_axis:
                 nodes[k].append(XYZAxis())
     elif isinstance(nodes[0], List):
         for i, v in enumerate(nodes):
-            cbar_list += [n for n in v if isinstance(n, Colorbar)]
+            cbars = [(i, n) for i, n in enumerate(v)
+                     if isinstance(n, Colorbar)]
+            if len(cbars) > 1:
+                warnings.warn(
+                    "only support one colorbar in each subcanvas, so we select the last one"
+                )
+                out = [nodes[i].pop(k[0])
+                       for k in cbars[:-1]]  # remove the other cbars
+            if len(cbars) > 0:
+                cbars = [cbars[-1][1]]
+                cbar_list += cbars
             if xyz_axis:
                 nodes[i].append(XYZAxis())
     else:
-        cbar_list = [n for n in nodes if isinstance(n, Colorbar)]
+        cbar_list = [(i, n) for i, n in enumerate(nodes)
+                     if isinstance(n, Colorbar)]
+        if len(cbar_list) > 1:
+            warnings.warn(
+                "only support one colorbar in each canvas, so we select the last one"
+            )
+            out = [nodes.pop(k[0])
+                   for k in cbar_list[:-1]]  # remove the other cbars
+        if len(cbar_list) > 0:
+            cbar_list = [cbar_list[-1][1]]
         if xyz_axis:
             nodes.append(XYZAxis())
 

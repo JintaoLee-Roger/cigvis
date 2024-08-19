@@ -47,7 +47,15 @@ import warnings
 from typing import List, Tuple, Union, Dict
 import copy
 import numpy as np
-import plotly.graph_objects as go
+from cigvis import ExceptionWrapper
+try:
+    import plotly.graph_objects as go
+except BaseException as e:
+    go = ExceptionWrapper(
+        e,
+        "run `pip install \"cigvis[plotly]\"` or run `pip install \"cigvis[all]\"` to enable jupyter support"
+    )
+
 from skimage.measure import marching_cubes
 from skimage import transform
 
@@ -107,7 +115,7 @@ def create_slices(volume: np.ndarray,
     assert isinstance(pos, Dict)
 
     if clim is None:
-        clim = [volume.min(), volume.max()]
+        clim = [utils.nmin(volume), utils.nmax(volume)]
     vmin, vmax = clim
 
     slices, pos = plotlyutils.make_slices(volume, pos=pos)
@@ -200,9 +208,9 @@ def create_overlay(bg_volume: np.ndarray,
     assert isinstance(pos, Dict)
 
     if bg_clim is None:
-        bg_clim = [bg_volume.min(), bg_volume.max()]
+        bg_clim = [utils.nmin(bg_volume), utils.nmax(bg_volume)]
     if fg_clim is None:
-        fg_clim = [[v.min(), v.max()] for v in fg_volume]
+        fg_clim = [[utils.nmin(v), utils.nmax(v)] for v in fg_volume]
     if not isinstance(fg_clim[0], (List, Tuple)):
         fg_clim = [fg_clim]
 
@@ -244,9 +252,8 @@ def create_overlay(bg_volume: np.ndarray,
             bs = bg_slices[dim][j]
             plotlyutils.verifyshape(bs.shape, shape, dim)
             fs = [fg[dim][j] for fg in fg_slices]
-            colors = colormap.blend_multiple(bs, fs, bg_cmap, fg_cmap, bg_clim,
-                                             fg_clim)
-            colors = np.round(colors * 255).reshape(-1, 3)
+            colors = colormap.arrs_to_image([bs]+fs, [bg_cmap]+fg_cmap, [bg_clim]+fg_clim, True).reshape(-1, 4)
+            # colors = np.round(colors * 255).reshape(-1, 3)
             cplotly = [f'rgb({x[0]}, {x[1]}, {x[2]})' for x in colors]
 
             traces.append(
@@ -349,12 +356,15 @@ def create_well_logs(*args, **kwargs):
     """
     use Mesh3D to create tube logs
     """
-    raise NotImplementedError("`create_well_logs` currently not supported in the jupyter, please run it with a .py file. If you must run in jupyter, please consider use `create_Line_logs`") # noqa: E501
+    raise NotImplementedError(
+        "`create_well_logs` currently not supported in the jupyter, please run it with a .py file. If you must run in jupyter, please consider use `create_Line_logs`"
+    )  # noqa: E501
 
 
 def add_mask(*args, **kwargs):
-    raise NotImplementedError("`add_mask` currently not supported in the jupyter, please run it with a .py file. If you must run in jupyter, please consider use `create_overlay`") # noqa: E501
-
+    raise NotImplementedError(
+        "`add_mask` currently not supported in the jupyter, please run it with a .py file. If you must run in jupyter, please consider use `create_overlay`"
+    )  # noqa: E501
 
 
 def create_points(points, color='red', size=3, sym='square'):
@@ -417,13 +427,15 @@ def create_bodys(volume, level, margin: float = None, color='yellow'):
 
 
 def create_fault_skin(*args, **kwargs):
-    raise NotImplementedError("`add_mask` currently not supported in the jupyter, please run it with a .py file. If you must run in jupyter, please consider use `create_overlay`") # noqa: E501
+    raise NotImplementedError(
+        "`add_mask` currently not supported in the jupyter, please run it with a .py file. If you must run in jupyter, please consider use `create_overlay`"
+    )  # noqa: E501
 
 
 def plot3D(traces, **kwargs):
 
     size = kwargs.get('size', (900, 900))
-    size = (size, size) if isinstance(size, int) else size
+    size = (size, size) if isinstance(size, (int, np.integer)) else size
 
     scene = plotlyutils.make_3Dscene(**kwargs)
 

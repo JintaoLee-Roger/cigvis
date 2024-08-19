@@ -83,7 +83,7 @@ class VDSReader:
             return data.transpose()
 
     def _process_keys(self, key) -> List:
-        if isinstance(key, int):
+        if isinstance(key, (int, np.integer)):
             if key < 0:
                 key += self.shape[0]
             if key < 0 or key >= self.shape[0]:
@@ -104,12 +104,17 @@ class VDSReader:
             for i, k in enumerate(key):
                 if k is None:
                     continue
-                if isinstance(k, int):
+                if isinstance(k, (int, np.integer)):
                     if k < 0:
                         k += self.shape[i]
                     start_idx[i] = k
                     end_idx[i] = k + 1
                 elif isinstance(k, slice):
+                    if not (k.step is None or k.step == 1):
+                        raise IndexError(
+                            f"only support step is 1, while got a step {k.step} in the {i}th dimension"
+                        )
+
                     start_idx[i] = k.start or 0
                     end_idx[i] = k.stop or self.shape[i]
 
@@ -133,6 +138,24 @@ class VDSReader:
 
     def close(self) -> None:
         self._close(self.vds)
+
+    def close(self) -> None:
+        self.segy.close_file()
+
+    def __array__(self):
+        """To support np.array(SegyNP(xxx))"""
+        return self[...]
+        
+    def to_numpy(self):
+        """like pandas"""
+        return self[...]
+
+    def __array_function__(self, func, types, args, kwargs):
+        if func is np.nanmin:
+            return self.min()
+        elif func is np.nanmax:
+            return self.max()
+        raise NotImplementedError(f"Function {func} is not implemented for SegyNP")
 
 
 def create_vds_from_array(d: np.ndarray,

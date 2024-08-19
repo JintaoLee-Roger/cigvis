@@ -19,10 +19,12 @@ Display 3D seismic data and multiple horizons
 
 import numpy as np
 import cigvis
+from pathlib import Path
+root = Path(__file__).resolve().parent.parent.parent
 
-sxp = '../../data/co2/sx.dat'
-sfp1 = '../../data/co2/mh21.dat'
-sfp2 = '../../data/co2/mh22.dat'
+sxp = root / 'data/co2/sx.dat'
+sfp1 = root / 'data/co2/mh21.dat'
+sfp2 = root / 'data/co2/mh22.dat'
 ni, nx, nt = 192, 192, 240
 
 sx = np.fromfile(sxp, np.float32).reshape(ni, nx, nt)

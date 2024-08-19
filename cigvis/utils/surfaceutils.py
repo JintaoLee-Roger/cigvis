@@ -12,51 +12,6 @@ from scipy.interpolate import griddata
 from scipy.ndimage import map_coordinates
 from cigvis import is_line_first
 
-##### Triangular meshing #######
-
-
-def get_vertices_and_faces(surf: np.ndarray,
-                           mask: np.ndarray = None,
-                           mask_type: str = 'e',
-                           anti_rot: bool = True,
-                           step1=2,
-                           step2=2) -> Tuple:
-    n1, n2 = surf.shape
-    surf = surf[::step1, ::step2]
-    mask = mask[::step1, ::step2] if mask is not None else None
-    n1g, n2g = surf.shape
-
-    if mask is not None and mask_type == 'e':
-        mask = ~mask
-
-    # set grid
-    if mask is None:
-        grid = np.arange(n1g * n2g).reshape(n1g, n2g)
-    else:
-        grid = -np.ones_like(mask, dtype=int)
-        grid[mask] = np.arange(mask.sum())
-
-    # get vertices
-    y, x = np.meshgrid(np.arange(0, n2, step2), np.arange(0, n1, step1))
-    vertices = np.stack((x, y, surf), axis=-1).reshape(-1, 3)
-    if mask is not None:
-        vertices = vertices[mask.flatten()]
-
-    faces = np.zeros((n1g - 1, n2g - 1, 2, 3))
-    faces[:, :, 0, 0] = grid[:-1, :-1]
-    faces[:, :, 0, 1] = grid[1:, :-1]
-    faces[:, :, 0, 2] = grid[1:, 1:]
-    faces[:, :, 1, 0] = grid[:-1, :-1]
-    faces[:, :, 1, 1] = grid[1:, 1:]
-    faces[:, :, 1, 2] = grid[:-1, 1:]
-
-    faces = faces.reshape(-1, 3).astype(int)
-    faces = faces[~np.any(faces == -1, axis=1)]
-    if anti_rot:
-        faces[:, [1, 2]] = faces[:, [2, 1]]
-
-    return vertices, faces.astype(int)
-
 
 def fill_grid(points: np.ndarray,
               shape: Union[List, Tuple],
@@ -214,7 +169,6 @@ def interp_linefirst_impl(volume: np.ndarray, surf: np.ndarray,
     return out.reshape(ni, nx)
 
 
-# @numba.jit(nopython=True)
 def interp_timefirst_impl(volume: np.ndarray, surf: np.ndarray,
                           order: int) -> np.ndarray:
     """
@@ -276,3 +230,113 @@ def interp_surf(volume: np.ndarray,
 
     return out
 
+
+
+
+def interp_arb(p: np.ndarray, d: np.ndarray) -> np.ndarray:
+    """
+    Interpolates a 1d series in 3d space by **linear** interpolation.
+    
+    Parameters
+    ----------
+    p : ArrayLike
+        (N, 2), each row is [x, y], normalized, i.e., 0 <= x, y <= 1
+    d : ArrayLike
+        shape is (N, 4, n3)
+    """
+    x = p[:, 0]
+    y = p[:, 1]
+
+    f00 = d[:, 0, :]
+    f01 = d[:, 1, :]
+    f10 = d[:, 2, :]
+    f11 = d[:, 3, :]
+
+    # linear interpolation
+    out = (f00 * (1 - x)[:, None] * (1 - y)[:, None] + 
+           f01 * (1 - x)[:, None] * y[:, None] + 
+           f10 * x[:, None] * (1 - y)[:, None] + 
+           f11 * x[:, None] * y[:, None])
+
+    return out
+
+
+def interpolate_path(points, di=1):
+    """
+    Interpolates a path from the given points with a given step size.
+    """
+    points = np.array(points)
+
+    diffs = np.diff(points, axis=0)
+    distances = np.sqrt((diffs**2).sum(axis=1))
+    cum_distances = np.concatenate(([0], np.cumsum(distances)))
+    total_distance = cum_distances[-1]
+
+    distances_interp = np.arange(0, total_distance + di, di)
+    x_points = np.interp(distances_interp, cum_distances, points[:, 0])
+    y_points = np.interp(distances_interp, cum_distances, points[:, 1])
+
+    return np.column_stack((x_points, y_points))
+
+
+
+def extract_data(data, p):
+    """
+    Parameters
+    ----------
+    segy: str
+        segyfile
+    p : ArrayLike
+        shape is (N, 2)
+    """
+    n1, n2, n3 = data.shape
+
+    N = p.shape[0]
+    xq = p[:, 0]
+    yq = p[:, 1]
+
+    i = np.clip(np.searchsorted(np.arange(n1), xq, side="right"), 1, n1 - 1)
+    j = np.clip(np.searchsorted(np.arange(n2), yq, side="right"), 1, n2 - 1)
+
+    x0 = i - 1
+    x1 = i
+    y0 = j - 1
+    y1 = j
+
+    # normalized path points
+    pout = np.zeros_like(p, np.float32)
+    pout[:, 0] = p[:, 0] - i + 1
+    pout[:, 1] = p[:, 1] - j + 1
+
+    assert pout.min() >= 0 and pout.max() <= 1
+
+    grid_points = np.stack(
+        [
+            np.array([x0, y0]).T,
+            np.array([x0, y1]).T,
+            np.array([x1, y0]).T,
+            np.array([x1, y1]).T
+        ],
+        axis=1,
+    )
+
+    all_points = grid_points.reshape(-1, 2)
+    unique, inverse = np.unique(all_points, axis=0, return_inverse=True)
+    unique_data = np.array([data[i, j] for i, j in unique])
+
+
+    return pout, unique_data[inverse].reshape(N, 4, n3)
+
+
+
+def arbitray_line(data, points, di: float = 1):
+    """
+    data : SegyNP or np.ndarray
+    points : the points to interpolate a path
+    di : step
+    """
+    p = interpolate_path(points, di)
+    pout, pdata = extract_data(data, p)
+    out = interp_arb(pout, pdata)
+
+    return out, p

@@ -5,10 +5,12 @@
 
 import sys
 import re
+import types
 from PyQt5 import QtWidgets as qtw
 from PyQt5 import QtCore, QtGui
 from pathlib import Path
 import cigvis
+from cigvis.utils import utils
 
 from cigvis.gui.custom_widgets import *
 
@@ -43,6 +45,7 @@ class LoadBtn(qtw.QPushButton):
     vmin = QtCore.pyqtSignal(str)
     vmax = QtCore.pyqtSignal(str)
     maskItem = QtCore.pyqtSignal(qtw.QListWidgetItem)
+    horzItem = QtCore.pyqtSignal(qtw.QListWidgetItem)
 
     def __init__(self, gstates: GlobalState, parent=None):
         super(LoadBtn, self).__init__("Load File", parent)
@@ -100,20 +103,30 @@ class LoadBtn(qtw.QPushButton):
                     self, "Error", "Please enter values for nx, ny, and nz.")
                 return
 
-        if filePath:
+        if self.gstates.loadType in ['base', 'mask']:
             nx, ny, nz = self.gstates.get_shape()
             try:
                 if filePath.endswith('.vds'):
                     data = cigvis.io.VDSReader(filePath)
                 elif filePath.endswith('.npy'):
-                    data = np.load(filePath)
+                    if nx * ny * nz > 1024 * 1024 * 1024:  # 4GB limit # HACK: to check? pass it from outside?
+                        data = np.load(filePath, mmap_mode='c')
+                    else:
+                        data = np.load(filePath)
+
+                elif filePath.endswith('.sgy') or filePath.endswith('.segy') or filePath.endswith('.Sgy'): # yapf: disable
+                    try:
+                        from cigsegy import SegyNP
+                    except:
+                        qtw.QMessageBox.critical(self, "Error", f"Error loading data: {e}. \nTo load SEG-Y file, please install cigsegy via `pip install cigsegy`") # yapf: disable
+                        return
+                    data = SegyNP(filePath)
+
                 else:
-                    # data = np.memmap(filePath,
-                    #                  np.float32,
-                    #                  'c',
-                    #                  shape=(nx, ny, nz))
-                    data = np.fromfile(filePath,
-                                       np.float32).reshape(nx, ny, nz)
+                    if nx * ny * nz > 1024 * 1024 * 1024:  # 4GB limit # HACK: to check? pass it from outside?
+                        data = np.memmap(filePath, np.float32, 'c', shape=(nx, ny, nz)) # yapf: disable
+                    else:
+                        data = np.fromfile(filePath, np.float32).reshape(nx, ny, nz) # yapf: disable
                 if not self._is_base():
                     nxc, nyc, nzc = data.shape
                     if (nxc != nx) or (nyc != ny) or (nzc != nz):
@@ -122,31 +135,175 @@ class LoadBtn(qtw.QPushButton):
                             f"Mask image's shape must be same as base image, but base is ({nx}, {ny}, {nz}), mask is ({nxc}, {nyc}, {nzc})") # yapf: disable
                         return
             except Exception as e:
-                qtw.QMessageBox.critical(self, "Error",
-                                         f"Error loading data: {e}")
+                qtw.QMessageBox.critical(self, "Error", f"Error loading data: {e}") # yapf: disable
+                return
+
+        elif self.gstates.loadType == 'horz':
+            nx, ny, nz = self.gstates.get_shape()
+            try:
+                if filePath.endswith('.txt'):
+                    data = np.loadtxt(filePath)
+                elif filePath.endswith('.npy'):
+                    data = np.load(filePath)
+                    nxc, nyc = data.shape
+                    if (nxc != nx) or (nyc != ny):
+                        qtw.QMessageBox.critical(
+                            self, "Warn",
+                            f"surface image's shape must be same as base image, but base is ({nx}, {ny}, nz), mask is ({nxc}, {nyc})") # yapf: disable
+                        return
+                else:
+                    data = np.fromfile(filePath, np.float32).reshape(nx, ny)
+
+            except Exception as e:
+                qtw.QMessageBox.critical(self, "Error", f"Error loading data: {e}") # yapf: disable
+                return
 
         if self.gstates.transpose:
             data = data.T
         self.gstates.dataLoaded = True  # 标记数据已加载
         if self._is_base():
-            self.vmin.emit(f'{data.min():.2f}')
-            self.vmax.emit(f'{data.max():.2f}')
-        else:
+            self.vmin.emit(f'{utils.nmin(data):.2f}')
+            self.vmax.emit(f'{utils.nmax(data):.2f}')
+        elif self.gstates.loadType == 'mask':
             item = qtw.QListWidgetItem(Path(filePath).name)
             paramsWidget = MaskImageParams(interps=INTERPS)
-            paramsWidget.vmin_input.setTextAndEmit(f'{data.min():.2f}')
-            paramsWidget.vmax_input.setTextAndEmit(f'{data.max():.2f}')
+            paramsWidget.vmin_input.setTextAndEmit(f'{utils.nmin(data):.2f}')
+            paramsWidget.vmax_input.setTextAndEmit(f'{utils.nmax(data):.2f}')
             item.paramsWidget = paramsWidget
             item.visible = True  # TODO:
             self.maskItem.emit(item)
+        else:
+            item = qtw.QListWidgetItem(Path(filePath).name)
+            paramsWidget = HorizonParams()
+            item.paramsWidget = paramsWidget
+            item.visible = True  # TODO:
+            self.horzItem.emit(item)
 
         self.data.emit(data)  # 发送数据加载完成的信号
 
 
-class HorizonWidget(qtw.QWidget):
+class OthersWidget(qtw.QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+
+
+class HorizonWidget(ItemsWidget):
+
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
+        first_layout = qtw.QHBoxLayout()
+        lightlabel = qtw.QLabel("Light Change")
+        self.light = RadioButtonPanel(['on', 'off'])
+        first_layout.addWidget(lightlabel)
+        first_layout.addWidget(self.light)
+        self.ilayout.addLayout(first_layout)
+
+
+class HorizonParams(BaseWidget):
+
+    def __init__(self, updateCallback: callable = None, parent=None):
+        super().__init__(parent)
+        self.updateCallback = updateCallback
+
+        self.ilayout = qtw.QVBoxLayout()
+        self.ilayout.setContentsMargins(0, 0, 0, 0)
+        self.ilayout.setSpacing(0)
+
+        # fmt: off
+        offset_layout = qtw.QHBoxLayout()
+        offset_label = qtw.QLabel('Offset: ')
+        self.offsetx = MyQLineEdit()
+        self.offsetx.setValidator(QtGui.QRegExpValidator(FLOAT_validator, self))
+        self.offsetx.setText('0')
+        self.offsety = MyQLineEdit()
+        self.offsety.setValidator(QtGui.QRegExpValidator(FLOAT_validator, self))
+        self.offsety.setText('0')
+        self.offsetz = MyQLineEdit()
+        self.offsetz.setValidator(QtGui.QRegExpValidator(FLOAT_validator, self))
+        self.offsetz.setText('0')
+        self.addwidgets(
+            offset_layout,
+            [offset_label, self.offsetx, self.offsety, self.offsetz])
+
+        interval_layout = qtw.QHBoxLayout()
+        interval_label = qtw.QLabel('interval: ')
+        self.itvx = MyQLineEdit()
+        self.itvx.setValidator(QtGui.QRegExpValidator(FLOAT_validator, self))
+        self.itvx.setText('1')
+        self.itvy = MyQLineEdit()
+        self.itvy.setValidator(QtGui.QRegExpValidator(FLOAT_validator, self))
+        self.itvy.setText('1')
+        self.itvz = MyQLineEdit()
+        self.itvz.setValidator(QtGui.QRegExpValidator(FLOAT_validator, self))
+        self.itvz.setText('1')
+        self.addwidgets(interval_layout,
+                        [interval_label, self.itvx, self.itvy, self.itvz])
+
+        # TODO: update after edit finishing? or push the bitton?
+        # In general, is it very slow when updating a mesh?
+        # If yes, update after pushing the button, otherwise remove this
+        update_layout = qtw.QHBoxLayout()
+        self.coord_push = qtw.QPushButton("update")
+        valuelabel = qtw.QLabel("values")
+        valuelabel.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
+        self.valuetype = EditableComboBox()
+        self.valuetype.addItems(['depth', 'amplitude'])
+        self.valuetype.setCurrentText('depth')
+
+        colormap_label = qtw.QLabel('cmap:')
+        self.colormap_combo = EditableComboBox()
+        colormaps = [
+            'jet', 'gray', 'seismic', 'Petrel', 'stratum'
+        ]
+        self.colormap_combo.addItems(colormaps)
+        self.colormap_combo.setCurrentText('jet')
+        self.addwidgets(update_layout, [self.coord_push, valuelabel, self.valuetype, colormap_label, self.colormap_combo])
+
+
+        sublayouts = [offset_layout, interval_layout, update_layout]
+        self.addlayout(self.ilayout, sublayouts)
+        self.setLayout(self.ilayout)
+
+        self.coord_push.clicked.connect(self.on_update_push)
+        self.valuetype.changed.connect(self.on_update_value)
+        self.colormap_combo.changed.connect(self.on_update_cmap)
+    # fmt: on
+
+    def on_update_push(self, init=False):
+        if self.updateCallback:
+            idx = -1 if init else None
+            offset = [
+                self.offsetx.text(),
+                self.offsety.text(),
+                self.offsetz.text()
+            ]
+            offset = [float(f) for f in offset]
+            itv = [self.itvx.text(), self.itvy.text(), self.itvz.text()]
+            itv = [float(f) for f in itv]
+            self.updateCallback('coord', [offset, itv], idx)
+
+    def on_update_value(self, text, init=False):
+        if self.updateCallback:
+            idx = -1 if init else None
+            if text == 'amplitude':
+                text = 'amp'
+                self.colormap_combo.setEnabled(False)
+            else:
+                self.colormap_combo.setEnabled(True)
+
+            self.updateCallback('value_type', text, idx)
+
+    def on_update_cmap(self, text, init=False):
+        if self.updateCallback:
+            idx = -1 if init else None
+            self.updateCallback('cmap', text, idx)
+
+    def set_callback(self, updateCallback: callable):
+        self.updateCallback = updateCallback
+        self.on_update_push(True)
+        self.on_update_value('depth', True)
+        self.on_update_cmap('jet', True)
 
 
 class ControlP(qtw.QWidget):
@@ -272,11 +429,12 @@ class ControlP(qtw.QWidget):
         self.tab_widget = qtw.QTabWidget()
         self.base_tab = ImageParams(interps=INTERPS)
         self.tab_widget.addTab(self.base_tab, "Base")
-        self.mask_tab = MaskWidget()
+        self.mask_tab = ItemsWidget()
         self.tab_widget.addTab(self.mask_tab, "Masks")
         self.horz_tab = HorizonWidget()
         self.tab_widget.addTab(self.horz_tab, "Horiz")
-        self.other_tab = HorizonWidget()
+
+        self.other_tab = OthersWidget()
         self.tab_widget.addTab(self.other_tab, "Other")
         row_tab.addWidget(self.tab_widget)
         row_tab.setStretch(0, 1)
@@ -298,19 +456,14 @@ class ControlP(qtw.QWidget):
         self.innerConnection()
 
     def innerConnection(self):
-        self.nx_input.editingFinished.connect(
-            lambda: self.update_xpos_limit(self.nx_input.text()))
-        self.ny_input.editingFinished.connect(
-            lambda: self.update_ypos_limit(self.ny_input.text()))
-        self.nz_input.editingFinished.connect(
-            lambda: self.update_zpos_limit(self.nz_input.text()))
+        # fmt: off
+        self.nx_input.editingFinished.connect(lambda: self.update_xpos_limit(self.nx_input.text()))
+        self.ny_input.editingFinished.connect(lambda: self.update_ypos_limit(self.ny_input.text()))
+        self.nz_input.editingFinished.connect(lambda: self.update_zpos_limit(self.nz_input.text()))
 
-        self.nx_input.editingFinished.connect(
-            lambda: self.update_nx(self.nx_input.text()))
-        self.ny_input.editingFinished.connect(
-            lambda: self.update_ny(self.ny_input.text()))
-        self.nz_input.editingFinished.connect(
-            lambda: self.update_nz(self.nz_input.text()))
+        self.nx_input.editingFinished.connect(lambda: self.update_nx(self.nx_input.text()))
+        self.ny_input.editingFinished.connect(lambda: self.update_ny(self.ny_input.text()))
+        self.nz_input.editingFinished.connect(lambda: self.update_nz(self.nz_input.text()))
 
         self.clear_btn.clicked.connect(self.clear)
         self.loadBtn.nx[str].connect(self.nx_input.setTextAndEmit)
@@ -318,21 +471,21 @@ class ControlP(qtw.QWidget):
         self.loadBtn.nz[str].connect(self.nz_input.setTextAndEmit)
         self.loadBtn.vmin[str].connect(self.base_tab.vmin_input.setTextAndEmit)
         self.loadBtn.vmax[str].connect(self.base_tab.vmax_input.setTextAndEmit)
-        self.loadfolder.currentPath[str].connect(
-            lambda fpath: self.loadBtn.loadData(fpath, check=False))
-        self.loadBtn.maskItem[qtw.QListWidgetItem].connect(
-            self.mask_tab.addItem)
+        self.loadfolder.currentPath[str].connect(lambda fpath: self.loadBtn.loadData(fpath, check=False))
+        self.loadBtn.maskItem[qtw.QListWidgetItem].connect(self.mask_tab.addItem)
+        self.loadBtn.horzItem[qtw.QListWidgetItem].connect(self.horz_tab.addItem)
+        # fmt: on
 
         self.tab_widget.currentChanged.connect(self.tabSelected)
         self.loadRad.selectionChanged[str].connect(self.transpose)
 
     def tabSelected(self, idx):
-        if idx == 1:
-            # self.loadRad.radioButtons[1].setChecked(True)
-            self.gstates.loadType = 'mask'
-        else:
-            # self.loadRad.radioButtons[0].setChecked(True)
+        if idx == 0:
             self.gstates.loadType = 'base'
+        elif idx == 1:
+            self.gstates.loadType = 'mask'
+        elif idx == 2:
+            self.gstates.loadType = 'horz'
 
     def addwidgets(self, layout, widgets):
         for widget in widgets:
@@ -400,6 +553,7 @@ class ControlP(qtw.QWidget):
         self.loadfolder.clear()
         self.base_tab.clear()
         self.mask_tab.clear()
+        self.horz_tab.clear()
 
         self.azimuth_input.setValue(50)
         self.elevation_input.setValue(50)
@@ -420,6 +574,7 @@ def _get_dim_from_filename(fname: str, return_int: bool = True):
     - xxx.vds, i.e., VDS file
     - fname_{x}_{y}_{z}.sufix, e.g., fname_200_500_128.dat
     - xxx.npy, i.e., numpy file
+    - xxx.sgy, i.e., SEG-Y file, need install cigsegy
     """
     if fname.endswith(".vds"):
         vds = cigvis.io.VDSReader(fname)
@@ -435,6 +590,19 @@ def _get_dim_from_filename(fname: str, return_int: bool = True):
             shape, _, _ = np.lib.format._read_array_header(f, version)
 
         if len(shape) != 3:
+            return False
+
+        if return_int:
+            return shape
+        else:
+            return str(shape[0]), str(shape[1]), str(shape[2])
+
+    elif fname.endswith('.sgy') or fname.endswith('.segy') or fname.endswith('.Sgy'): # yapf: disable
+        try:
+            from cigsegy import SegyNP
+            d = SegyNP(fname)
+            shape = d.shape
+        except:
             return False
 
         if return_int:

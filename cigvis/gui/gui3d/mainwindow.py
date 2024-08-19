@@ -27,11 +27,12 @@ class CentralController(QtCore.QObject):
         self.baseTabConnection()
         self.controlP.clear_btn.clicked.connect(self.pCanvas.clear)
         self.maskTabConnection()
+        self.horzTabConnect()
 
+    # fmt: off
     def cameraConnection(self):
         self.controlP.azimuth_input.changed.connect(self.pCanvas.set_azimuth)
-        self.controlP.elevation_input.changed.connect(
-            self.pCanvas.set_elevation)
+        self.controlP.elevation_input.changed.connect(self.pCanvas.set_elevation)
         self.controlP.fov_input.changed.connect(self.pCanvas.set_fov)
 
         self.controlP.xpos.changed.connect(self.pCanvas.set_xpos)
@@ -43,25 +44,24 @@ class CentralController(QtCore.QObject):
         self.controlP.aspz.changed.connect(self.pCanvas.set_aspectz)
 
         # self.pCanvas.camera_params[list].connect(self.controlP.update_camera)
-        self.controlP.update_btn.clicked.connect(
-            lambda: self.controlP.update_camera(self.pCanvas.get_params()))
+        self.controlP.update_btn.clicked.connect(lambda: self.controlP.update_camera(self.pCanvas.get_params()))
 
     def baseTabConnection(self):
-        self.controlP.base_tab.colormap_combo.changed.connect(
-            self.pCanvas.set_cmap)
-        self.controlP.base_tab.interp_combo.currentTextChanged.connect(
-            self.pCanvas.set_interp)
-        self.controlP.base_tab.vmin_input.editingFinished.connect(
-            lambda: self.pCanvas.set_vmin(self.controlP.base_tab.vmin_input.
-                                          text()))
-        self.controlP.base_tab.vmax_input.editingFinished.connect(
-            lambda: self.pCanvas.set_vmax(self.controlP.base_tab.vmax_input.
-                                          text()))
+        self.controlP.base_tab.colormap_combo.changed.connect(self.pCanvas.set_cmap)
+        self.controlP.base_tab.interp_combo.currentTextChanged.connect(self.pCanvas.set_interp)
+        self.controlP.base_tab.vmin_input.editingFinished.connect(lambda: self.pCanvas.set_vmin(self.controlP.base_tab.vmin_input.text()))
+        self.controlP.base_tab.vmax_input.editingFinished.connect(lambda: self.pCanvas.set_vmax(self.controlP.base_tab.vmax_input.text()))
 
     def maskTabConnection(self):
-        self.controlP.mask_tab.params[list].connect(
-            self.pCanvas.set_mask_params)
+        self.controlP.mask_tab.params[list].connect(self.pCanvas.set_mask_params)
         self.controlP.mask_tab.deleteIdx[int].connect(self.pCanvas.remove_mask)
+
+    def horzTabConnect(self):
+        self.controlP.horz_tab.params[list].connect(self.pCanvas.set_horz_params)
+        self.controlP.horz_tab.deleteIdx[int].connect(self.pCanvas.remove_horz)
+        self.controlP.horz_tab.light.selectionChanged[str].connect(self.pCanvas.canvas.update_light)
+
+    # fmt: on
 
 
 class MyMainWindow(qtw.QMainWindow):
@@ -87,6 +87,10 @@ class MyMainWindow(qtw.QMainWindow):
 
         central_widget.setLayout(self.main_layout)
         self.setCentralWidget(central_widget)
+
+    def keyPressEvent(self, event):
+        if event.key() == QtCore.Qt.Key_Escape:
+            self.close()
 
 
 def gui3d(nx=None, ny=None, nz=None, clear_dim=True):

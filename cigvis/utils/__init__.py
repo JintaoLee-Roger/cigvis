@@ -8,3 +8,4 @@ from .coord import *
 from . import surfaceutils
 from . import vispyutils
 from . import plotlyutils
+from . import maskutils

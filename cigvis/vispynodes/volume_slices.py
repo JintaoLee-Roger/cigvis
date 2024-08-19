@@ -13,6 +13,7 @@ from typing import List, Callable, Tuple, Union
 import numpy as np
 from vispy.color import Colormap
 from cigvis import is_line_first
+from cigvis.utils import utils
 
 
 from .axis_aligned_image import AxisAlignedImage, get_image_func
@@ -28,7 +29,8 @@ def volume_slices(volumes: Union[np.ndarray, List],
                   cmaps: Union[str, Colormap, List] = 'grays',
                   clims: Union[List, Tuple] = None,
                   interpolation: str = 'linear',
-                  method: str = 'auto') -> List[AxisAlignedImage]:
+                  method: str = 'auto',
+                  texture_format=None) -> List[AxisAlignedImage]:
     """ 
     Acquire a list of slices in the form of AxisAlignedImage.
     The list can be attached to a VisCanvas to visualize the volume
@@ -103,7 +105,8 @@ def volume_slices(volumes: Union[np.ndarray, List],
                                               cmaps=cmaps,
                                               clims=clims,
                                               interpolation=interpolation,
-                                              method=method)
+                                              method=method,
+                                              texture_format=texture_format)
 
                 slices_list.append(image_node)
 
@@ -158,6 +161,6 @@ def _process_args(volumes: Union[np.ndarray, List],
                     + "time, cmap=(cmin, cmax) is recommended.",
                     UserWarning,
                     stacklevel=2)
-            clims[i_vol] = (vol.min(), vol.max())
+            clims[i_vol] = (utils.nmin(vol), utils.nmax(vol))
 
     return volumes, preproc_funcs, cmaps, clims, interpolation, n_vol, shape

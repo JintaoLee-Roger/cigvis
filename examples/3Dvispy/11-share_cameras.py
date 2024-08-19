@@ -18,8 +18,10 @@ Share camera parameters across multiple canvas
 
 import numpy as np
 import cigvis
+from pathlib import Path
+root = Path(__file__).resolve().parent.parent.parent
 
-seisp = '../../data/co2/sx.dat'
+seisp = root / 'data/co2/sx.dat'
 ni, nx, nt = 192, 192, 240
 sx = np.fromfile(seisp, np.float32).reshape(ni, nx, nt)
 

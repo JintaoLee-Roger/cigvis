@@ -16,8 +16,6 @@ class FixedImage(scene.visuals.Image):
     fixed location image, input slices, instead of volume, disable
     drag mode
 
-    TODO: tilted placement
-
     Parameters
     -----------
     imgs : array-like or List[array-like]
@@ -89,7 +87,7 @@ class FixedImage(scene.visuals.Image):
         assert axis in ['x', 'y', 'z']
         self.axis = axis
 
-        if isinstance(pos, int):
+        if isinstance(pos, (int, np.integer)):
             if axis == 'x':
                 self.pos = (pos, 0, 0)
             elif axis == 'y':

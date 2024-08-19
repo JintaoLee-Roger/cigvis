@@ -45,7 +45,7 @@ def load_wellLog(p):
 
 if __name__ == '__main__':
 
-    root = '/Users/lijintao/Downloads/data/F3/'
+    root = '/Volumes/T7/DATA/cigvisdata/F3/'
     seisp = root + 'seis.dat'
     saltp = root + 'salt.dat'
     hz2p = root + 'hz.dat'
@@ -67,7 +67,7 @@ if __name__ == '__main__':
 
     # hrizon (surface)
     hz2 = np.fromfile(hz2p, np.float32).reshape(ni, nx)
-    nodes += cigvis.create_surfaces([hz2], color='yellow')
+    nodes += cigvis.create_surfaces([hz2], value_type='yellow')
 
     # displacement field of unconformity (volume)
     unc = np.fromfile(uncp, np.float32).reshape(shape).astype(np.float32)

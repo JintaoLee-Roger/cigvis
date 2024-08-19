@@ -3,17 +3,14 @@
 # University of Science and Technology of China (USTC).
 # All rights reserved.
 
-
 import vispy
 from vispy.util import keys
 from vispy.gloo.util import _screenshot
 
-
 import cigvis
-from .xyz_axis import XYZAxis
+from .indicator import XYZAxis, NorthPointer
 from .axis_aligned_image import AxisAlignedImage
 from vispy.visuals import MeshVisual, CompoundVisual
-
 
 
 class EventMixin:
@@ -100,6 +97,10 @@ class EventMixin:
                 view.interactive = True
 
     def on_key_press(self, event):
+        if not hasattr(self, 'keymove'):
+            self.unfreeze()
+            self.keymove = 0
+            self.freeze()
         # Press <Space> to reset camera.
         if event.text == ' ':
             for view in self.view:
@@ -114,7 +115,7 @@ class EventMixin:
                 view.camera._update_camera_pos()
 
                 for child in view.children:
-                    if isinstance(child, XYZAxis):
+                    if isinstance(child, (XYZAxis, NorthPointer)):
                         child._update_axis()
 
         # Press <s> to save a screenshot.
@@ -206,11 +207,28 @@ class EventMixin:
             for view in self.view:
                 view.camera.fov -= 5
 
+        if event.key == keys.LEFT:
+            self.keymove = (self.keymove - 1) % 3
+        if event.key == keys.RIGHT:
+            self.keymove = (self.keymove + 1) % 3
+        if event.key == keys.UP:
+            for nodes in self.nodes.values():
+                for node in nodes:
+                    if isinstance(node, AxisAlignedImage):
+                        if node.axis == ['x', 'y', 'z'][self.keymove]:
+                            node._update_location(
+                                node.pos + 10)  # TODO: control the step size?
+        if event.key == keys.DOWN:
+            for nodes in self.nodes.values():
+                for node in nodes:
+                    if isinstance(node, AxisAlignedImage):
+                        if node.axis == ['x', 'y', 'z'][self.keymove]:
+                            node._update_location(node.pos - 10)
+
     def on_key_release(self, event):
         # Cancel selection and highlight if release <Ctrl>.
         if keys.CONTROL not in event.modifiers:
             self._exit_drag_mode()
-
 
     def _exit_drag_mode(self):
         if self._check_drag(self.hover_on):
@@ -251,27 +269,34 @@ class LightMixin:
     def _attach_light(self, view, nodes):
         light_dir = (0, -1, 0, 0)
 
+        initial_light_dir = view.camera.transform.imap(light_dir)
+        if not hasattr(self, "initial_light_dir"):
+            self.initial_light_dir = initial_light_dir
+        view.camera.azimuth = self.azimuth
+        view.camera.elevation = self.elevation
+
         for node in nodes:
             if isinstance(node, MeshVisual):
                 if node.shading_filter is not None:
-                    node.shading_filter.light_dir = light_dir[:3]
+                    node.shading_filter.light_dir = view.camera.transform.map(
+                        initial_light_dir)[:3]
             if isinstance(node, CompoundVisual):
                 if hasattr(node, 'meshs'):
                     for mesh in node.meshs:
                         if mesh.shading_filter is not None:
-                            mesh.shading_filter.light_dir = light_dir[:3]
-
-        initial_light_dir = view.camera.transform.imap(light_dir)
-        view.camera.azimuth = self.azimuth
-        view.camera.elevation = self.elevation
+                            mesh.shading_filter.light_dir = view.camera.transform.map(
+                                initial_light_dir)[:3]
 
         @view.scene.transform.changed.connect
         def on_transform_change(event):
+            if not self.change_light:
+                return
             transform = view.camera.transform
             for node in nodes:
+                if hasattr(node, 'change_light') and not node.change_light:
+                    continue
                 if isinstance(node, MeshVisual):
                     if node.shading_filter is not None:
-                        # print(transform.map(initial_light_dir))
                         node.shading_filter.light_dir = transform.map(
                             initial_light_dir)[:3]
                 if isinstance(node, CompoundVisual):
@@ -283,30 +308,36 @@ class LightMixin:
 
     def _attach_light_share(self, view, nodess):
         light_dir = (0, -1, 0, 0)
+        initial_light_dir = view.camera.transform.imap(light_dir)
+        if not hasattr(self, "initial_light_dir"):
+            self.initial_light_dir = initial_light_dir
+        view.camera.azimuth = self.azimuth
+        view.camera.elevation = self.elevation
 
         for nodes in nodess.values():
             for node in nodes:
                 if isinstance(node, MeshVisual):
                     if node.shading_filter is not None:
-                        node.shading_filter.light_dir = light_dir[:3]
+                        node.shading_filter.light_dir = view.camera.transform.map(
+                            initial_light_dir)[:3]
                 if isinstance(node, CompoundVisual):
                     if hasattr(node, 'meshs'):
                         for mesh in node.meshs:
                             if mesh.shading_filter is not None:
-                                mesh.shading_filter.light_dir = light_dir[:3]
-        initial_light_dir = view.camera.transform.imap(light_dir)
-
-        view.camera.azimuth = self.azimuth
-        view.camera.elevation = self.elevation
+                                mesh.shading_filter.light_dir = view.camera.transform.map(
+                                    initial_light_dir)[:3]
 
         @view.scene.transform.changed.connect
         def on_transform_change(event):
+            if not self.change_light:
+                return
             transform = view.camera.transform
             for nodes in nodess.values():
                 for node in nodes:
+                    if hasattr(node, 'change_light') and not node.change_light:
+                        continue
                     if isinstance(node, MeshVisual):
                         if node.shading_filter is not None:
-                            # print(transform.map(initial_light_dir))
                             node.shading_filter.light_dir = transform.map(
                                 initial_light_dir)[:3]
                     if isinstance(node, CompoundVisual):
@@ -315,3 +346,33 @@ class LightMixin:
                                 if mesh.shading_filter is not None:
                                     mesh.shading_filter.light_dir = transform.map(
                                         initial_light_dir)[:3]
+
+
+class AxisMixin:
+
+    def _change_pos(self, view, node):
+
+        @view.scene.transform.changed.connect
+        def on_transform_change(event):
+            if view.camera.azimuth < -6 and view.camera.azimuth >= -90 - 6:
+                if view.camera.elevation > -10:
+                    node.update_ticks_pos([3, 1, 0])
+                else:
+                    node.update_ticks_pos([1, 3, 0])
+            elif view.camera.azimuth >= -6 and view.camera.azimuth <= 90 - 6:
+                if view.camera.elevation > -10:
+                    node.update_ticks_pos([3, 3, 1])
+                else:
+                    node.update_ticks_pos([1, 1, 1])
+            elif view.camera.azimuth > 90 - 6 and view.camera.azimuth < 180 - 6:
+                if view.camera.elevation > -10:
+                    node.update_ticks_pos([1, 3, 3])
+                else:
+                    node.update_ticks_pos([3, 1, 3])
+            elif view.camera.azimuth > -180 and view.camera.azimuth < -90 - 6:
+                if view.camera.elevation > -10:
+                    node.update_ticks_pos([1, 1, 2])
+                else:
+                    node.update_ticks_pos([3, 3, 2])
+
+            node.update_axis()

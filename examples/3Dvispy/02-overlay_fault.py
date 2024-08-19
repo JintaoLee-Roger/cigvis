@@ -23,9 +23,11 @@ and the second parameters is (foreground)
 import numpy as np
 import cigvis
 from cigvis import colormap
+from pathlib import Path
+root = Path(__file__).resolve().parent.parent.parent
 
-sxp = '../../data/rgt/sx.dat'
-fxp = '../../data/rgt/fx.dat'
+sxp = root / 'data/rgt/sx.dat'
+fxp = root / 'data/rgt/fx.dat'
 ni, nx, nt = 128, 128, 128
 
 sx = np.fromfile(sxp, np.float32).reshape(ni, nx, nt)
@@ -35,16 +37,8 @@ fx = np.fromfile(fxp, np.float32).reshape(ni, nx, nt)
 fg_cmap = colormap.set_alpha_except_min('jet', alpha=1)
 
 # fx is discrete data, set interpolation as 'nearest'
-
-## create_overlay is deprecated
-# nodes = cigvis.create_overlay(sx,
-#                               fx,
-#                               pos=[[36], [28], [84]],
-#                               bg_cmap='gray',
-#                               fg_cmap=fg_cmap,
-#                               fg_interpolation='nearest')
-
 nodes = cigvis.create_slices(sx, pos=[[36], [28], [84]], cmap='gray')
 nodes = cigvis.add_mask(nodes, fx, cmaps=fg_cmap, interpolation='nearest')
+nodes += cigvis.create_colorbar_from_nodes(nodes, 'Amplitude', select='slices')
 
-cigvis.plot3D(nodes, size=(800, 800), savename='example.png')
+cigvis.plot3D(nodes, size=(700, 600), savename='example.png')

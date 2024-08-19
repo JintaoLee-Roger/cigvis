@@ -332,39 +332,45 @@ class MaskImageParams(ImageParams):
 
     def set_callback(self, updateCallback: callable):
         self.updateCallback = updateCallback
-        self.on_vmin_changed(self.vmin_input.text())
-        self.on_vmax_changed(self.vmax_input.text())
-        self.on_cmap_changed(self.colormap_combo.currentText())
-        self.on_interp_changed(self.interp_combo.currentText())
-        self.on_alpha_changed(self.alpha.value())
-        self.on_except_changed(self.exclude.currentText())
+        self.on_vmin_changed(self.vmin_input.text(), True)
+        self.on_vmax_changed(self.vmax_input.text(), True)
+        self.on_cmap_changed(self.colormap_combo.currentText(), True)
+        self.on_interp_changed(self.interp_combo.currentText(), True)
+        self.on_alpha_changed(self.alpha.value(), True)
+        self.on_except_changed(self.exclude.currentText(), True)
 
-    def on_vmin_changed(self, text):
+    def on_vmin_changed(self, text, init=False):
         if self.updateCallback:
-            self.updateCallback('vmin', float(text))
+            idx = -1 if init else None
+            self.updateCallback('vmin', float(text), idx)
 
-    def on_vmax_changed(self, text):
+    def on_vmax_changed(self, text, init=False):
         if self.updateCallback:
-            self.updateCallback('vmax', float(text))
+            idx = -1 if init else None
+            self.updateCallback('vmax', float(text), idx)
 
-    def on_cmap_changed(self, text):
+    def on_cmap_changed(self, text, init=False):
         if self.updateCallback:
-            self.updateCallback('cmap', text)
+            idx = -1 if init else None
+            self.updateCallback('cmap', text, idx)
 
-    def on_interp_changed(self, text):
+    def on_interp_changed(self, text, init=False):
         if self.updateCallback:
-            self.updateCallback('interp', text)
+            idx = -1 if init else None
+            self.updateCallback('interp', text, idx)
 
-    def on_alpha_changed(self, alpha):
+    def on_alpha_changed(self, alpha, init=False):
         if self.updateCallback:
-            self.updateCallback('alpha', float(alpha))
+            idx = -1 if init else None
+            self.updateCallback('alpha', float(alpha), idx)
 
-    def on_except_changed(self, text):
+    def on_except_changed(self, text, init=False):
         if self.updateCallback:
-            self.updateCallback('except', text)
+            idx = -1 if init else None
+            self.updateCallback('except', text, idx)
 
 
-class MaskWidget(qtw.QWidget):
+class ItemsWidget(qtw.QWidget):
     # TODO: 改变顺序的时候发送信号
     params = QtCore.pyqtSignal(list)
     deleteIdx = QtCore.pyqtSignal(int)
@@ -433,9 +439,10 @@ class MaskWidget(qtw.QWidget):
                 del item.paramsWidget
             del item  # 显式删除项目
 
-    def updateCallback(self, mode: str, value):
-        assert mode in ['vmin', 'vmax', 'cmap', 'interp', 'alpha', 'except']
-        idx = self.listWidget.currentRow()
+    def updateCallback(self, mode: str, value, idx=None):
+        # assert mode in ['vmin', 'vmax', 'cmap', 'interp', 'alpha', 'except']
+        if idx is None:
+            idx = self.listWidget.currentRow() # TODO: The idx is error when select the item
         self.params.emit([idx, mode, value])
 
 
