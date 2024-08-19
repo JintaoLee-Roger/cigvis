@@ -22,9 +22,11 @@ are plotted as faces.
 
 import numpy as np
 import cigvis
+from pathlib import Path
+root = Path(__file__).resolve().parent.parent.parent
 
-sxp = '../../data/co2/sx.dat'
-lasp = '../../data/cb23.las'
+sxp = root / 'data/co2/sx.dat'
+lasp = root / 'data/cb23.las'
 ni, nx, nt = 192, 192, 240
 
 sx = np.fromfile(sxp, np.float32).reshape(ni, nx, nt)
@@ -50,4 +52,8 @@ nodes += cigvis.create_well_logs(
     null_value=null_value,
     cmap=['jet', 'seismic', 'Petrel', 'od_seismic1'])
 
-cigvis.plot3D(nodes, zoom_factor=8, size=(800, 800), savename='example.png')
+# idx=0 means select the first WellLog node in nodes (though there is only one WellLog node in this case).
+# idx2=1 means select the second cmap, and clim for the select WellLog node, ('seismic' in this case).
+nodes += cigvis.create_colorbar_from_nodes(nodes, 'Log Impedance', select='logs', idx=0, idx2=1)
+
+cigvis.plot3D(nodes, zoom_factor=8, size=(800, 600), savename='example.png')

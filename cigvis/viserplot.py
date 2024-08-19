@@ -12,6 +12,7 @@ from cigvis.visernodes import (
     SurfaceNode,
     MeshNode,
 )
+from cigvis.meshs import surface2mesh
 import cigvis.utils as utils
 from cigvis.utils import surfaceutils
 
@@ -184,8 +185,13 @@ def create_surfaces(surfs: List[np.ndarray],
     mesh_nodes = []
     for s, v, c in zip(surfaces, values, colors):
         mask = np.logical_or(s < 0, np.isnan(s))
-        vertices, faces = surfaceutils.get_vertices_and_faces(
-            s, mask, anti_rot=anti_rot, step1=step1, step2=step2)
+        vertices, faces = surface2mesh(
+            s,
+            mask,
+            anti_rot=anti_rot,
+            step1=step1,
+            step2=step2,
+        )
         mask = mask[::step1, ::step2]
         if v is not None:
             v = v[::step1, ::step2]
@@ -231,7 +237,7 @@ def plot3D(nodes, axis_scales=[1, 1, 1], **kwargs):
             node.update_scale(axis_scales)
             draw_slices = True
 
-    if init_scale == -1: # no slices # TODO: for other types, Well logs?
+    if init_scale == -1:  # no slices # TODO: for other types, Well logs?
         init_scale = 100
         for node in nodes:
             if isinstance(node, MeshNode):
@@ -246,17 +252,6 @@ def plot3D(nodes, axis_scales=[1, 1, 1], **kwargs):
             node.name = f'mesh{meshid}'
             meshid += 1
         node.server = server
-
-    @server.on_client_connect
-    def _(client: viser.ClientHandle):
-        client.camera.fov = -5
-
-        # TODO: move the origin (0, 0, 0) to the top
-        # def _(camera):
-        # client.camera.position = (3, 3, 3)
-
-    server.scene.add_frame('f', position=(-3, -3, -3))
-    server.scene.set_up_direction((0.0, 0.0, -1.0))
 
     # gui slices slibers to control slices position
     with server.gui.add_folder("slices pos"):
@@ -282,7 +277,7 @@ def plot3D(nodes, axis_scales=[1, 1, 1], **kwargs):
                 initial_value=nodex.pos,
             )
             guix.on_update(lambda _: nodex.update_node(guix.value))
-        
+
         if len(nodey) > 0:
             nodey = nodey[0]
             guiy = server.gui.add_slider(
@@ -341,14 +336,16 @@ def plot3D(nodes, axis_scales=[1, 1, 1], **kwargs):
                 initial_value=nodes[0].clim[1],
             )
 
-            guivmin.on_update(lambda _: update_clim(guivmin.value, guivmax.value))
-            guivmax.on_update(lambda _: update_clim(guivmin.value, guivmax.value))
+            guivmin.on_update(
+                lambda _: update_clim(guivmin.value, guivmax.value))
+            guivmax.on_update(
+                lambda _: update_clim(guivmin.value, guivmax.value))
 
             guicmap = server.gui.add_dropdown(
                 'cmap',
                 options=[
-                    'gray', 'seismic', 'Petrel', 'stratum', 'jet', 'od_seismic1',
-                    'od_seismic2', 'od_seismic3'
+                    'gray', 'seismic', 'Petrel', 'stratum', 'jet',
+                    'od_seismic1', 'od_seismic2', 'od_seismic3'
                 ],
                 initial_value='gray',
             )
@@ -394,10 +391,26 @@ def plot3D(nodes, axis_scales=[1, 1, 1], **kwargs):
         gui_scalez.on_update(lambda _: update_scale(
             [gui_scalex.value, gui_scaley.value, gui_scalez.value]))
 
+    @server.on_client_connect
+    def _(client: viser.ClientHandle) -> None:
+        client.camera.fov = np.pi / 4.0  # Or some other angle in radians
+
+        # TODO: move the origin (0, 0, 0) to the top
+        # def _(camera):
+        client.camera.position = (8, 8, 0)
+        # client.camera.wxyz = (0.7, 0, 0,0.7)
+
+    server.scene.set_up_direction((0.0, 0.0, -1.0))
+
+
     try:
         while True:
             time.sleep(0.1)
     except KeyboardInterrupt:
+        # ca = server.get_clients()
+        # for k, cc in ca.items():
+        #     c = cc.camera
+        #     print(k, c.position, c.wxyz, c.fov, c.aspect, c.look_at, c.up_direction)
         server.stop()
         del server
         print("Execution interrupted")

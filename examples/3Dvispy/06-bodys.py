@@ -16,9 +16,11 @@ Display 3D seismic data and 3D geological bodies (CO2)
 
 import numpy as np
 import cigvis
+from pathlib import Path
+root = Path(__file__).resolve().parent.parent.parent
 
-sxp = '../../data/co2/sx.dat'
-lxp = '../../data/co2/lx.dat'
+sxp = root / 'data/co2/sx.dat'
+lxp = root / 'data/co2/lx.dat'
 ni, nx, nt = 192, 192, 240
 
 sx = np.fromfile(sxp, np.float32).reshape(ni, nx, nt)

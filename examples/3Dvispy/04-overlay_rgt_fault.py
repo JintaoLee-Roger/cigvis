@@ -23,10 +23,12 @@ Overlay multiple 3D data bodies (RGT, fault) on slices of 3D seismic data bodies
 import numpy as np
 import cigvis
 from cigvis import colormap
+from pathlib import Path
+root = Path(__file__).resolve().parent.parent.parent
 
-sxp = '../../data/rgt/sx.dat'
-uxp = '../../data/rgt/ux.dat'
-fxp = '../../data/rgt/fx.dat'
+sxp = root / 'data/rgt/sx.dat'
+uxp = root / 'data/rgt/ux.dat'
+fxp = root / 'data/rgt/fx.dat'
 ni, nx, nt = 128, 128, 128
 
 sx = np.fromfile(sxp, np.float32).reshape(ni, nx, nt)
@@ -43,5 +45,6 @@ nodes = cigvis.create_slices(sx, pos=[[36], [28], [84]], cmap='gray')
 nodes = cigvis.add_mask(nodes, [rgt, fx],
                         cmaps=[rgt_cmap, fx_cmap],
                         interpolation=['cubic', 'nearest'])
+nodes += cigvis.create_colorbar_from_nodes(nodes, 'RGT', select='mask', idx=0) # idx = 0 means the first mask
 
-cigvis.plot3D(nodes, size=(800, 800), savename='example.png')
+cigvis.plot3D(nodes, size=(800, 600), savename='example.png')

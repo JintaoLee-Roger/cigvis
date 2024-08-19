@@ -44,7 +44,7 @@ def load_wellLog(p):
 
 if __name__ == '__main__':
 
-    root = '/Users/lijintao/Downloads/data/F3/'
+    root = '/Volumes/T7/DATA/cigvisdata/F3/'
     seisp = root + 'seis.dat'
     saltp = root + 'salt.dat'
     hz1p = root + 'hz1.dat'
@@ -63,19 +63,12 @@ if __name__ == '__main__':
 
     fg_cmap = colormap.set_alpha('jet', 0.6)
     fg_clim = [inter.max() * 0.15, inter.max() * 0.5]
-    # nodes = cigvis.create_overlay(seis,
-    #                               inter,
-    #                               pos=[ni - 2, 25, nt - 2],
-    #                               bg_cmap='gray',
-    #                               bg_clim=[-2.0, 1.5],
-    #                               fg_cmap=fg_cmap,
-    #                               fg_clim=fg_clim,
-    #                               fg_interpolation='nearest')
     nodes = cigvis.create_slices(seis,
                                  pos=[ni - 2, 25, nt - 2],
                                  cmap='gray',
                                  clim=[-2.0, 1.5])
-    nodes = cigvis.add_mask(nodes, inter,
+    nodes = cigvis.add_mask(nodes,
+                            inter,
                             clims=fg_clim,
                             cmaps=fg_cmap,
                             interpolation='nearest')
@@ -85,7 +78,7 @@ if __name__ == '__main__':
 
     hz2 = np.fromfile(hz2p, np.float32).reshape(ni, nx)
     nodes += cigvis.create_surfaces([hz2],
-                                    color='yellow',
+                                    value_type='yellow',
                                     step1=step1,
                                     step2=step2)
 
@@ -100,6 +93,14 @@ if __name__ == '__main__':
     nodes += load_wellLog(root + 'logs.dat')
 
     nodes += cigvis.create_fault_skin(root + 'skins/')
+
+    nodes += cigvis.create_axis(seis.shape,
+                                'axis',
+                                'auto',
+                                ticks_font_size=28,
+                                labels_font_size=32,
+                                ticks_length=6)
+    nodes += cigvis.create_colorbar_from_nodes(nodes, 'Impedance', 'mask')
 
     cigvis.plot3D(nodes,
                   azimuth=-65.0,

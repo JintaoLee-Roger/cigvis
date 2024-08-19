@@ -14,7 +14,7 @@ Including:
 
 """
 
-from typing import List, Union
+from typing import List, Tuple, Union
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap, LinearSegmentedColormap
@@ -33,7 +33,7 @@ def arrs_to_image(arr, cmap, clim, as_uint8=False):
 
     def _to_image(arr, cmap, clim):
         norm = plt.Normalize(vmin=clim[0], vmax=clim[1])
-        cmap = get_cmap_from_str(cmap)
+        cmap = cmap_to_mpl(cmap)
         img = cmap(norm(arr))
         return img
 
@@ -41,7 +41,7 @@ def arrs_to_image(arr, cmap, clim, as_uint8=False):
         arr = [arr]
     if not isinstance(cmap, List):
         cmap = [cmap]
-    if not isinstance(clim[0], List):
+    if not isinstance(clim[0], (List, Tuple)):
         clim = [clim]
     if len(arr) != len(cmap) or len(arr) != len(clim):
         raise RuntimeError("(len(arr) != len(cmap)) or (len(arr) != len(clim))")
@@ -127,6 +127,20 @@ def get_cmap_from_str(cmap: str, includevispy: bool = False):
             pass
 
     return cmap
+
+
+def cmap_to_mpl(cmap):
+    """
+    convert `vispy's Colormap` or str to matplotlib's cmap
+    """
+    if isinstance(cmap, mplColormap):
+        return cmap 
+    elif isinstance(cmap, str):
+        return get_cmap_from_str(cmap)
+    elif isinstance(cmap, vispyColormap):
+        return ListedColormap(np.array(cmap.colors))
+    else:
+        raise ValueError("unkown cmap")
 
 
 def cmap_to_plotly(cmap):

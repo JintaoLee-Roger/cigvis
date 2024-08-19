@@ -1,18 +1,18 @@
-# Copyright (c) 2023 Jintao Li.
+# Copyright (c) 2024 Jintao Li.
 # Computational and Interpretation Group (CIG),
 # University of Science and Technology of China (USTC).
 # All rights reserved.
 """
-Display a 3D volume of data (by selecting several slices)
+Display an arbitray line
 ============================================================
 
-.. image:: ../../_static/cigvis/3Dvispy/01.png
+.. image:: ../../_static/cigvis/3Dvispy/14.png
     :alt: image
     :align: center
 
 """
 
-# sphinx_gallery_thumbnail_path = '_static/cigvis/3Dvispy/01.png'
+# sphinx_gallery_thumbnail_path = '_static/cigvis/3Dvispy/14.png'
 
 import numpy as np
 import cigvis
@@ -24,6 +24,8 @@ ni, nx, nt = 192, 192, 240
 sx = np.fromfile(seisp, np.float32).reshape(ni, nx, nt)
 
 nodes = cigvis.create_slices(sx, cmap='Petrel')
-nodes += cigvis.create_colorbar_from_nodes(nodes, 'Amplitude', select='slices')
+nodes += cigvis.create_arbitrary_line(anchor=[[0, 0], [90, 190], [190, 50]],
+                                      volume=sx,
+                                      nodes=nodes)
 
-cigvis.plot3D(nodes, size=(800, 800), savename='example.png', xyz_axis=False)
+cigvis.plot3D(nodes, size=(1000, 800), savename='example.png')

@@ -8,8 +8,10 @@
 from .axis_aligned_image import AxisAlignedImage
 from .fixed_image import FixedImage
 from .volume_slices import volume_slices
-from .xyz_axis import XYZAxis
+from .indicator import XYZAxis, NorthPointer
 from .colorbar import Colorbar
 from .well_log import WellLog
 from .vis_canvas import VisCanvas
+from .meshnode import SurfaceNode, ArbLineNode
+from .axis3d import Axis3D
 

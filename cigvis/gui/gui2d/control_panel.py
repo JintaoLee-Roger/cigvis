@@ -315,7 +315,7 @@ class ControlP(qtw.QWidget):
         self.tab_widget.addTab(self.base_tab, "Base")
         self.anno_tab = AnnotationWidget(gstates)
         self.tab_widget.addTab(self.anno_tab, "Annotation")
-        self.mask_tab = MaskWidget()
+        self.mask_tab = ItemsWidget()
         self.tab_widget.addTab(self.mask_tab, "Masks")
         row_tab.addWidget(self.tab_widget)
         row_tab.setStretch(0, 1)

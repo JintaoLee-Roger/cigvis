@@ -12,6 +12,9 @@ Surfaces (n1, n2) are displayed
 
 import numpy as np
 import cigvis
+from pathlib import Path
+
+root = Path(__file__).resolve().parent.parent.parent
 
 
 def show(sx, sfs):
@@ -61,10 +64,10 @@ def show(sx, sfs):
 
 
 if __name__ == '__main__':
-    sxp = '../../data/co2/sx.dat'
-    lxp = '../../data/co2/lx.dat'
-    sf1p = '../../data/co2/mh21.dat'
-    sf2p = '../../data/co2/mh22.dat'
+    sxp = root / 'data/co2/sx.dat'
+    lxp = root / 'data/co2/lx.dat'
+    sf1p = root / 'data/co2/mh21.dat'
+    sf2p = root / 'data/co2/mh22.dat'
     ni, nx, nt = 192, 192, 240
 
     sx = np.memmap(sxp, np.float32, 'c', shape=(ni, nx, nt))

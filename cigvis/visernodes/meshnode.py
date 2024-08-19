@@ -1,10 +1,12 @@
 from typing import Optional
+import warnings
 from numpy.typing import ArrayLike
 import numpy as np
 import matplotlib.pyplot as plt
 
 from cigvis import colormap, ExceptionWrapper
 from cigvis.meshs.surfaces import arbline2mesh
+from cigvis.utils import surfaceutils
 
 try:
     import viser
@@ -260,18 +262,27 @@ class ArbLineNode(MeshNode):
 
     def __init__(
         self,
-        path,
-        data,
+        path=None,
+        anchor=None,
+        data=None,
+        volume=None,
         scale=-1,
         cmap: Optional[str] = 'jet',
         clim: Optional[ArrayLike] = None,
+        hstep=1,
         vstep=1,
         **kwargs,
     ):
+        self.hstep = hstep 
+        self.vstep = vstep
+        self.preprocess(path, anchor, data, volume)
+        if clim is None:
+            clim = [np.nanmin(self.data), np.nanmax(self.data)]
+
         self.nl, self.nt = data.shape
         assert len(path) == self.nl
 
-        vertices, faces = arbline2mesh(path, self.nt, False, vstep=vstep)
+        vertices, faces = arbline2mesh(self.path[::hstep], self.nt, False, vstep=vstep)
         super().__init__(
             vertices=vertices,
             faces=faces,
@@ -293,7 +304,7 @@ class ArbLineNode(MeshNode):
             self.clim = [np.nanmin(self.data), np.nanmax(self.data)]
 
         norm = plt.Normalize(vmin=self.clim[0], vmax=self.clim[1])
-        colors = colormap.get_cmap_from_str(self._cmap)(norm(self.data))
+        colors = colormap.get_cmap_from_str(self._cmap)(norm(self.data[::self.hstep, ::self.vstep]))
         colors = color_f2i(colors)
         self.visual.vertex_colors = colors.reshape(-1, 4)
         self._set_visual()
@@ -305,3 +316,40 @@ class ArbLineNode(MeshNode):
         self.visual.material.roughnessFactor = 0.4
         self.visual.material.metallicFactor = 0.2
         self.visual.material.baseColorFactor = [100, 100, 100, 255]
+
+
+    def preprocess(self, path=None, anchor=None, data=None, volume=None):
+        if path is not None and anchor is not None:
+            self.path = path
+            self.anchor = None
+            warnings.warn(
+                "Both 'path' and 'anchor' are provided. Using 'path'.",
+                category=UserWarning
+            )
+        elif path is not None:
+            self.path = path
+            self.anchor = None
+        elif anchor is not None:
+            self.path = None
+            self.anchor = anchor
+        else:
+            raise ValueError("Either 'path' or 'anchor' must be provided.")
+
+        # Check data and volume
+        if data is not None and volume is not None:
+            warnings.warn(
+                "Both 'data' and 'volume' are provided. Using 'data'.",
+                category=UserWarning
+            )
+        elif data is None and volume is None:
+            raise ValueError("Either 'data' or 'volume' must be provided.")
+
+        self.data = data 
+        self.volume = volume
+
+        if self.path is None:
+            self.path = surfaceutils.interpolate_path(self.anchor)
+        if self.data is None:
+            pout, pdata = surfaceutils.extract_data(self.volume, self.path)
+            self.data = surfaceutils.interp_arb(pout, pdata)
+        

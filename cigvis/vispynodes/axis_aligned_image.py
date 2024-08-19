@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # -----------------------------------------------------------------------------
-# Copyright (c) 2023, modified by Jintao Li.
+# Copyright (c) 2024, modified by Jintao Li.
 # Computational and Interpretation Group (CIG),
 # University of Science and Technology of China (USTC)
 #

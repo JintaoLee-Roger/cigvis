@@ -18,7 +18,8 @@ import cigvis
 from cigvis import colormap
 from pathlib import Path
 
-root = Path('/Users/lijintao/work/mygit/cigvis/data/channel/')
+root = Path(__file__).resolve().parent.parent.parent
+root = root / 'data/channel'
 
 n1, n2, n3 = 256, 256, 256
 shape = (n1, n2, n3)

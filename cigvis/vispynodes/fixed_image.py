@@ -16,8 +16,6 @@ class FixedImage(scene.visuals.Image):
     fixed location image, input slices, instead of volume, disable
     drag mode
 
-    TODO: tilted placement
-
     Parameters
     -----------
     imgs : array-like or List[array-like]

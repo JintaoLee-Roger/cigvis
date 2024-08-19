@@ -16,14 +16,16 @@ Displays a variety of geophysical data
 
 import numpy as np
 import cigvis
+from pathlib import Path
+root = Path(__file__).resolve().parent.parent.parent
 
-sx = np.memmap('../../data/co2/sx.dat', np.float32, 'r', shape=(192, 192, 240))
-lx = np.memmap('../../data/co2/lx.dat', np.float32, 'c', shape=(192, 192, 240))
-sf1 = np.fromfile('../../data/co2/mh21.dat', np.float32).reshape(192, 192)
-sf2 = np.fromfile('../../data/co2/mh22.dat', np.float32).reshape(192, 192)
+sx = np.memmap(root / 'data/co2/sx.dat', np.float32, 'r', shape=(192, 192, 240))
+lx = np.memmap(root / 'data/co2/lx.dat', np.float32, 'c', shape=(192, 192, 240))
+sf1 = np.fromfile(root / 'data/co2/mh21.dat', np.float32).reshape(192, 192)
+sf2 = np.fromfile(root / 'data/co2/mh22.dat', np.float32).reshape(192, 192)
 
 # v = np.random.rand(100)
-las = cigvis.io.load_las('../../data/cb23.las')
+las = cigvis.io.load_las(root / 'data/cb23.las')
 idx = las['Well']['name'].index('NULL')
 null_value = float(las['Well']['value'][3])
 v = las['data'][:, 1:5]
@@ -49,5 +51,5 @@ nodes += cigvis.create_surfaces([sf1, sf2],
                                 'amp',
                                 cmap='Petrel',
                                 clim=[sx.min(), sx.max()])
-
+nodes += cigvis.create_colorbar_from_nodes(nodes, 'Amplitude', select='slices')
 cigvis.plot3D(nodes, savename='example.png')
