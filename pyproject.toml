@@ -39,16 +39,19 @@ dependencies = [
 [project.optional-dependencies]
 plotly = [
     "plotly",
+    "pandas",
 ]
 
 viser = [
     "viser", 
     "trimesh", 
     "plotly",
+    "pandas",
 ]
 
 all = [
     "plotly", 
+    "pandas",
     "viser", 
     "trimesh", 
     "cigsegy",
