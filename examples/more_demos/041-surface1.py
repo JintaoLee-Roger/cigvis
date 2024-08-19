@@ -2,6 +2,13 @@
 Surfaces (N, 3) displayed
 ==========================
 
+.. Note::
+
+    You may feel a lag when rotating, this is due to a bug in vispy. You have two ways to fix it.
+    - turn off the changing light: ```cigvis.plot3D(..., change_light=False)```.
+    - See this pull: https://github.com/vispy/vispy/pull/2532
+ 
+
 .. image:: ../../_static/cigvis/more_demos/041.png
     :alt: image
     :align: center

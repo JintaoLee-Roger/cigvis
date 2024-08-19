@@ -47,4 +47,4 @@ nodes = cigvis.add_mask(nodes, [rgt, fx],
                         interpolation=['cubic', 'nearest'])
 nodes += cigvis.create_colorbar_from_nodes(nodes, 'RGT', select='mask', idx=0) # idx = 0 means the first mask
 
-cigvis.plot3D(nodes, size=(800, 600), savename='example.png')
+cigvis.plot3D(nodes, size=(750, 600), savename='example.png')

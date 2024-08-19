@@ -28,4 +28,4 @@ nodes += cigvis.create_arbitrary_line(anchor=[[0, 0], [90, 190], [190, 50]],
                                       volume=sx,
                                       nodes=nodes)
 
-cigvis.plot3D(nodes, size=(1000, 800), savename='example.png')
+cigvis.plot3D(nodes, size=(800, 800), savename='example.png')

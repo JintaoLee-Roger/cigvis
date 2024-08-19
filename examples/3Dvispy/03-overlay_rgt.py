@@ -38,4 +38,4 @@ nodes = cigvis.create_slices(sx, pos=[[36], [28], [84]], cmap='gray')
 nodes = cigvis.add_mask(nodes, rgt, cmaps=fg_cmap)
 nodes += cigvis.create_colorbar_from_nodes(nodes, 'RGT', select='mask')
 
-cigvis.plot3D(nodes, size=(800, 600), savename='example.png')
+cigvis.plot3D(nodes, size=(750, 600), savename='example.png')

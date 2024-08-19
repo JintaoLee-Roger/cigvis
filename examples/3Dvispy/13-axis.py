@@ -36,9 +36,17 @@ nodes3 = cigvis.create_slices(sx, pos=[[0, 191], [0, 191], [0, 239]])
 # there are some other parameters to control the axis, such as tick_nums, ticks_font_size, labels_font_size, ticks_length
 nodes3 += cigvis.create_axis(sx.shape, 'axis', axis_pos=[0, 0, 1], tick_nums=4, ticks_font_size=26, labels_font_size=30, ticks_length=6)
 
-cigvis.plot3D([nodes1, nodes2, nodes3],
+
+nodes4 = cigvis.create_slices(sx, pos=[[0, 191], [0, 191], [0, 239]])
+# More controls, see cigvis/vispynodes/axis3d/Axis3D class
+# for example, axis color, axis line width, ticks color, rotation the axis label
+nodes4 += cigvis.create_axis(sx.shape, 'axis', axis_pos=[3, 3, 1], color='blue', ticks_color='red', rotation=[50, -40, -100])
+
+
+
+cigvis.plot3D([nodes1, nodes2, nodes3, nodes4],
               xyz_axis=False,
-              grid=(1, 3),
+              grid=(2, 2),
               share=True,
-              size=(1600, 500),
+              size=(900, 800),
               savename='example.png')

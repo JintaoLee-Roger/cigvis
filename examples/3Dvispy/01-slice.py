@@ -26,4 +26,4 @@ sx = np.fromfile(seisp, np.float32).reshape(ni, nx, nt)
 nodes = cigvis.create_slices(sx, cmap='Petrel')
 nodes += cigvis.create_colorbar_from_nodes(nodes, 'Amplitude', select='slices')
 
-cigvis.plot3D(nodes, size=(800, 800), savename='example.png', xyz_axis=False)
+cigvis.plot3D(nodes, size=(700, 600), savename='example.png', xyz_axis=False)
