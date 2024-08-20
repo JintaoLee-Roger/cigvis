@@ -108,6 +108,7 @@ class EventMixin:
                 view.camera.azimuth = self.azimuth
                 view.camera.elevation = self.elevation
                 view.camera.set_range()
+                view.camera.center = self.center
                 view.camera.scale_factor = self.scale_factor
                 view.camera.scale_factor /= self.zoom_factor
 

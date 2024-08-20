@@ -149,6 +149,7 @@ def create_slices(volume: np.ndarray,
                           texture_format=texture_format)
 
     if return_cbar:
+        warnings.warn("`return_cbar` is deprecated and will be remove in the future version. To create colorbar for slices, you can use `nodes += cigvis.create_colorbar_from_nodes(nodes, 'Amplitude', select='slices')`", DeprecationWarning, stacklevel=2) # yapf: disable
         cbar_kwargs = vispyutils.get_valid_kwargs('colorbar', **kwargs)
         cbar = create_colorbar(cmap, clim, **cbar_kwargs)
         return nodes, cbar
@@ -394,7 +395,6 @@ def create_colorbar(cmap,
     if isinstance(cmap, str) and cmap in colormap.list_custom_cmap():
         cmap = colormap.get_custom_cmap(cmap)
 
-    kwargs = vispyutils.get_valid_kwargs('colorbar', **kwargs)
     cbar = Colorbar(cmap=cmap,
                     clim=clim,
                     discrete=discrete,
@@ -575,7 +575,7 @@ def create_surfaces(surfs: List[np.ndarray],
         surfs = [surfs]
 
     if any([sf.ndim > 2 for sf in surfs]):
-        warnings.warn("The usage of surfs with ndim > 2, i.e., combining the color matrix (or value) directly with the surf, has been deprecated since version v0.1.0 and will be completely removed in version v0.0.9. We recommend placing the value or color matrix inside value_type. Please refer to `examples/3Dvispy/12-surf-overlay.py` for guidance.", DeprecationWarning, stacklevel=2) # yapf: disable
+        warnings.warn("The usage of surfs with ndim > 2, i.e., combining the color matrix (or value) directly with the surf, has been deprecated since version v0.1.0 and will be completely removed in version v0.1.5. We recommend placing the value or color matrix inside value_type. Please refer to `examples/3Dvispy/12-surf-overlay.py` for guidance.", DeprecationWarning, stacklevel=2) # yapf: disable
         surfs = surfs[0] if len(surfs) == 1 else surfs
         return _create_surfaces_old(surfs, volume, value_type, clim, cmap, 1, shape, interp, step1=step1, step2=step2, **kwargs) # yapf: disable
 

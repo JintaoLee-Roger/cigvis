@@ -11,6 +11,7 @@
 # -----------------------------------------------------------------------------
 
 from typing import Dict, List, Tuple, Union
+import warnings
 from vispy import scene
 
 import cigvis
@@ -105,6 +106,9 @@ class VisCanvas(scene.SceneCanvas, EventMixin, LightMixin, AxisMixin):
                                    bgcolor=bgcolor)
 
         self.unfreeze()
+        if not auto_range:
+            warnings.warn("`auto_range` is deprecated and will be remove in the future version. Just ignore this parameter.", DeprecationWarning, stacklevel=2) # yapf: disable
+
         self.nodes = {}
 
         self.init_size = size
@@ -114,9 +118,6 @@ class VisCanvas(scene.SceneCanvas, EventMixin, LightMixin, AxisMixin):
         self.elevation = elevation
         self.scale_factor = scale_factor
         self.center = center
-        self.auto_range = auto_range
-        if not self.auto_range:
-            zoom_factor = 1
         self.zoom_factor = zoom_factor
         self.share = share
 
@@ -126,12 +127,6 @@ class VisCanvas(scene.SceneCanvas, EventMixin, LightMixin, AxisMixin):
         for i, r in enumerate(cigvis.is_axis_reversed()):
             axis_scales[i] *= (1 - 2 * r)
         self.axis_scales = axis_scales
-
-        # Attach a ViewBox to a grid and initiate the camera with the given
-        # parameters.
-        if not (auto_range or (scale_factor and center)):
-            raise ValueError("scale_factor and center cannot be None" +
-                             " when auto_range=False")
 
         # Manage the selected visual node.
         self.drag_mode = False
@@ -302,11 +297,16 @@ class VisCanvas(scene.SceneCanvas, EventMixin, LightMixin, AxisMixin):
             if isinstance(node, Axis3D) and node.auto_change:
                 self._change_pos(view, node)
 
-        if self.auto_range:
-            view.camera.set_range()
+        view.camera.set_range()
+        if self.center is not None:
+            view.camera.center = self.center
+        if self.scale_factor is not None:
+            view.camera.scale_factor = self.scale_factor
 
         if self.scale_factor is None:
             self.scale_factor = view.camera.scale_factor
+        if self.center is None:
+            self.center = view.camera.center
 
         view.camera.scale_factor /= self.zoom_factor
 

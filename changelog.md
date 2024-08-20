@@ -1,6 +1,14 @@
 # Changelog
 
 
+
+### v0.1.1
+
+- provided a higher resolution colorbar image
+- formatted axis tick labels, e.g., "0.85000001" to "0.85"
+- improved the deprecated information.
+
+
 ### v0.1.0
 
 **Breaking Changes**

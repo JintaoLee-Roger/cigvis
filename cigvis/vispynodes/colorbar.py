@@ -11,6 +11,7 @@
 # ------------------------------------------------------------------------------
 
 import io
+from typing import List
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -77,13 +78,16 @@ class Colorbar(scene.visuals.Image):
             clim=None,
             discrete=False,
             disc_ticks=None,
-            dpi_scale=1.5,
+            dpi_scale=4,
             label_str="Colorbar",
             label_color='black',
             label_size=None,
+            label_bold=False,
             tick_size=None,
             border_width=None,
             border_color='black',
+
+            height_ratio=0.96,
             savedir=None,
             visible=True,
             parent=None):
@@ -120,6 +124,20 @@ class Colorbar(scene.visuals.Image):
         self.tick_size = tick_size
         self.border_width = border_width
         self.border_color = border_color
+        self.label_bold = 'bold' if label_bold else 'normal'
+        assert height_ratio > 0 and height_ratio <= 1
+        self.height_ratio = height_ratio
+
+        if self.label_size is None:
+            self.label_size = plt.rcParams['axes.labelsize']
+        if self.tick_size is None:
+            self.tick_size = plt.rcParams['ytick.labelsize']
+        if self.border_width is None:
+            self.border_width = plt.rcParams['lines.linewidth']
+        self.tick_length = plt.rcParams['ytick.major.size']
+        self.tick_width = plt.rcParams['ytick.major.width']
+
+        [self.label_size, self.tick_size] = self.get_font_size([self.label_size, self.tick_size]) # yapf: disable
 
         # Draw colorbar using Matplotlib.
         if self.cbar_size is not None:
@@ -162,18 +180,22 @@ class Colorbar(scene.visuals.Image):
         direction, because the coordinate is relative to the secondary ViewBox
         that stays on the right side of the canvas.
         """
-        # TODO: Resize the image?
-        pos = np.array(self.pos).astype(np.single)
+        pos = np.array(self.pos).astype(np.float32)
         pos[1] *= event.size[1] / self.canvas_size[1]
         self.pos = tuple(pos)
+
+        scale = 1 / self.dpi_scale * self.height_ratio
 
         # Move the colorbar to specified position (with half-size padding, because
         # Image visual uses a different anchor (top-left corner) rather than the
         # center-left corner used by ColorBar visual.).
         self.transform.reset()
         self.transform.translate((
-            self.pos[0] / 2.618,  # make the gap smaller :)
-            self.pos[1] - self.size[1] / 2.))
+            1/scale,  # Keep the colorbar close to the left side 
+            # self.pos[1] * self.dpi_scale * 0.05,
+            (self.pos[1] - self.size[1] / 2. * scale) / scale,  # Move the colorbar to the center
+        ))
+        self.transform.scale([scale, scale])
 
         # Update the canvas size.
         self.canvas_size = event.size
@@ -184,8 +206,11 @@ class Colorbar(scene.visuals.Image):
         rendering buffer, and return this buffer as a numpy array.
         """
         assert self.cbar_size is not None
+
+        # Using `self.dpi_scale`` to zoom in the font, produce a high resolution colorbar
         dpi = get_dpi()
-        figsize = (self.cbar_size[0] / dpi, self.cbar_size[1] / dpi)
+        figsize = (self.cbar_size[0] / dpi * self.dpi_scale,
+                   self.cbar_size[1] / dpi * self.dpi_scale)
 
         sm, ticks = self.get_ScalarMappable()
 
@@ -193,8 +218,6 @@ class Colorbar(scene.visuals.Image):
         fig = plt.figure(figsize=figsize)
         width = figsize[1] * 0.2 / figsize[0] / 5
         cbar_axes = fig.add_axes([0.01, 0.01, width, 0.98])
-        # fig, ax = plt.subplots(figsize=figsize)
-        # cb = fig.colorbar(sm, cax=ax)
         cb = fig.colorbar(sm, cax=cbar_axes)
         if self.discrete:
             cb.set_ticks(ticks['ticks'])
@@ -204,17 +227,19 @@ class Colorbar(scene.visuals.Image):
         cb.set_label(
             self.label_str,
             color=self.label_color,
-            size=self.label_size,
+            fontsize=self.label_size * self.dpi_scale,
+            fontweight=self.label_bold,
         )
         plt.setp(plt.getp(cb.ax.axes, 'yticklabels'), color=self.label_color)
         cb.ax.yaxis.set_tick_params(
             color=self.label_color,
-            labelsize=self.tick_size,
+            labelsize=self.tick_size * self.dpi_scale,
+            length=self.tick_length * self.dpi_scale,
+            width=self.tick_width * self.dpi_scale,
         )
-        cb.outline.set_linewidth(self.border_width)
+        cb.ax.yaxis.get_offset_text().set_size(self.tick_size * self.dpi_scale)
+        cb.outline.set_linewidth(self.border_width * self.dpi_scale)
         cb.outline.set_edgecolor(self.border_color)
-
-        # plt.tight_layout()
 
         # Export the rendering to a numpy array in the buffer.
         buf = io.BytesIO()
@@ -224,9 +249,8 @@ class Colorbar(scene.visuals.Image):
             buf,
             format='png',
             bbox_inches='tight',
-            pad_inches=0.01,
+            pad_inches=0.04,
             dpi=dpi,
-            # dpi=dpi * self.dpi_scale,
             transparent=True,
         )
 
@@ -235,8 +259,8 @@ class Colorbar(scene.visuals.Image):
                 Path(self.savedir) / self.cbar_name,
                 format='png',
                 bbox_inches='tight',
-                pad_inches=0.02,
-                dpi=dpi * 4,
+                pad_inches=0.04,
+                dpi=dpi,
                 transparent=True,
             )
 
@@ -287,3 +311,22 @@ class Colorbar(scene.visuals.Image):
                 ticks['labels'] = self.disc_ticks[1]
 
         return plt.cm.ScalarMappable(cmap=cmap, norm=norm), ticks
+
+    def get_font_size(self, fonts):
+        if not isinstance(fonts, List):
+            fontsl = [fonts]
+        else:
+            fontsl = fonts
+        fig, ax = plt.subplots()
+        t = ax.text(0.5, 0.5, 'Text')
+        font_size = []
+        for font in fontsl:
+            if isinstance(font, (int, float)):
+                font_size.append(font)
+            else:
+                t.set_fontsize(font)
+                font_size.append(round(t.get_fontsize(), 2))
+        plt.close(fig)
+        if not isinstance(fonts, List):
+            font_size = font_size[0]
+        return font_size

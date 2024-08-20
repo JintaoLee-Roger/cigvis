@@ -328,9 +328,11 @@ class Axis3D(Compound):
             self._textaxis.pos = pos
 
     def update_ticks_labels(self):
-        self.xtick_labels = [str(self.sp_x[i]) for i in self.xticks]
-        self.ytick_labels = [str(self.sp_y[i]) for i in self.yticks]
-        self.ztick_labels = [str(self.sp_z[i]) for i in self.zticks]
+        def _fmt(x):
+            return f'{x:.2f}'.rstrip('0').rstrip('.')
+        self.xtick_labels = [_fmt(self.sp_x[i]) for i in self.xticks]
+        self.ytick_labels = [_fmt(self.sp_y[i]) for i in self.yticks]
+        self.ztick_labels = [_fmt(self.sp_z[i]) for i in self.zticks]
         self._textx.text = self.xtick_labels
         self._texty.text = self.ytick_labels
         self._textz.text = self.ztick_labels
