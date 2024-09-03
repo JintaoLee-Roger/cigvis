@@ -29,11 +29,13 @@ from vispy.color import get_colormap as get_vispycmap
 from .customcmap import *
 
 
-def arrs_to_image(arr, cmap, clim, as_uint8=False):
+def arrs_to_image(arr, cmap, clim, as_uint8=False, nancolor=None):
 
-    def _to_image(arr, cmap, clim):
+    def _to_image(arr, cmap, clim, nancolor=None):
         norm = plt.Normalize(vmin=clim[0], vmax=clim[1])
         cmap = cmap_to_mpl(cmap)
+        if nancolor is not None:
+            cmap.set_bad(nancolor)
         img = cmap(norm(arr))
         return img
 
@@ -46,9 +48,9 @@ def arrs_to_image(arr, cmap, clim, as_uint8=False):
     if len(arr) != len(cmap) or len(arr) != len(clim):
         raise RuntimeError("(len(arr) != len(cmap)) or (len(arr) != len(clim))")
 
-    out = _to_image(arr[0], cmap[0], clim[0])
+    out = _to_image(arr[0], cmap[0], clim[0], nancolor)
     for i in range(1, len(arr)):
-        img = _to_image(arr[i], cmap[i], clim[i])
+        img = _to_image(arr[i], cmap[i], clim[i], nancolor)
 
         bgRGB = out[:, :, :3]
         fgRGB = img[:, :, :3]

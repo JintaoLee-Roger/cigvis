@@ -259,7 +259,7 @@ class ImageParams(BaseWidget):
         colormap_label = qtw.QLabel('cmap:')
         self.colormap_combo = EditableComboBox()
         colormaps = [
-            'gray', 'seismic', 'Petrel', 'stratum', 'jet', 'od_seismic1',
+            'gray', 'seismic', 'Petrel', 'stratum', 'jet', 'od_seismic1', 'bwp',
             'od_seismic2', 'od_seismic3'
         ]
         self.colormap_combo.addItems(colormaps)

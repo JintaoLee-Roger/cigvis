@@ -20,7 +20,8 @@ class VolumeSlice:
                  pos=0,
                  cmap='gray',
                  clim=None,
-                 scale=-1):
+                 scale=-1,
+                 nancolor=None):
         self._server = None # viser.ViserServer
         self.volume = volume
         self.axis = axis
@@ -31,6 +32,7 @@ class VolumeSlice:
         ]
 
         self.init_scale = [8 / max(volume.shape)] * 3
+        self.nancolor = nancolor
 
         if isinstance(scale, (int, float)):
             if scale < 0:
@@ -105,7 +107,7 @@ class VolumeSlice:
             fg = [mask[:, :, self.pos] for mask in self.masks]
 
         img = colormap.arrs_to_image([bg] + fg, [self.cmap] + self.fg_cmaps,
-                                     [self.clim] + self.fg_clims, True)
+                                     [self.clim] + self.fg_clims, True, self.nancolor)
         return img
 
     def update_node(self, pos):

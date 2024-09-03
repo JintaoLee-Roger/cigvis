@@ -231,8 +231,6 @@ def interp_surf(volume: np.ndarray,
     return out
 
 
-
-
 def interp_arb(p: np.ndarray, d: np.ndarray) -> np.ndarray:
     """
     Interpolates a 1d series in 3d space by **linear** interpolation.
@@ -253,10 +251,9 @@ def interp_arb(p: np.ndarray, d: np.ndarray) -> np.ndarray:
     f11 = d[:, 3, :]
 
     # linear interpolation
-    out = (f00 * (1 - x)[:, None] * (1 - y)[:, None] + 
-           f01 * (1 - x)[:, None] * y[:, None] + 
-           f10 * x[:, None] * (1 - y)[:, None] + 
-           f11 * x[:, None] * y[:, None])
+    out = (f00 * (1 - x)[:, None] * (1 - y)[:, None] + f01 *
+           (1 - x)[:, None] * y[:, None] + f10 * x[:, None] *
+           (1 - y)[:, None] + f11 * x[:, None] * y[:, None])
 
     return out
 
@@ -276,8 +273,9 @@ def interpolate_path(points, di=1):
     x_points = np.interp(distances_interp, cum_distances, points[:, 0])
     y_points = np.interp(distances_interp, cum_distances, points[:, 1])
 
-    return np.column_stack((x_points, y_points))
+    indices = np.searchsorted(distances_interp, cum_distances)
 
+    return np.column_stack((x_points, y_points)), indices
 
 
 def extract_data(data, p):
@@ -324,9 +322,7 @@ def extract_data(data, p):
     unique, inverse = np.unique(all_points, axis=0, return_inverse=True)
     unique_data = np.array([data[i, j] for i, j in unique])
 
-
     return pout, unique_data[inverse].reshape(N, 4, n3)
-
 
 
 def arbitray_line(data, points, di: float = 1):
@@ -335,8 +331,8 @@ def arbitray_line(data, points, di: float = 1):
     points : the points to interpolate a path
     di : step
     """
-    p = interpolate_path(points, di)
+    p, indices = interpolate_path(points, di)
     pout, pdata = extract_data(data, p)
     out = interp_arb(pout, pdata)
 
-    return out, p
+    return out, p, indices

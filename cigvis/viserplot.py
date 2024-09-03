@@ -21,6 +21,7 @@ def create_slices(volume: np.ndarray,
                   pos: Union[List, Dict] = None,
                   clim: List = None,
                   cmap: str = 'Petrel',
+                  nancolor=None,
                   **kwargs) -> List:
     # set pos
     ni, nx, nt = volume.shape
@@ -41,7 +42,16 @@ def create_slices(volume: np.ndarray,
     nodes = []
     for axis, p in pos.items():
         for i in p:
-            nodes.append(VolumeSlice(volume, axis, i, cmap, clim, **kwargs))
+            nodes.append(
+                VolumeSlice(
+                    volume,
+                    axis,
+                    i,
+                    cmap,
+                    clim,
+                    nancolor=nancolor,
+                    **kwargs,
+                ))
 
     return nodes
 
@@ -225,8 +235,9 @@ def create_surfaces(surfs: List[np.ndarray],
     return mesh_nodes
 
 
-def plot3D(nodes, axis_scales=[1, 1, 1], **kwargs):
+def plot3D(nodes, axis_scales=[1, 1, 1], fov=30, **kwargs):
     server = viser.ViserServer(label='cigvis-viser')
+    fov = fov * np.pi / 180
 
     # update scale of slices
     draw_slices = False
@@ -304,6 +315,8 @@ def plot3D(nodes, axis_scales=[1, 1, 1], **kwargs):
     if draw_slices:
         vmin = utils.nmin(nodes[0].volume)
         vmax = utils.nmax(nodes[0].volume)
+        if vmin == vmax:
+            vmax = vmin + 1
         step = (vmax - vmin) / 100
 
     def update_clim(vmin, vmax):
@@ -344,7 +357,7 @@ def plot3D(nodes, axis_scales=[1, 1, 1], **kwargs):
             guicmap = server.gui.add_dropdown(
                 'cmap',
                 options=[
-                    'gray', 'seismic', 'Petrel', 'stratum', 'jet',
+                    'gray', 'seismic', 'Petrel', 'stratum', 'jet', 'bwp',
                     'od_seismic1', 'od_seismic2', 'od_seismic3'
                 ],
                 initial_value='gray',
@@ -393,15 +406,14 @@ def plot3D(nodes, axis_scales=[1, 1, 1], **kwargs):
 
     @server.on_client_connect
     def _(client: viser.ClientHandle) -> None:
-        client.camera.fov = np.pi / 4.0  # Or some other angle in radians
+        client.camera.fov = fov  # Or some other angle in radians, np.pi / 6 -> 30 degree
 
         # TODO: move the origin (0, 0, 0) to the top
         # def _(camera):
-        client.camera.position = (8, 8, 0)
+        # client.camera.position = (8, 8, 0)
         # client.camera.wxyz = (0.7, 0, 0,0.7)
 
     server.scene.set_up_direction((0.0, 0.0, -1.0))
-
 
     try:
         while True:

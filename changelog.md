@@ -1,6 +1,12 @@
 # Changelog
 
 
+### v0.1.2
+
+- added `blue_white_purple` colormap
+- added `nancolor` to set nan color in viser
+- added `extract_arbitrary_line_by_view` function to a extract arbitrary line by clicking
+
 
 ### v0.1.1
 

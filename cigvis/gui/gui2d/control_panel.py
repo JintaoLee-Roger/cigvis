@@ -320,12 +320,18 @@ class ControlP(qtw.QWidget):
         row_tab.addWidget(self.tab_widget)
         row_tab.setStretch(0, 1)
 
+        value_tab = qtw.QHBoxLayout()
+        self.status_label = qtw.QLabel('')
+        self.status_label.setStyleSheet("font-size: 12px; padding: 5px;")
+        value_tab.addWidget(self.status_label)
+
         self.addlayout(layout, [
             row1_layout,
             row_folder,
             row2_layout,
             rowl_layout,
             row_tab,
+            value_tab,
         ])
 
         layout.addStretch(1)

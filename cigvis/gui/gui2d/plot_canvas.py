@@ -272,6 +272,11 @@ class AnnotationMixin:
                                            self.scrib_list[-1][1])
             self.draw()
 
+        if event.inaxes and self.data is not None:
+            v = self.data[round(event.xdata), round(event.ydata)]
+            self.parent().parent().controlP.status_label.setText(
+                f'x={event.xdata:.1f}, y={event.ydata:.1f}, v={v:.1f}')
+
     def on_mouse_release(self, event):
         if self.box_mode > 0 and event.inaxes:
             self.rect = None
@@ -359,7 +364,7 @@ class PlotCanvas(FigureCanvas, DraggableMixin, ImageMixin, AnnotationMixin,
         self.fig = Figure(figsize=(width, height), dpi=dpi)
         self.axes = self.fig.add_subplot(111)
         self.axes.set_axis_off()
-        self.fig.subplots_adjust(left=0.05, right=0.95, top=0.95, bottom=0.05)
+        self.fig.subplots_adjust(left=0.08, right=0.98, top=0.98, bottom=0.05)
         super().__init__(self.fig)
         self.setParent(parent)
         self.controlP = self.parent().controlP
@@ -408,7 +413,9 @@ class PlotCanvas(FigureCanvas, DraggableMixin, ImageMixin, AnnotationMixin,
             self.axes.axis('off')
             self.baseim = None
         else:
-            self.baseim = self.axes.imshow(self.data.T, **self.params)
+            self.baseim = self.axes.imshow(self.data.T,
+                                           **self.params,
+                                           aspect='auto')
         self.draw()
 
     def clear(self):
