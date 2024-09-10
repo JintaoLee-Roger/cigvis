@@ -81,6 +81,7 @@ class FixedImage(scene.visuals.Image):
 
         # Set GL state. Must check depth test, otherwise weird in 3D.
         self.set_gl_state(depth_test=True,
+                          blend=True,
                           depth_func='lequal',
                           blend_func=('src_alpha', 'one_minus_src_alpha'))
 

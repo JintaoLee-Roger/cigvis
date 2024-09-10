@@ -13,6 +13,7 @@ docs/_build
 .DS_Store
 cpp
 advance/
+.vscode
 
 test*
 data/*

@@ -235,7 +235,15 @@ def create_surfaces(surfs: List[np.ndarray],
     return mesh_nodes
 
 
-def plot3D(nodes, axis_scales=[1, 1, 1], fov=30, **kwargs):
+def plot3D(
+    nodes,
+    axis_scales=[1, 1, 1],
+    fov=30,
+    look_at=None,
+    wxyz=None,
+    position=None,
+    **kwargs,
+):
     server = viser.ViserServer(label='cigvis-viser')
     fov = fov * np.pi / 180
 
@@ -404,14 +412,40 @@ def plot3D(nodes, axis_scales=[1, 1, 1], fov=30, **kwargs):
         gui_scalez.on_update(lambda _: update_scale(
             [gui_scalex.value, gui_scaley.value, gui_scalez.value]))
 
+    def _print_states(server: viser.ViserServer):
+        client = list(server.get_clients().values())[0]
+
+        camera = client.camera
+        print('')
+        print('----------- Current States ------------')
+        print(f'fov: {_round(camera.fov * 180 / np.pi)}')
+        print(f'look_at: {_round(camera.look_at)}')
+        print(f'wxyz: {_round(camera.wxyz)}')
+        print(f'position: {_round(camera.position)}')
+        print('----------- axis position -------------')
+        print(f'x: {guix.value}, y: {guiy.value}, z: {guiz.value}')
+        print('----------- parameters ----------------')
+        print(f'cmap: {guicmap.value}')
+        print(f'vmin: {guivmin.value:.2f}, vmax: {guivmax.value:.2f}')
+        print('----------- Aspect Ratio --------------')
+        print(f'scale_x: {gui_scalex.value:.2f}, scale_y: {gui_scaley.value:.2f}, scale_z: {gui_scalez.value:.2f}') # yapf: disable
+        print('')
+
+    with server.gui.add_folder('states'):
+        gui_states = server.gui.add_button('print states')
+        gui_states.on_click(lambda _: _print_states(server))
+
     @server.on_client_connect
     def _(client: viser.ClientHandle) -> None:
         client.camera.fov = fov  # Or some other angle in radians, np.pi / 6 -> 30 degree
-
-        # TODO: move the origin (0, 0, 0) to the top
-        # def _(camera):
-        # client.camera.position = (8, 8, 0)
-        # client.camera.wxyz = (0.7, 0, 0,0.7)
+        if look_at is None:
+            client.camera.look_at = (1, 1, 0)
+        else:
+            client.camera.look_at = tuple(look_at)
+        if wxyz is not None:
+            client.camera.wxyz = wxyz
+        if position is not None:
+            client.camera.position = tuple(position)
 
     server.scene.set_up_direction((0.0, 0.0, -1.0))
 
@@ -422,7 +456,17 @@ def plot3D(nodes, axis_scales=[1, 1, 1], fov=30, **kwargs):
         # ca = server.get_clients()
         # for k, cc in ca.items():
         #     c = cc.camera
-        #     print(k, c.position, c.wxyz, c.fov, c.aspect, c.look_at, c.up_direction)
+        #     print('')
+        #     print(c.look_at)
         server.stop()
         del server
         print("Execution interrupted")
+
+
+def _round(f):
+    if np.isscalar(f):
+        return round(f, 2)
+    if isinstance(f, list):
+        return [round(x, 2) for x in f]
+    if isinstance(f, np.ndarray):
+        return np.round(f, 2)

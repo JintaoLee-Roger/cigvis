@@ -1,6 +1,8 @@
 import sys
+import platform
 from PyQt5 import QtWidgets as qtw
 from PyQt5 import QtCore
+from PyQt5.QtGui import QFont
 
 import numpy as np
 
@@ -56,7 +58,8 @@ class CentralController(QtCore.QObject):
             self.pCanvas.set_brush_size)
 
     def maskTabConnection(self):
-        self.controlP.mask_tab.params[list].connect(self.pCanvas.set_mask_params)
+        self.controlP.mask_tab.params[list].connect(
+            self.pCanvas.set_mask_params)
         self.controlP.mask_tab.deleteIdx[int].connect(self.pCanvas.remove_mask)
 
     def loadDataConnection(self):
@@ -86,7 +89,18 @@ class MyMainWindow(qtw.QMainWindow):
 
 
 def gui2d(nx: int = None, ny: int = None, clear_dim: bool = True):
+    system = platform.system()
+    QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
+
     app = qtw.QApplication(sys.argv)
+
+    if system == 'Linux':
+        font = QFont('Ubuntu')
+        app.setFont(font)
+    elif system == 'Windows':
+        font = QFont('Segoe UI')
+        app.setFont(font)
+
     main = MyMainWindow(nx, ny, clear_dim)
     main.show()
     sys.exit(app.exec_())

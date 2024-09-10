@@ -3,6 +3,7 @@
 # University of Science and Technology of China (USTC).
 # All rights reserved.
 
+import platform
 from PyQt5 import QtWidgets as qtw
 from PyQt5 import QtCore
 
@@ -94,9 +95,19 @@ class MyMainWindow(qtw.QMainWindow):
 
 
 def gui3d(nx=None, ny=None, nz=None, clear_dim=True):
+    QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
+    system = platform.system()
+
     app = use_app("pyqt5")
     app.create()
     win = MyMainWindow(nx, ny, nz, clear_dim)
+
+    if system == 'Linux':
+        font = QtGui.QFont('Ubuntu')
+        win.setFont(font)
+    elif system == 'Windows':
+        font = QtGui.QFont('Segoe UI')
+        win.setFont(font)
+
     win.show()
     app.run()
-    # sys.exit(app.exec_())

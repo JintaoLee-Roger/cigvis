@@ -31,7 +31,7 @@ class VolumeSlice:
             utils.nmin(volume), utils.nmax(volume)
         ]
 
-        self.init_scale = [8 / max(volume.shape)] * 3
+        self.init_scale = [1.5 / max(volume.shape)] * 3
         self.nancolor = nancolor
 
         if isinstance(scale, (int, float)):
