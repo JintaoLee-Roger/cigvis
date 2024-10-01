@@ -16,6 +16,7 @@ class ImageMixin:
         if self.data is None:
             self.data = data
             self.nodes = cigvis.create_slices(self.data, **self.params)
+            # self.nodes += cigvis.create_axis(data.shape, mode='axis', axis_pos='auto', axis_labels=['Inline [points]', 'Xline [points]', 'Time [points]'])
             self.canvas.add_nodes(self.nodes)
         else:
             self.clear()

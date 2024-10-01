@@ -162,13 +162,15 @@ class LoadBtn(qtw.QPushButton):
             data = data.T
         self.gstates.dataLoaded = True  # 标记数据已加载
         if self._is_base():
-            self.vmin.emit(f'{utils.nmin(data):.2f}')
-            self.vmax.emit(f'{utils.nmax(data):.2f}')
+            v1, v2 = utils.auto_clim(data)
+            self.vmin.emit(_format(v1))
+            self.vmax.emit(_format(v2))
         elif self.gstates.loadType == 'mask':
+            v1, v2 = utils.auto_clim(data)
             item = qtw.QListWidgetItem(Path(filePath).name)
             paramsWidget = MaskImageParams(interps=INTERPS)
-            paramsWidget.vmin_input.setTextAndEmit(f'{utils.nmin(data):.2f}')
-            paramsWidget.vmax_input.setTextAndEmit(f'{utils.nmax(data):.2f}')
+            paramsWidget.vmin_input.setTextAndEmit(_format(v1))
+            paramsWidget.vmax_input.setTextAndEmit(_format(v2))
             item.paramsWidget = paramsWidget
             item.visible = True  # TODO:
             self.maskItem.emit(item)
@@ -630,6 +632,13 @@ def _get_dim_from_filename(fname: str, return_int: bool = True):
             return x, y, z
 
     return False
+
+
+def _format(f):
+    if abs(f) >= 1:
+        return f'{f:.2f}'
+    else:
+        return f'{f:.2g}'
 
 
 if __name__ == '__main__':

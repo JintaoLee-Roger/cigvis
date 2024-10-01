@@ -341,5 +341,23 @@ class Axis3D(Compound):
         """
         get ticks for axis, num is the number of ticks
         """
-        interval = int(length / (num - 1))
-        return np.arange(0, length + interval, interval)[:num - 1]
+        # interval = int(length / (num - 1))
+        # return np.arange(0, length + interval, interval)[:num - 1]
+        vmin = 0
+        vmax =length - 1
+        data_range = vmax - vmin
+        raw_interval = data_range / (num - 1)
+        mag = 10 ** np.floor(np.log10(raw_interval))
+        normalized_interval = raw_interval / mag
+
+        if normalized_interval <= 1.5:
+            tick_interval = 1 * mag
+        elif normalized_interval <= 3:
+            tick_interval = 2 * mag
+        elif normalized_interval <= 7:
+            tick_interval = 5 * mag
+        else:
+            tick_interval = 10 * mag
+
+        tick = np.arange(0, length, tick_interval).astype(int)
+        return tick

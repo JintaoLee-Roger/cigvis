@@ -37,7 +37,7 @@ def create_slices(volume: np.ndarray,
     assert isinstance(pos, Dict)
 
     if clim is None:
-        clim = [utils.nmin(volume), utils.nmax(volume)]
+        clim = utils.auto_clim(volume)
 
     nodes = []
     for axis, p in pos.items():
@@ -69,7 +69,7 @@ def add_mask(nodes: List,
         utils.check_mmap(volume)
 
     if clims is None:
-        clims = [[utils.nmin(v), utils.nmax(v)] for v in volumes]
+        clims = [utils.auto_clim(v) for v in volumes]
     if not isinstance(clims[0], (List, Tuple)):
         clims = [clims]
 
@@ -321,8 +321,7 @@ def plot3D(
 
     # gui to control slices clim and cmap
     if draw_slices:
-        vmin = utils.nmin(nodes[0].volume)
-        vmax = utils.nmax(nodes[0].volume)
+        [vmin, vmax] = utils.auto_clim(nodes[0].volume)
         if vmin == vmax:
             vmax = vmin + 1
         step = (vmax - vmin) / 100
@@ -453,11 +452,6 @@ def plot3D(
         while True:
             time.sleep(0.1)
     except KeyboardInterrupt:
-        # ca = server.get_clients()
-        # for k, cc in ca.items():
-        #     c = cc.camera
-        #     print('')
-        #     print(c.look_at)
         server.stop()
         del server
         print("Execution interrupted")

@@ -101,13 +101,13 @@ class LoadBtn(qtw.QPushButton):
             data = data.T
         self.gstates.dataLoaded = True  # 标记数据已加载
         if self._is_base():
-            self.vmin.emit(f'{data.min():.2f}')
-            self.vmax.emit(f'{data.max():.2f}')
+            self.vmin.emit(_format(data.min()))
+            self.vmax.emit(_format(data.max()))
         else:
             item = qtw.QListWidgetItem(Path(filePath).name)
             paramsWidget = MaskImageParams()
-            paramsWidget.vmin_input.setTextAndEmit(f'{data.min():.2f}')
-            paramsWidget.vmax_input.setTextAndEmit(f'{data.max():.2f}')
+            paramsWidget.vmin_input.setTextAndEmit(_format(data.min()))
+            paramsWidget.vmax_input.setTextAndEmit(_format(data.max()))
             item.paramsWidget = paramsWidget
             self.maskItem.emit(item)
 
@@ -413,3 +413,11 @@ class ControlP(qtw.QWidget):
         self.base_tab.clear()
         self.anno_tab.clear()
         self.mask_tab.clear()
+
+
+
+def _format(f):
+    if abs(f) >= 1:
+        return f'{f:.2f}'
+    else:
+        return f'{f:.2g}'

@@ -158,9 +158,9 @@ def _process_args(volumes: Union[np.ndarray, List],
                 from warnings import warn
                 warn(
                     "cmap='auto' with np.memmap can significantly impact launching "
-                    + "time, cmap=(cmin, cmax) is recommended.",
+                    + "time, clim=(cmin, cmax) is recommended.",
                     UserWarning,
                     stacklevel=2)
-            clims[i_vol] = (utils.nmin(vol), utils.nmax(vol))
+            clims[i_vol] = utils.auto_clim(vol)
 
     return volumes, preproc_funcs, cmaps, clims, interpolation, n_vol, shape

@@ -27,9 +27,7 @@ class VolumeSlice:
         self.axis = axis
         self.pos = pos
         self.cmap = cmap
-        self.clim = clim if clim is not None else [
-            utils.nmin(volume), utils.nmax(volume)
-        ]
+        self.clim = clim if clim is not None else utils.auto_clim()
 
         self.init_scale = [1.5 / max(volume.shape)] * 3
         self.nancolor = nancolor
@@ -166,7 +164,7 @@ class VolumeSlice:
         assert vol.shape == self.volume.shape
         self.masks.append(vol)
         if clim is None:
-            clim = [utils.nmin(vol), utils.nmax(vol)]
+            clim = utils.auto_clim(vol)
         self.fg_cmaps.append(cmap)
         self.fg_clims.append(clim)
         self.update_node(self.pos)
