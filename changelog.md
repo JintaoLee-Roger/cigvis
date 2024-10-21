@@ -1,6 +1,14 @@
 # Changelog
 
 
+### v0.1.3
+
+- add `parula` and `batlow` colormap
+- higher resolution colorbar
+- fix a bug when the alpha is not 1
+- support to print states in viser
+- gui support high dpi scaling
+
 ### v0.1.2
 
 - added `blue_white_purple` colormap

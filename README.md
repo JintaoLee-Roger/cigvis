@@ -31,16 +31,16 @@ For local installation, clone the repository from GitHub and then install it usi
 ```shell
 git clone https://github.com/JintaoLee-Roger/cigvis.git
 # Minimal installation
-pip install -e . --config-settings editable_mode=strict
+pip install -e . --config-settings editable_mode=compat
 
 # include plotly 
-pip install -e ".[plotly]" --config-settings editable_mode=strict
+pip install -e ".[plotly]" --config-settings editable_mode=compat
 
 # include viser
-pip install -e ".[viser]" --config-settings editable_mode=strict
+pip install -e ".[viser]" --config-settings editable_mode=compat
 
 # install all dependencies
-pip install -e ".[all]" --config-settings editable_mode=strict
+pip install -e ".[all]" --config-settings editable_mode=compat
 ```
 
 ## Core Features
