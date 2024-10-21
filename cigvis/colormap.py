@@ -560,7 +560,10 @@ def get_custom_cmap(cmap: str) -> LinearSegmentedColormap:
         raise RuntimeWarning(
             f"cmap {cmap} not in opendtect cmap list {cmap_list}")
 
-    return LinearSegmentedColormap(f'{cmap}', custom_cdict[cmap])
+    if isinstance(custom_cdict[cmap], dict):
+        return LinearSegmentedColormap(f'{cmap}', custom_cdict[cmap])
+    else:
+        return ListedColormap(np.array(custom_cdict[cmap]), f'{cmap}')
 
 
 def plot_cmap(cmap, norm: List = None, save: str = None):

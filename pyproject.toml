@@ -9,7 +9,7 @@ authors = [
     {name = "Jintao Li", email = "lijintaobt@gmail.com"},
 ]
 
-version = "0.1.2"
+version = "0.1.3"
 
 description = "CIGVis is a tool for geophysical data visualization"
 readme = "README.md"
@@ -44,16 +44,12 @@ plotly = [
 
 viser = [
     "viser", 
-    "trimesh", 
-    "plotly",
-    "pandas",
 ]
 
 all = [
     "plotly", 
     "pandas",
     "viser", 
-    "trimesh", 
     "cigsegy",
 ]
 

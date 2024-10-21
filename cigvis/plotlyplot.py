@@ -115,7 +115,7 @@ def create_slices(volume: np.ndarray,
     assert isinstance(pos, Dict)
 
     if clim is None:
-        clim = [utils.nmin(volume), utils.nmax(volume)]
+        clim = utils.auto_clim(volume)
     vmin, vmax = clim
 
     slices, pos = plotlyutils.make_slices(volume, pos=pos)
@@ -208,9 +208,9 @@ def create_overlay(bg_volume: np.ndarray,
     assert isinstance(pos, Dict)
 
     if bg_clim is None:
-        bg_clim = [utils.nmin(bg_volume), utils.nmax(bg_volume)]
+        bg_clim = utils.auto_clim(bg_volume)
     if fg_clim is None:
-        fg_clim = [[utils.nmin(v), utils.nmax(v)] for v in fg_volume]
+        fg_clim = [utils.auto_clim(v) for v in fg_volume]
     if not isinstance(fg_clim[0], (List, Tuple)):
         fg_clim = [fg_clim]
 
@@ -229,19 +229,11 @@ def create_overlay(bg_volume: np.ndarray,
 
     traces = []
 
-    idx = 0
     for dim in ['x', 'y', 'z']:
 
         assert len(bg_slices[dim]) == len(pos[dim])
 
         for j in range(len(bg_slices[dim])):
-
-            if show_cbar and idx == 0:
-                showscale = True
-            else:
-                showscale = False
-
-            idx += 1
 
             num = pos[dim][j]
             name = f'{dim}/{dimname[dim]}'
@@ -252,7 +244,9 @@ def create_overlay(bg_volume: np.ndarray,
             bs = bg_slices[dim][j]
             plotlyutils.verifyshape(bs.shape, shape, dim)
             fs = [fg[dim][j] for fg in fg_slices]
-            colors = colormap.arrs_to_image([bs]+fs, [bg_cmap]+fg_cmap, [bg_clim]+fg_clim, True).reshape(-1, 4)
+            colors = colormap.arrs_to_image([bs] + fs, [bg_cmap] + fg_cmap,
+                                            [bg_clim] + fg_clim,
+                                            True).reshape(-1, 4)
             # colors = np.round(colors * 255).reshape(-1, 3)
             cplotly = [f'rgb({x[0]}, {x[1]}, {x[2]})' for x in colors]
 
@@ -264,18 +258,43 @@ def create_overlay(bg_volume: np.ndarray,
                           j=jj,
                           k=kk,
                           name=name,
-                          vertexcolor=cplotly,
-                          showscale=False))
+                          vertexcolor=cplotly))
+
+    if show_cbar:
+        fg_cmap = colormap.cmap_to_plotly(fg_cmap[-1])
+        fg_clim = fg_clim[-1]
+        tickvals = np.linspace(fg_clim[0], fg_clim[1], 6)
+        ticktext = [f'{i/1e6:.2f}M' for i in tickvals]
+        cbar = go.Scatter3d(
+            x=[None],
+            y=[None],
+            z=[None],
+            mode='markers',
+            marker=dict(
+                colorscale=fg_cmap,  # 与 vertexcolor 对应的 colorscale
+                cmin=fg_clim[0],  # 手动设置 colorscale 范围
+                cmax=fg_clim[1],
+                colorbar=dict(title="Seismic Amplitude",
+                              titleside="right",
+                              tickvals=tickvals,
+                              ticktext=ticktext,
+                              ticks="outside",
+                              thickness=15,),
+                showscale=True))
+        traces.append(cbar)
 
     return traces
 
 
-def create_surfaces(surfs,
-                    volume=None,
-                    value_type='depth',
-                    clim=None,
-                    cmap='jet',
-                    show_cbar=False):
+def create_surfaces(
+    surfs,
+    volume=None,
+    value_type='depth',
+    clim=None,
+    cmap='jet',
+    show_cbar=False,
+    **kwargs,
+):
 
     line_first = cigvis.is_line_first()
 
@@ -309,12 +328,23 @@ def create_surfaces(surfs,
             v = v.T
 
         traces.append(
-            go.Surface(z=s,
-                       surfacecolor=v,
-                       colorscale=cmap,
-                       cmin=vmin,
-                       cmax=vmax,
-                       showscale=show_cbar))
+            go.Surface(
+                z=s,
+                surfacecolor=v,
+                colorscale=cmap,
+                cmin=vmin,
+                cmax=vmax,
+                showscale=show_cbar,
+                # flatshading=False,
+                # 光照效果
+                lighting=dict(ambient=0.1,
+                              diffuse=0.9,
+                              specular=0.5,
+                              roughness=0.3,
+                              fresnel=0.5),
+
+                # 光源位置
+                lightposition=dict(x=100, y=200, z=300)))
 
     return traces
 
@@ -437,7 +467,10 @@ def plot3D(traces, **kwargs):
     size = kwargs.get('size', (900, 900))
     size = (size, size) if isinstance(size, (int, np.integer)) else size
 
-    scene = plotlyutils.make_3Dscene(**kwargs)
+    scene = kwargs.get('scene', {})
+    scened = plotlyutils.make_3Dscene(**kwargs)
+    for k, v in scened.items():
+        scene.setdefault(k, v)
 
     fig = go.Figure(data=traces)
 
@@ -446,6 +479,7 @@ def plot3D(traces, **kwargs):
         width=size[1],
         scene=scene,
         margin=dict(l=5, r=5, t=5, b=5),
+        showlegend=False,
     )
 
     savequality = kwargs.get('savequality', 1)
