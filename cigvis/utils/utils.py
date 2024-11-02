@@ -90,15 +90,15 @@ def nmax(d):
     else:
         return np.nanmax(d)
 
-def auto_clim(d):
+def auto_clim(d, scale=1):
     v1 = nmin(d)
     v2 = nmax(d)
     if v1 == v2:
         return [v1-0.1, v1+0.2]
     if v1*v2 < 0:
         if abs(v1) / abs(v2) < 0.05 or abs(v1) / abs(v2) > 20:
-            return [v1, v2]
+            return [v1*scale, v2*scale]
         else:
-            v = min(abs(v1), abs(v2))
+            v = min(abs(v1), abs(v2))*scale
             return [-v, v]
-    return [v1, v2]
+    return [v1*scale, v2*scale]

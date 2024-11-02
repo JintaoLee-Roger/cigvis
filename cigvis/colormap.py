@@ -335,6 +335,44 @@ def ramp(cmap, blow=0, up=1, alpha_min=0, alpha_max=1, forvispy=True):
     return cmap
 
 
+def set_up_as(cmap, color, forvispy=True):
+    if isinstance(cmap, str):
+        cmap = get_cmap_from_str(cmap)
+
+    if isinstance(cmap, vispyColormap):
+        colors = cmap.colors.rgba
+        colors[-1] = mpl.colors.to_rgba(color)
+        return vispyColormap(colors)
+    elif isinstance(cmap, mplColormap):
+        rgba = cmap(np.arange(cmap.N))
+        rgba[-1] = mpl.colors.to_rgba(color)
+        cmap = ListedColormap(rgba)
+        if forvispy:
+            cmap = cmap_to_vispy(cmap)
+        return cmap
+    else:
+        raise ValueError("unkown cmap")
+
+
+def set_down_as(cmap, color, forvispy=True):
+    if isinstance(cmap, str):
+        cmap = get_cmap_from_str(cmap)
+
+    if isinstance(cmap, vispyColormap):
+        colors = cmap.colors.rgba
+        colors[0] = mpl.colors.to_rgba(color)
+        return vispyColormap(colors)
+    elif isinstance(cmap, mplColormap):
+        rgba = cmap(np.arange(cmap.N))
+        rgba[0] = mpl.colors.to_rgba(color)
+        cmap = ListedColormap(rgba)
+        if forvispy:
+            cmap = cmap_to_vispy(cmap)
+        return cmap
+    else:
+        raise ValueError("unkown cmap")
+
+
 def set_alpha(cmap, alpha: float, forvispy: bool = True):
     """
     Set the alpha blending value, between 0 (transparent) and 1 (opaque)

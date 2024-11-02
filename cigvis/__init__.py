@@ -58,6 +58,20 @@ class ExceptionWrapper:
         raise super().__getattribute__("exception")
 
 
+def is_running_in_notebook():
+    try:
+        from IPython import get_ipython
+        shell = get_ipython().__class__.__name__
+        if shell == 'ZMQInteractiveShell':
+            return True
+        elif shell == 'TerminalInteractiveShell':
+            return False
+        else:
+            return False
+    except NameError:
+        return False
+
+
 import sys
 from .config import *
 from . import io
@@ -65,7 +79,7 @@ from . import colormap
 from . import meshs
 from . import gui
 
-injupyter = 'ipykernel_launcher.py' in sys.argv[0] or 'lab' in sys.argv[0]
+injupyter = is_running_in_notebook()
 
 if injupyter:
     from .plotlyplot import *
@@ -82,3 +96,4 @@ except BaseException as E:
 
 from .mpl2dplot import *
 from .mpl1dplot import *
+from . import colors

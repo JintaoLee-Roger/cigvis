@@ -242,9 +242,15 @@ def plot3D(
     look_at=None,
     wxyz=None,
     position=None,
+    server=None,
+    run_app=True,
     **kwargs,
 ):
-    server = viser.ViserServer(label='cigvis-viser')
+    if server is None:
+        server = viser.ViserServer(label='cigvis-viser', port=8080)
+    server.scene.reset()
+    server.gui.reset()
+
     fov = fov * np.pi / 180
 
     # update scale of slices
@@ -448,13 +454,26 @@ def plot3D(
 
     server.scene.set_up_direction((0.0, 0.0, -1.0))
 
+    if run_app and not cigvis.is_running_in_notebook():
+        try:
+            while True:
+                time.sleep(0.1)
+        except KeyboardInterrupt:
+            server.stop()
+            del server
+            print("Execution interrupted")
+
+
+def run():
     try:
         while True:
             time.sleep(0.1)
     except KeyboardInterrupt:
-        server.stop()
-        del server
         print("Execution interrupted")
+
+
+def create_server(port=8080, label='cigvis-viser', verbose=True):
+    return viser.ViserServer(label=label, port=port, verbose=verbose)
 
 
 def _round(f):

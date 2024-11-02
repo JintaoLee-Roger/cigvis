@@ -1204,7 +1204,7 @@ def create_axis(
 def plot3D(nodes: List,
            grid: Tuple = None,
            share: bool = False,
-           xyz_axis: bool = True,
+           xyz_axis: bool = False,
            cbar_region_ratio: float = 0.125,
            savename: str = None,
            savedir: str = './',
