@@ -97,3 +97,4 @@ except BaseException as E:
 from .mpl2dplot import *
 from .mpl1dplot import *
 from . import colors
+from .mplstyle import load_theme
