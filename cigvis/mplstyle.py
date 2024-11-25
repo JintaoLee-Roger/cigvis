@@ -1,4 +1,5 @@
 _spectrum = """
+font.family: 'Arial', 'SimHei'
 xtick.minor.visible: True
 ytick.minor.visible: True
 xtick.minor.size: 4
@@ -12,10 +13,23 @@ grid.linestyle: --
 grid.linewidth: 0.8
 grid.alpha: 0.8
 axes.facecolor : (0.95, 0.95, 0.95)
-axes.prop_cycle: cycler('color', ['#da7b36', '#3ec8b2', '#0b565a', '#aebf4f'])
+axes.prop_cycle: cycler('color', ['#da7b36', '#3ec8b2', '#0b565a', '#aebf4f', '#ef3c29', '#fbcf48', '#f7f5c4', '#21d1cb', '#016d66'])
 """
 
-_THEMES = {'spectrum': _spectrum, 'default': 'default'}
+_imshow = """
+font.family: 'Arial', 'SimHei'
+xtick.minor.visible: True
+ytick.minor.visible: True
+xtick.minor.size: 4
+ytick.minor.size: 4
+xtick.major.size: 6
+ytick.major.size: 6
+xtick.minor.width: 0.8
+ytick.minor.width: 0.8
+axes.prop_cycle: cycler('color', ['#da7b36', '#3ec8b2', '#0b565a', '#aebf4f', '#ef3c29', '#fbcf48', '#f7f5c4', '#21d1cb', '#016d66'])
+"""
+
+_THEMES = {'spectrum': _spectrum, 'default': 'default', 'imshow': _imshow}
 _FHelveticaNeueCondensedBold = {
     'family': 'Helvetica Neue',
     'weight': 700,
@@ -34,6 +48,7 @@ _FONTS_PRESET = {
 }
 
 import ast
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.font_manager import FontProperties
 
@@ -49,6 +64,7 @@ class load_theme:
         self._tick_font = None
         self._legend_font = None
         self._minor_ticks = None
+        self._using_hcnb = False
 
     def parse_style_string(self, style_str):
         if style_str == 'default':
@@ -69,6 +85,17 @@ class load_theme:
 
     def __enter__(self):
         style_file = self.parse_style_string(self.theme)
+
+        if self._using_hcnb:
+            font = FontProperties(family=['Helvetica Neue', 'Microsoft YaHei'], weight=700, stretch='condensed')
+            # self._tick_font = font
+            self._label_font = font
+            self._title_font = font
+            self._legend_font = font
+            # style_file['font.family'] = ['Helvetica Neue', 'Microsoft YaHei']
+            # style_file['font.weight'] = 700
+            # style_file['font.stretch'] = 'condensed'
+
         self.pth = plt.style.context(style_file)
         self.pth.__enter__()
         if self._minor_ticks:
@@ -85,7 +112,8 @@ class load_theme:
         if self._legend_font:
             set_legend_font(self._legend_font)
 
-        set_mixed_fonts(self.font_zh)
+        # set_mixed_fonts(self.font_zh)
+
 
     def set_title_font(self, fontdict):
         self._title_font = fontdict
@@ -105,6 +133,10 @@ class load_theme:
 
     def set_minor_ticks(self, x=True, y=True):
         self._minor_ticks = (x, y)
+        return self
+
+    def using_hncb(self):
+        self._using_hcnb = True
         return self
 
 
@@ -132,7 +164,7 @@ def set_title_font(fontdict):
     fig = plt.gcf()
     axes_list = fig.get_axes()
     for ax in axes_list:
-        if 'size' not in fontdict:
+        if isinstance(fontdict, dict) and  'size' not in fontdict:
             size = ax.title.get_fontsize()
             fontdict['size'] = size
         ax.title.set_fontproperties(fontdict)
@@ -143,7 +175,7 @@ def set_label_font(fontdict):
     fig = plt.gcf()
     axes_list = fig.get_axes()
     for ax in axes_list:
-        if 'size' not in fontdict:
+        if isinstance(fontdict, dict) and  'size' not in fontdict:
             size = ax.xaxis.label.get_fontsize()
             fontdict['size'] = size
         ax.xaxis.label.set_fontproperties(fontdict)
@@ -156,12 +188,12 @@ def set_tick_font(fontdict):
     axes_list = fig.get_axes()
     for ax in axes_list:
         for tick in ax.get_xticklabels():
-            if 'size' not in fontdict:
+            if isinstance(fontdict, dict) and  'size' not in fontdict:
                 size = tick.get_fontsize()
                 fontdict['size'] = size
             tick.set_fontproperties(fontdict)
         for tick in ax.get_yticklabels():
-            if 'size' not in fontdict:
+            if isinstance(fontdict, dict) and  'size' not in fontdict:
                 size = tick.get_fontsize()
                 fontdict['size'] = size
             tick.set_fontproperties(fontdict)
@@ -175,7 +207,7 @@ def set_legend_font(fontdict):
         legend = ax.get_legend()
         if legend is not None:
             for text in legend.get_texts():
-                if 'size' not in fontdict:
+                if isinstance(fontdict, dict) and  'size' not in fontdict:
                     size = text.get_fontsize()
                     fontdict['size'] = size
                 text.set_fontproperties(fontdict)
