@@ -22,7 +22,7 @@ class VolumeSlice:
                  clim=None,
                  scale=-1,
                  nancolor=None):
-        self._server = None # viser.ViserServer
+        self._server = None  # viser.ViserServer
         self.volume = volume
         self.axis = axis
         self.pos = pos
@@ -93,6 +93,11 @@ class VolumeSlice:
         else:
             return (ri / 2, rx / 2, self.pos * rt / (nt - 1))
 
+    def _to_np(self, img):
+        if utils.is_torch_tensor(img):
+            img = img.detach().cpu().numpy()
+        return img
+
     def to_img(self):
         if self.axis == 'x':
             bg = self.volume[self.pos, :, :]
@@ -104,8 +109,12 @@ class VolumeSlice:
             bg = self.volume[:, :, self.pos]
             fg = [mask[:, :, self.pos] for mask in self.masks]
 
+        bg = self._to_np(bg)
+        fg = [self._to_np(g) for g in fg]
+
         img = colormap.arrs_to_image([bg] + fg, [self.cmap] + self.fg_cmaps,
-                                     [self.clim] + self.fg_clims, True, self.nancolor)
+                                     [self.clim] + self.fg_clims, True,
+                                     self.nancolor)
         return img
 
     def update_node(self, pos):

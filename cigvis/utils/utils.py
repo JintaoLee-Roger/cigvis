@@ -60,8 +60,9 @@ def mmap_min(d: np.ndarray):
                 return np.nanmin(d)
             m1 = np.nanmin(d[:5])
             m2 = np.nanmin(d[-5:])
-            m3 = np.nanmin(d[ni//2-2:ni//2+3])
+            m3 = np.nanmin(d[ni // 2 - 2:ni // 2 + 3])
             return min([m1, m2, m3])
+
 
 def mmap_max(d: np.ndarray):
     if isinstance(d, np.memmap):
@@ -73,32 +74,49 @@ def mmap_max(d: np.ndarray):
                 return np.nanmax(d)
             m1 = np.nanmax(d[:5])
             m2 = np.nanmax(d[-5:])
-            m3 = np.nanmax(d[ni//2-2:ni//2+3])
+            m3 = np.nanmax(d[ni // 2 - 2:ni // 2 + 3])
             return max([m1, m2, m3])
 
+
+def is_torch_tensor(d):
+    if type(d).__module__ == 'torch' and type(d).__name__ == 'Tensor':
+        return True
+    return False
 
 
 def nmin(d):
     if isinstance(d, np.memmap):
         return mmap_min(d)
     else:
+        if is_torch_tensor(d):
+            ma = d.min().item()
+            if np.isnan(ma):
+                raise ValueError("The minimum value of the tensor is nan")
+            return ma
         return np.nanmin(d)
+
 
 def nmax(d):
     if isinstance(d, np.memmap):
         return mmap_max(d)
     else:
+        if is_torch_tensor(d):
+            ma = d.max().item()
+            if np.isnan(ma):
+                raise ValueError("The maximum value of the tensor is nan")
+            return ma
         return np.nanmax(d)
+
 
 def auto_clim(d, scale=1):
     v1 = nmin(d)
     v2 = nmax(d)
     if v1 == v2:
-        return [v1-0.1, v1+0.2]
-    if v1*v2 < 0:
+        return [v1 - 0.1, v1 + 0.2]
+    if v1 * v2 < 0:
         if abs(v1) / abs(v2) < 0.05 or abs(v1) / abs(v2) > 20:
-            return [v1*scale, v2*scale]
+            return [v1 * scale, v2 * scale]
         else:
-            v = min(abs(v1), abs(v2))*scale
+            v = min(abs(v1), abs(v2)) * scale
             return [-v, v]
-    return [v1*scale, v2*scale]
+    return [v1 * scale, v2 * scale]
