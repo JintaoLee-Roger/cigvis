@@ -5,6 +5,7 @@ Gallery
   :hidden:
 
   3Dvispy/index
+  viser/index
   2D/index
   1D/index
   colormap/index
@@ -16,6 +17,15 @@ Gallery
 ----------
 
 See the :doc:`3Dvispy Gallery <3Dvispy/index>` for examples.
+
+
+
+Viser Demos
+--------------
+
+See the :doc:`viser Gallery <viser/index>` for examples.
+
+
 
 
 2D

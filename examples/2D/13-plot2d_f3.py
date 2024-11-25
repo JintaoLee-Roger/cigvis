@@ -21,7 +21,7 @@ import cigvis
 from cigvis import colormap
 import matplotlib.pyplot as plt
 
-root = '/Users/lijintao/Downloads/data/F3/'
+root = '/Volumes/T7/DATA/cigvisdata/F3/'
 seisp = root + 'seis.dat'
 saltp = root + 'salt.dat'
 hz2p = root + 'hz.dat'
@@ -85,8 +85,8 @@ cigvis.plot2d(
     aspect='auto',
     xsample=[0, 0.0125],
     ysample=[0, 0.002],
-    xlabel='Crossline / km',
-    ylabel='Time / s',
+    xlabel='Crossline [km]',
+    ylabel='Time [s]',
     title='2D section (Inline=259)',
     ax=axs[0],
 )
@@ -97,11 +97,12 @@ cigvis.plot_multi_traces(
     traces,
     dt=0.002,
     c='black',
-    fill_up=0.2,
+    fill_down=0.01,
     ax=axs[1],
+    ylabel='Time [s]',
 )
 
 plt.tight_layout()
-plt.savefig('2Dcanvas.png', bbox_inches='tight', pad_inches=0.01, dpi=100)
+plt.savefig('2Dcanvas.png', bbox_inches='tight', pad_inches=0.01, dpi=300)
 
 plt.show()

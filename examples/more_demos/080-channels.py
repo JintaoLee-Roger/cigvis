@@ -31,15 +31,55 @@ iped = np.memmap(root / 'Ip_6.dat', np.float32, mode='c', shape=shape)
 pos = [6, 6, 250]
 
 vis1 = cigvis.create_slices(seis, pos=pos)
+vis1 += cigvis.create_axis(
+    seis.shape,
+    'axis',
+    'auto',
+    axis_labels=['Inline [km]', 'Xline [km]', 'Time [s]'],
+    line_width=1,
+    intervals=[0.025, 0.025, 0.002],
+    rotation=(30, -30, -90),
+    tick_nums=4,
+)
 
 vis2 = cigvis.create_slices(iped, cmap='jet', pos=pos)
+vis2 += cigvis.create_axis(
+    seis.shape,
+    'axis',
+    'auto',
+    axis_labels=['Inline [km]', 'Xline [km]', 'Time [s]'],
+    line_width=1,
+    intervals=[0.025, 0.025, 0.002],
+    rotation=(30, -30, -90),
+    tick_nums=4,
+)
 
 fg_cmap = colormap.set_alpha_except_min('jet', 1)
 vis3 = cigvis.create_slices(seis, pos=pos, cmap='gray')
 vis3 = cigvis.add_mask(vis3, labl, cmaps=fg_cmap, interpolation='nearest')
+vis3 += cigvis.create_axis(
+    seis.shape,
+    'axis',
+    'auto',
+    axis_labels=['Inline [km]', 'Xline [km]', 'Time [s]'],
+    line_width=1,
+    intervals=[0.025, 0.025, 0.002],
+    rotation=(30, -30, -90),
+    tick_nums=4,
+)
 
 vis4 = cigvis.create_slices(seis, pos=pos, cmap='Petrel')
 vis4 = cigvis.add_mask(vis4, labl, cmaps=fg_cmap, interpolation='nearest')
 vis4 += cigvis.create_bodys(labl, 0.5, 0)
+vis4 += cigvis.create_axis(
+    seis.shape,
+    'axis',
+    'auto',
+    axis_labels=['Inline [km]', 'Xline [km]', 'Time [s]'],
+    line_width=1,
+    intervals=[0.025, 0.025, 0.002],
+    rotation=(30, -30, -90),
+    tick_nums=4,
+)
 
 cigvis.plot3D([vis1, vis2, vis3, vis4], (2, 2), True, False, size=(1200, 1100))

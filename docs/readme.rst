@@ -25,7 +25,8 @@ and documentation is available at
 cigvis leverages the power of underlying libraries such as 
 `vispy <https://github.com/vispy/vispy>`_ for 3D visualization, 
 `matplotlib <https://matplotlib.org/>`_ for 2D and 1D visualization, 
-and `plotly <https://plotly.com/>`_ for Jupyter environments (work in progress). 
+`plotly <https://plotly.com/>`_ for Jupyter environments (work in progress), and 
+`viser <https://github.com/nerfstudio-project/viser>`_ for web-based visualization (SSH-Friendly). 
 The 3D visualization component is heavily based on the code from 
 `yunzhishi/seismic-canvas <https://github.com/yunzhishi/seismic-canvas>`_ 
 and has been further developed upon this foundation.
@@ -170,6 +171,74 @@ at `cigvis/gallery/3Dvispy/11 <https://cigvis.readthedocs.io/en/latest/gallery/3
    :align: center
 
 These capabilities provide a powerful way to visualize and compare multiple independent 3D data sets within a single canvas using cigvis.
+
+
+
+Web-based Visualization
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Based on `viser <https://github.com/nerfstudio-project/viser>`_, cigvis also supports visualization 3D data in web/browser environment with just a few lines changed. All you need to do is simply replace ``cigvis`` with ``viserplot``, see follows:
+
+.. code-block:: diff
+
+      import numpy as np
+      import cigvis
+   +   from cigvis import viserplot
+
+      # Load data
+      d = np.fromfile('sx.dat', np.float32).reshape(ni, nt, nx)
+
+      # Create nodes
+   -   nodes = cigvis.create_slices(d)
+   +   nodes = viserplot.create_slices(d)
+
+      # Visualize in 3D
+   -   cigvis.plot3D(nodes)
+   +   viserplot.plot3D(nodes)
+
+
+When you are in ``jupyter`` environment, we recommand to maintain a unique server, 
+otherwise the port will be changed.
+
+.. code-block:: diff
+
+      import numpy as np
+      import cigvis
+   +   from cigvis import viserplot
+   +   server = viserplot.create_server(8080)
+
+      # Load data
+      d = np.fromfile('sx.dat', np.float32).reshape(ni, nt, nx)
+
+      # Create nodes
+   -   nodes = cigvis.create_slices(d)
+   +   nodes = viserplot.create_slices(d)
+
+      # Visualize in 3D
+   -   cigvis.plot3D(nodes)
+   +   viserplot.plot3D(nodes, server=server)
+
+
+After calling ``viserplot.plot3D``, it will generate some logs like:
+
+.. code-block:: text
+
+   ╭─────────────── viser ───────────────╮
+   │             ╷                       │
+   │   HTTP      │ http://0.0.0.0:8080   │
+   │   Websocket │ ws://0.0.0.0:8080     │
+   │             ╵                       │
+   ╰─────────────────────────────────────╯
+
+
+If you are running the code on your local machine, just open ``0.0.0.0:8080`` in your 
+browser to see the image. If you are running the code on a remote server 
+(yes, cigvis also works when connected remotely using ssh!), 
+you can enter ``{ip}:8080`` in the browser to see the 
+visualization (``ip`` is the ip of remote server, e.g., ``222.195.77.88:8080``).
+
+There are sevreal examples in ``examples/viser/`` for reference.
+
 
 
 

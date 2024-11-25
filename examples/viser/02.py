@@ -36,7 +36,5 @@ nodes += viserplot.create_surfaces(
     clim=[sx.min(), sx.max()],
 )
 
-# # add two points
-# nodes += viserplot.create_points(np.array([[70, 50, 158], [20, 100, 80]]), r=3)
 
 viserplot.plot3D(nodes)

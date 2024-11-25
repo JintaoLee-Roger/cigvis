@@ -12,6 +12,8 @@ rm -rf gallery/3Dvispy
 
 rm -rf gallery/more_demos
 
+rm -rf gallery/viser
+
 rm -rf api/
 
 rm -rf _build

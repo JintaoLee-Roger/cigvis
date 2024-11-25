@@ -321,7 +321,7 @@ class ArbLineNode(Mesh):
         self.volume = volume
 
         if self.path is None:
-            self.path = surfaceutils.interpolate_path(self.anchor)
+            self.path, _ = surfaceutils.interpolate_path(self.anchor)
         if self.data is None:
             pout, pdata = surfaceutils.extract_data(self.volume, self.path)
             self.data = surfaceutils.interp_arb(pout, pdata)

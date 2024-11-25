@@ -54,6 +54,7 @@ nodes += cigvis.create_well_logs(
 
 # idx=0 means select the first WellLog node in nodes (though there is only one WellLog node in this case).
 # idx2=1 means select the second cmap, and clim for the select WellLog node, ('seismic' in this case).
-nodes += cigvis.create_colorbar_from_nodes(nodes, 'Log Impedance', select='logs', idx=0, idx2=1)
+# nodes += cigvis.create_colorbar_from_nodes(nodes, 'Log Impedance', select='logs', idx=0, idx2=1)
+nodes += cigvis.create_axis(sx.shape, 'axis', 'auto', axis_labels=['Inline [km]', 'Xline [km]', 'Time [s]'], line_width=1, intervals=[0.025, 0.025, 0.002], rotation=(30, -30, -90), tick_nums=4)
 
-cigvis.plot3D(nodes, zoom_factor=8, size=(800, 600), savename='example.png')
+cigvis.plot3D(nodes, zoom_factor=8, size=(800, 600), savename='example.png', xyz_axis=False)

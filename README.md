@@ -8,7 +8,7 @@
 
 cigvis can be used for various geophysical data visualizations, including 3D seismic data, overlays of seismic data with other information like labels, faults, RGT, horizon surfaces, well log trajectories, and well log curves, 3D geological bodies, 2D data, and 1D data, among others. Its GitHub repository can be found at [github.com/JintaoLee-Roger/cigvis](https://github.com/JintaoLee-Roger/cigvis), and documentation is available at [https://cigvis.readthedocs.io/](https://cigvis.readthedocs.io/).
 
-cigvis leverages the power of underlying libraries such as [vispy](https://github.com/vispy/vispy) for 3D visualization, [matplotlib](https://matplotlib.org/) for 2D and 1D visualization, and [plotly](https://plotly.com/) for Jupyter environments (work in progress). The 3D visualization component is heavily based on the code from [yunzhishi/seismic-canvas](https://github.com/yunzhishi/seismic-canvas) and has been further developed upon this foundation.
+cigvis leverages the power of underlying libraries such as [vispy](https://github.com/vispy/vispy) for 3D visualization, [matplotlib](https://matplotlib.org/) for 2D and 1D visualization, [plotly](https://plotly.com/) for Jupyter environments (work in progress), and [viser](https://github.com/nerfstudio-project/viser) for web-based visualization (SSH-Friendly). The 3D visualization component is heavily based on the code from [yunzhishi/seismic-canvas](https://github.com/yunzhishi/seismic-canvas) and has been further developed upon this foundation.
 
 ## Installation
 
@@ -124,6 +124,61 @@ You can find example code for this functionality in the documentation at [cigvis
 ![11](https://raw.githubusercontent.com/JintaoLee-Roger/images/main/cigvis/3Dvispy/11.gif)
 
 These capabilities provide a powerful way to visualize and compare multiple independent 3D data sets within a single canvas using cigvis.
+
+## Web-based Visualization
+
+Based on [viser](https://github.com/nerfstudio-project/viser), cigvis also supports visualization 3D data in web/browser environment with just a few lines changed. All you need to do is simply replace `cigvis` with `viserplot`, see follows:
+
+``` diff
+    import numpy as np
+    import cigvis
++   from cigvis import viserplot
+
+    # Load data
+    d = np.fromfile('sx.dat', np.float32).reshape(ni, nt, nx)
+
+    # Create nodes
+-   nodes = cigvis.create_slices(d)
++   nodes = viserplot.create_slices(d)
+
+    # Visualize in 3D
+-   cigvis.plot3D(nodes)
++   viserplot.plot3D(nodes)
+```
+
+When you are in `jupyter` environment, we recommand to maintain a unique server, otherwise the port will be changed.
+
+``` diff
+    import numpy as np
+    import cigvis
++   from cigvis import viserplot
++   server = viserplot.create_server(8080)
+
+    # Load data
+    d = np.fromfile('sx.dat', np.float32).reshape(ni, nt, nx)
+
+    # Create nodes
+-   nodes = cigvis.create_slices(d)
++   nodes = viserplot.create_slices(d)
+
+    # Visualize in 3D
+-   cigvis.plot3D(nodes)
++   viserplot.plot3D(nodes, server=server)
+```
+
+After calling `viserplot.plot3D`, it will generate some logs like:
+```txt
+╭─────────────── viser ───────────────╮
+│             ╷                       │
+│   HTTP      │ http://0.0.0.0:8080   │
+│   Websocket │ ws://0.0.0.0:8080     │
+│             ╵                       │
+╰─────────────────────────────────────╯
+```
+
+If you are running the code on your local machine, just open `0.0.0.0:8080` in your browser to see the image. If you are running the code on a remote server (yes, cigvis also works when connected remotely using ssh!), you can enter `{ip}:8080` in the browser to see the visualization (`ip` is the ip of remote server, e.g., `222.195.77.88:8080`).
+
+There are sevreal examples in `examples/viser/` for reference.
 
 
 ## Example Data
