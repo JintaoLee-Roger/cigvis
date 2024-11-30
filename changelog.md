@@ -1,6 +1,18 @@
 # Changelog
 
 
+### v0.1.5
+
+- added `shading` and `dyn_light` to control the mesh's shadingfilter and dyanmic lightning
+
+
+### v0.1.4
+
+- fixed a bug reported by #20 and #21
+- added mplstpyle file
+- improved viserplot
+
+
 ### v0.1.3
 
 - add `parula` and `batlow` colormap
