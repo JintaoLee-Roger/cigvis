@@ -88,7 +88,7 @@ class VisCanvas(scene.SceneCanvas, EventMixin, LightMixin, AxisMixin):
         auto_range: bool = True,
 
         # for light
-        change_light: bool = True,
+        dyn_light: bool = True,
 
         # for save
         savedir: str = './',
@@ -121,7 +121,7 @@ class VisCanvas(scene.SceneCanvas, EventMixin, LightMixin, AxisMixin):
         self.zoom_factor = zoom_factor
         self.share = share
 
-        self.change_light = change_light
+        self.dyn_light = dyn_light
 
         axis_scales = list(axis_scales)
         for i, r in enumerate(cigvis.is_axis_reversed()):

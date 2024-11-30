@@ -290,11 +290,11 @@ class LightMixin:
 
         @view.scene.transform.changed.connect
         def on_transform_change(event):
-            if not self.change_light:
+            if not self.dyn_light:
                 return
             transform = view.camera.transform
             for node in nodes:
-                if hasattr(node, 'change_light') and not node.change_light:
+                if hasattr(node, 'dyn_light') and not node.dyn_light:
                     continue
                 if isinstance(node, MeshVisual):
                     if node.shading_filter is not None:
@@ -330,12 +330,12 @@ class LightMixin:
 
         @view.scene.transform.changed.connect
         def on_transform_change(event):
-            if not self.change_light:
+            if not self.dyn_light:
                 return
             transform = view.camera.transform
             for nodes in nodess.values():
                 for node in nodes:
-                    if hasattr(node, 'change_light') and not node.change_light:
+                    if hasattr(node, 'dyn_light') and not node.dyn_light:
                         continue
                     if isinstance(node, MeshVisual):
                         if node.shading_filter is not None:

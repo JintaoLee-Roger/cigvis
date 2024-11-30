@@ -541,8 +541,10 @@ def create_surfaces(surfs: List[np.ndarray],
                     cmap: str = 'jet',
                     shape: Union[Tuple, List] = None,
                     interp: bool = False,
-                    step1=1,
-                    step2=1,
+                    step1: int = 1,
+                    step2: int = 1,
+                    shading: str = 'smooth',
+                    dyn_light: bool = True,
                     **kwargs) -> List:
     """
     create a surfaces node
@@ -567,6 +569,16 @@ def create_surfaces(surfs: List[np.ndarray],
     shape : List or Tuple
         If surf's shape is like (N, 3), shape must be specified,
         if surf's shape is like (n1, n2), shape will be ignored
+    interp : bool
+        interpolate the surface or not if the surf is not dense
+    step1 : int
+        mesh interval in x direction
+    step2 : int
+        mesh interval in y direction
+    shading : str
+        could be one of ['smooth', 'flat', None], if None, no shading filter
+    dyn_light : bool
+        dynamic light or not, valid when shading is not None
     """
     utils.check_mmap(volume)
 
@@ -600,8 +612,17 @@ def create_surfaces(surfs: List[np.ndarray],
 
     nodes = []
     for i in range(len(surfs)):
-        node = SurfaceNode(surfs[i], volume, value_type[i], clim[i], cmap[i],
-                           shape, step1, step2, **kwargs)
+        node = SurfaceNode(surfs[i],
+                           volume,
+                           value_type[i],
+                           clim[i],
+                           cmap[i],
+                           shape,
+                           step1,
+                           step2,
+                           shading=shading,
+                           dyn_light=dyn_light,
+                           **kwargs)
         nodes.append(node)
 
     return nodes
@@ -761,6 +782,8 @@ def create_bodys(volume: np.ndarray,
                  margin: float = None,
                  color: str = 'yellow',
                  filter_sigma: Union[float, List] = None,
+                 shading: str = 'smooth',
+                 dyn_light: bool = True,
                  **kwargs) -> List:
     """
     using marching_cubes to find meshs (its vertices and faces), 
@@ -774,6 +797,14 @@ def create_bodys(volume: np.ndarray,
         mesh value
     color : str
         color for mesh
+    margin : float
+        if is not None, set a margin to the volume
+    filter_sigma : float
+        if is not None, filter the volume by gaussian filter
+    shading : str
+        could be one of ['smooth', 'flat', None], if None, no shading filter
+    dyn_light : bool
+        dynamic light or not, valid when shading is not None
     
     kwargs : Dict
         parameters for vispy.scene.visuals.Mesh
@@ -800,7 +831,10 @@ def create_bodys(volume: np.ndarray,
     # F3 demo, salt body, skimage: 3.04s, vispy: 21.44s
     verts, faces, normals, values = marching_cubes(volume, level)
     kwargs = vispyutils.get_valid_kwargs('mesh', **kwargs)
-    body = Mesh(verts, faces, color=color, shading='smooth', **kwargs)
+    body = Mesh(verts, faces, color=color, shading=shading, **kwargs)
+    body.unfreeze()
+    body.dyn_light = dyn_light
+    body.freeze()
 
     # HACK, NOTE: use Isosurface or convert to Mesh?
     # body = Isosurface(volume, level=level, color=color, shading='smooth')
@@ -898,7 +932,10 @@ def create_well_logs(points: np.ndarray,
                      clim: List = None,
                      index: List = None,
                      tube_points: int = 16,
-                     mode: str = 'triangles'):
+                     mode: str = 'triangles',
+                     shading: str = 'smooth',
+                     dyn_light: bool = True,
+                     **kwargs):
     """
     create a well log node
 
@@ -926,6 +963,10 @@ def create_well_logs(points: np.ndarray,
         the number of points to represent a circle
     mode : str
         use 'triangles'
+    shading : str
+        could be one of ['smooth', 'flat', None], if None, no shading filter
+    dyn_light : bool
+        dynamic light or not, valid when shading is not None
 
     Returns
     --------
@@ -984,7 +1025,7 @@ def create_well_logs(points: np.ndarray,
         r = _cal_radius(values[:, i], radius_line)
         radius.append(r)
 
-    node = WellLog(points, radius, colors, index, tube_points, mode)
+    node = WellLog(points, radius, colors, index, tube_points, mode, shading=shading, dyn_light=dyn_light)
     node.cmap = cmap
     node.clim = clim
 
@@ -996,6 +1037,8 @@ def create_points(points: np.ndarray,
                   color: str = 'green',
                   cmap='jet',
                   clim=None,
+                  shading='flat',
+                  dyn_light=True,
                   **kwargs):
     """
     create a node to show points using Mesh instead of Marker
@@ -1012,6 +1055,10 @@ def create_points(points: np.ndarray,
         colormap to map when set `vertex_values`
     clim : List
         clim if use cmap
+    shading : str
+        could be one of ['smooth', 'flat', None], if None, no shading filter
+    dyn_light : bool
+        dynamic light or not, valid when shading is not None
 
     kwargs : Dict
         parameters for Mesh 
@@ -1040,8 +1087,11 @@ def create_points(points: np.ndarray,
     point_mesh = Mesh(vertices=vertices,
                       faces=faces,
                       color=color,
-                      shading='flat',
+                      shading=shading,
                       **mesh_kwargs)
+    point_mesh.unfreeze()
+    point_mesh.dyn_light = dyn_light
+    point_mesh.freeze()
 
     if color is None and kwargs.get('vertex_values', None) is not None:
         point_mesh.cmap = cmap
@@ -1056,6 +1106,8 @@ def create_fault_skin(skin_dir,
                       values_type='likelihood',
                       cmap='jet',
                       clim=None,
+                      shading='smooth',
+                      dyn_light=True,
                       **kwargs):
     """"""
     if os.path.isfile(skin_dir):
@@ -1072,8 +1124,11 @@ def create_fault_skin(skin_dir,
     node = Mesh(vertices,
                 faces,
                 vertex_values=values,
-                shading='smooth',
+                shading=shading,
                 **kwargs)
+    node.unfreeze()
+    node.dyn_light = dyn_light
+    node.freeze()
     if values is not None and kwargs.get('vertex_colors',
                                          None) is None and kwargs.get(
                                              'color', None) is None:
@@ -1212,6 +1267,7 @@ def plot3D(nodes: List,
            cbar_name: str = 'cbar.png',
            size: Tuple = (800, 600),
            run_app: bool = True,
+           dyn_light: bool = True,
            **kwargs):
     """
     plot nodes in a 3D canvas
@@ -1236,6 +1292,10 @@ def plot3D(nodes: List,
         the save colorbar image name
     size : Tuple
         canvas size
+    run_app : bool
+        run the app or not
+    dyn_light : bool
+        dynamic light or not,
     kwargs : Dict
         other parameters pass to `Colorbar` and `VisCanvas`
     
@@ -1315,6 +1375,7 @@ def plot3D(nodes: List,
                        cbar_region_ratio=cbar_region_ratio,
                        savedir=savedir,
                        size=size,
+                       dyn_light=dyn_light,
                        **kwargs)
 
     canvas.show()

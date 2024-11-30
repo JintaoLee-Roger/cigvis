@@ -478,13 +478,13 @@ class CanvasWrapper(VisCanvas):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.change_light = True
+        self.dyn_light = True
 
     def update_light(self, text):
         if text == 'on':
-            self.change_light = True
+            self.dyn_light = True
         else:
-            self.change_light = False
+            self.dyn_light = False
 
     def update_camera(self, azimuth, elevation, fov):
         self.azimuth = azimuth

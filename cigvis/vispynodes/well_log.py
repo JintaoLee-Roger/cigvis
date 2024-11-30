@@ -49,7 +49,9 @@ class WellLog(Compound):
                  tube_points=16,
                  mode='triangles',
                  cmap=None,
-                 clim=None):
+                 clim=None,
+                 shading='smooth',
+                 dyn_light=True):
         assert tube_points > 2
         assert points.ndim == 2 and points.shape[1] == 3
 
@@ -71,6 +73,7 @@ class WellLog(Compound):
 
         self._cmap = cmap
         self._clim = clim
+        self.dyn_light = dyn_light
         tangents, normals, binormals = _frenet_frames(points, False)
 
         # tube mesh
@@ -82,7 +85,7 @@ class WellLog(Compound):
         tube = MeshVisual(tube_vertices,
                           tube_indices,
                           vertex_colors=tube_colors,
-                          shading='smooth',
+                          shading=shading,
                           mode=mode)
 
         line_facemesh = []

@@ -33,6 +33,8 @@ class SurfaceNode(Mesh):
                  interval: List = [1, 1, 1],
                  interp: bool = True,
                  anti_rot: bool = True,
+                 shading: str = 'smooth',
+                 dyn_light: bool = True,
                  **kwargs):
         self.volume = volume
         self.steps = [int(step1), int(step2)]
@@ -48,7 +50,8 @@ class SurfaceNode(Mesh):
         self._clims = clims
         self.is_instance = False
         self._interp = interp
-        self.render_type = -1 # 0 for colors, 1 for vetex_values, and 2 for vetex_colors
+        self.render_type = -1  # 0 for colors, 1 for vetex_values, and 2 for vetex_colors
+        self.dyn_light = dyn_light
 
         # define shape
         if volume is None and shape is None:
@@ -70,7 +73,7 @@ class SurfaceNode(Mesh):
 
         super().__init__(vertices=vertices,
                          faces=faces,
-                         shading='smooth',
+                         shading=shading,
                          **kwargs)
         self.process_values()
 
@@ -184,14 +187,17 @@ class SurfaceNode(Mesh):
                     self.values[i] = c
                 except:
                     raise ValueError(f"Invalid value {value}")
-            elif isinstance(value, tuple) and isinstance(value[0], str) and len(value) == 2:
+            elif isinstance(value, tuple) and isinstance(
+                    value[0], str) and len(value) == 2:
                 try:
-                    assert value[1] <= 1 and value[1] >= 0, "alpha must between 0 and 1"
+                    assert value[1] <= 1 and value[
+                        1] >= 0, "alpha must between 0 and 1"
                     c = mcolors.to_rgba(value[0], value[1])
                     self.values[i] = c
                 except:
                     raise ValueError(f"Invalid value {value}")
-            elif isinstance(value, tuple) and len(value) >= 3 and len(value) <= 4:
+            elif isinstance(value,
+                            tuple) and len(value) >= 3 and len(value) <= 4:
                 assert all([isinstance(v, (int, float)) for v in value]), "value must be a tuple of numbers" # yapf: disable
                 assert all([v <= 1 and v >= 0 for v in value]), "value must be a tuple of numbers between 0 and 1" # yapf: disable
                 self.values[i] = value
@@ -208,10 +214,12 @@ class SurfaceNode(Mesh):
 
         if len(self.values) == 1:
             if isinstance(self.values[0], tuple) and len(self.values[0]) <= 4:
-                if self.render_type == 0 or self.render_type == -1: # no change
+                if self.render_type == 0 or self.render_type == -1:  # no change
                     self.color = self.values[0]
                 else:
-                    self.set_data(vertices=self._meshdata.get_vertices(),faces=self._meshdata.get_faces(), color=self.values[0])
+                    self.set_data(vertices=self._meshdata.get_vertices(),
+                                  faces=self._meshdata.get_faces(),
+                                  color=self.values[0])
                 self.render_type = 0
             else:
                 value = self.values[0][::self.steps[0], ::self.steps[1]].flatten() # yapf: disable
@@ -220,7 +228,9 @@ class SurfaceNode(Mesh):
                 if self.render_type == 1 or self.render_type == -1:
                     self._meshdata.set_vertex_values(value)
                 else:
-                    self.set_data(vertices=self._meshdata.get_vertices(),faces=self._meshdata.get_faces(), vertex_values=value)
+                    self.set_data(vertices=self._meshdata.get_vertices(),
+                                  faces=self._meshdata.get_faces(),
+                                  vertex_values=value)
                 self.render_type = 1
                 self.cmap = colormap.cmap_to_vispy(self._cmaps[0])
                 self.clim = self._clims[0]
@@ -232,10 +242,10 @@ class SurfaceNode(Mesh):
             if self.render_type == 2 or self.render_type == -1:
                 self._meshdata.set_vertex_colors(colors)
             else:
-                self.set_data(vertices=self._meshdata.get_vertices(),faces=self._meshdata.get_faces(), vertex_colors=colors)
+                self.set_data(vertices=self._meshdata.get_vertices(),
+                              faces=self._meshdata.get_faces(),
+                              vertex_colors=colors)
             self.render_type = 2
-
-
 
     def update_colors_by_slice_node(self, nodes, volumes):
         node = [n for n in nodes if isinstance(n, AxisAlignedImage)]
@@ -287,8 +297,8 @@ class ArbLineNode(Mesh):
             vertices=vertices,
             faces=faces,
             vertex_values=values,
-            shading=
-            None,  # don't set shading, as it will be lighted with gloss and shadow
+            # don't set shading, as it will be lighted with gloss and shadow
+            shading=None,
             **kwargs)
         self.cmap = colormap.cmap_to_vispy(cmap)
         self.clim = clim

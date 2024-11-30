@@ -83,9 +83,9 @@ def valid_kwargs(ktype):
     elif ktype == 'viscanvas':
         seiscanvas_kwargs = [
             'size', 'bgcolor', 'visual_nodes', 'grid', 'share',
-            'cbar_region_ratio', 'scale_factor', 'center', 'fov',
-            'azimuth', 'elevation', 'zoom_factor', 'axis_scales', 'auto_range',
-            'savedir', 'title', 'change_light'
+            'cbar_region_ratio', 'scale_factor', 'center', 'fov', 'azimuth',
+            'elevation', 'zoom_factor', 'axis_scales', 'auto_range', 'savedir',
+            'title', 'dyn_light'
         ]
         return seiscanvas_kwargs
     elif ktype == 'line':

@@ -198,7 +198,7 @@ class NorthPointer(Compound, FixMixin):
                           depth_test=True)
         Compound.__init__(self, [self._mesh, self._text])
         self.unfreeze()
-        self.change_light = False
+        self.dyn_light = False
         # Determine the size and position.
         self.loc = loc
         self.size = size
