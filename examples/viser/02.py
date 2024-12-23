@@ -3,15 +3,17 @@
 # University of Science and Technology of China (USTC).
 # All rights reserved.
 """
-Display 3D seismic data and multiple horizons
-================================================
+Display a 3D volume and two surfaces in web browser
+==============================================================
 
-层位可以是一个 (n1, n2) 大小的 Z 值,
-也可以是 (N, 3) 大小的 N 个点
+.. image:: ../../_static/cigvis/viser/02.png
+    :alt: image
+    :align: center
 
 """
 
-# sphinx_gallery_thumbnail_path = '_static/cigvis/3Dvispy/05.png'
+# sphinx_gallery_thumbnail_path = '_static/cigvis/viser/02.png'
+
 
 import numpy as np
 from cigvis import viserplot
@@ -25,7 +27,7 @@ sx = np.fromfile(sxp, np.float32).reshape(ni, nx, nt)
 sf1 = np.fromfile(sfp1, np.float32).reshape(ni, nx)
 sf2 = np.fromfile(sfp2, np.float32).reshape(ni, nx)
 
-nodes = viserplot.create_slices(sx, cmap='gray')
+nodes = viserplot.create_slices(sx, pos=[20, 40, 200], cmap='gray')
 
 # show amplitude
 nodes += viserplot.create_surfaces(

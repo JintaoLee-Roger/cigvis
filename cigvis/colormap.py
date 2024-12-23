@@ -46,7 +46,8 @@ def arrs_to_image(arr, cmap, clim, as_uint8=False, nancolor=None):
     if not isinstance(clim[0], (List, Tuple)):
         clim = [clim]
     if len(arr) != len(cmap) or len(arr) != len(clim):
-        raise RuntimeError("(len(arr) != len(cmap)) or (len(arr) != len(clim))")
+        raise RuntimeError(
+            "(len(arr) != len(cmap)) or (len(arr) != len(clim))")
 
     out = _to_image(arr[0], cmap[0], clim[0], nancolor)
     for i in range(1, len(arr)):
@@ -114,10 +115,19 @@ def get_cmap_from_str(cmap: str, includevispy: bool = False):
     includevispy : bool
         include vispy's cmaps
     """
+    reverse = False
+    if cmap.endswith('_r'):
+        reverse = True
+        cmap = cmap[:-2]
+
     if cmap in list_custom_cmap():
         cmap = get_custom_cmap(cmap)
+        if reverse:
+            cmap = cmap.reversed()
     else:
         try:
+            if reverse:
+                cmap = cmap + '_r'
             cmap = plt.get_cmap(cmap)
         except:
             pass
@@ -136,7 +146,7 @@ def cmap_to_mpl(cmap):
     convert `vispy's Colormap` or str to matplotlib's cmap
     """
     if isinstance(cmap, mplColormap):
-        return cmap 
+        return cmap
     elif isinstance(cmap, str):
         return get_cmap_from_str(cmap)
     elif isinstance(cmap, vispyColormap):
@@ -303,6 +313,22 @@ def discrete_cmap(cmap, clim, values):
     cmap = custom_disc_cmap(values, colors)
 
     return cmap
+
+
+def reversed(cmap):
+    if isinstance(cmap, str):
+        if cmap.endswith('_r'):
+            cmap = cmap[:-2]
+        else:
+            cmap = cmap + '_r'
+        return get_cmap_from_str(cmap)
+    elif isinstance(cmap, mplColormap):
+        return cmap.reversed()
+    elif isinstance(cmap, vispyColormap):
+        colors = cmap.colors.rgba[::-1]
+        return vispyColormap(colors)
+    else:
+        raise ValueError("unkown cmap")
 
 
 def ramp(cmap, blow=0, up=1, alpha_min=0, alpha_max=1, forvispy=True):

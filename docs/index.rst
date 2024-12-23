@@ -22,6 +22,13 @@
 
 
 .. toctree::
+   :caption: Blog
+   :maxdepth: 2
+   
+   blog/index
+
+
+.. toctree::
   :hidden:
 
   API <api/modules>

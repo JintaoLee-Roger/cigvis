@@ -27,7 +27,7 @@ def download_image():
     shutil.rmtree(down_path)
 
 
-download_image()
+# download_image()
 
 from sphinx_gallery.scrapers import figure_rst
 
@@ -69,6 +69,7 @@ extensions = [
     'sphinx.ext.autodoc',
     'sphinxcontrib.apidoc',
     'sphinx_gallery.gen_gallery',
+    'myst_parser',
 ]
 
 apidoc_module_dir = "../cigvis"
@@ -83,6 +84,7 @@ from sphinx_gallery.sorting import FileNameSortKey
 # the following files are ignored from gallery processing
 ignore_files = [
     'demos/*',
+    r'test_.*\.py',
 ]
 ignore_pattern_regex = [re.escape(os.sep) + f for f in ignore_files]
 ignore_pattern_regex = "|".join(ignore_pattern_regex)
@@ -134,7 +136,10 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', "**.ipynb_checkpoints"]
 language = 'zh_CN'
 
 # The suffix of source filenames.
-source_suffix = '.rst'
+source_suffix = {
+    '.rst': 'restructuredtext',
+    '.md': 'markdown',
+}
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output

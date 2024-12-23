@@ -144,7 +144,7 @@ class AxisAlignedImage(scene.visuals.Image):
                  texture_format: str = 'auto',
                  preproc_f: Callable = None):
         self.unfreeze()
-        image_func = get_image_func(self.axis, vol, preproc_f)
+        image_func = get_image_func(self.axis, vol, preproc_f, True)
         self.image_funcs.append(image_func)
 
         self.overlaid_images.append(
@@ -398,8 +398,10 @@ class AxisAlignedImage(scene.visuals.Image):
                     im._clippers[node] = clipper
 
 
-def get_image_func(axis: str, vol: np.ndarray,
-                   preproc_f: Callable) -> Callable:
+def get_image_func(axis: str,
+                   vol: np.ndarray,
+                   preproc_f: Callable,
+                   forcefp32=False) -> Callable:
     """
     Parameters
     ----------
@@ -413,6 +415,19 @@ def get_image_func(axis: str, vol: np.ndarray,
     if not line_first:
         shape = shape[::-1]
 
+    def wrap_preproc_f(x, func=None, forcefp32=False):
+        if func is not None:
+            x = func(x)
+        if not forcefp32:
+            return x
+
+        x = np.array(x)
+        if x.dtype == np.float16:
+            x = x.astype(np.float32)
+        return x
+
+    _preproc_f = lambda x: wrap_preproc_f(x, preproc_f, forcefp32)
+
     def slicing_at_axis(pos, get_shape=False):
         if get_shape:  # just return the shape information
             if axis == 'x': return shape[1], shape[2]
@@ -422,23 +437,23 @@ def get_image_func(axis: str, vol: np.ndarray,
             pos = int(np.round(pos))
             # vol = volumes[i_vol]
             # preproc_f = preproc_funcs[i_vol]
-            if preproc_f is not None:
-                if line_first:
-                    if axis == 'x': return preproc_f(vol[pos, :, :].T)
-                    elif axis == 'y': return preproc_f(vol[:, pos, :].T)
-                    elif axis == 'z': return preproc_f(vol[:, :, pos].T)
-                else:
-                    if axis == 'x': return preproc_f(vol[:, :, pos])
-                    elif axis == 'y': return preproc_f(vol[:, pos, :])
-                    elif axis == 'z': return preproc_f(vol[pos, :, :])
+            # if preproc_f is not None:
+            if line_first:
+                if axis == 'x': return _preproc_f(vol[pos, :, :].T)
+                elif axis == 'y': return _preproc_f(vol[:, pos, :].T)
+                elif axis == 'z': return _preproc_f(vol[:, :, pos].T)
             else:
-                if line_first:
-                    if axis == 'x': return vol[pos, :, :].T
-                    elif axis == 'y': return vol[:, pos, :].T
-                    elif axis == 'z': return vol[:, :, pos].T
-                else:
-                    if axis == 'x': return vol[:, :, pos]
-                    elif axis == 'y': return vol[:, pos, :]
-                    elif axis == 'z': return vol[pos, :, :]
+                if axis == 'x': return _preproc_f(vol[:, :, pos])
+                elif axis == 'y': return _preproc_f(vol[:, pos, :])
+                elif axis == 'z': return _preproc_f(vol[pos, :, :])
+            # else:
+            #     if line_first:
+            #         if axis == 'x': return vol[pos, :, :].T
+            #         elif axis == 'y': return vol[:, pos, :].T
+            #         elif axis == 'z': return vol[:, :, pos].T
+            #     else:
+            #         if axis == 'x': return vol[:, :, pos]
+            #         elif axis == 'y': return vol[:, pos, :]
+            #         elif axis == 'z': return vol[pos, :, :]
 
     return slicing_at_axis

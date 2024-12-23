@@ -109,8 +109,8 @@ def nmax(d):
 
 
 def auto_clim(d, scale=1):
-    v1 = nmin(d)
-    v2 = nmax(d)
+    v1 = float(nmin(d))
+    v2 = float(nmax(d))
     if v1 == v2:
         return [v1 - 0.1, v1 + 0.2]
     if v1 * v2 < 0:

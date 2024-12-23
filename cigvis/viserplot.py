@@ -247,7 +247,7 @@ def plot3D(
     **kwargs,
 ):
     if server is None:
-        server = viser.ViserServer(label='cigvis-viser', port=8080)
+        server = viser.ViserServer(label='cigvis-viser', port=8080, verbose=False)
     server.scene.reset()
     server.gui.reset()
 
@@ -472,7 +472,7 @@ def run():
         print("Execution interrupted")
 
 
-def create_server(port=8080, label='cigvis-viser', verbose=True):
+def create_server(port=8080, label='cigvis-viser', verbose=False):
     return viser.ViserServer(label=label, port=port, verbose=verbose)
 
 
