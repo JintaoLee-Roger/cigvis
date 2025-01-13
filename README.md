@@ -10,9 +10,10 @@ cigvis can be used for various geophysical data visualizations, including 3D sei
 
 cigvis leverages the power of underlying libraries such as [vispy](https://github.com/vispy/vispy) for 3D visualization, [matplotlib](https://matplotlib.org/) for 2D and 1D visualization, [plotly](https://plotly.com/) for Jupyter environments (work in progress), and [viser](https://github.com/nerfstudio-project/viser) for web-based visualization (SSH-Friendly). The 3D visualization component is heavily based on the code from [yunzhishi/seismic-canvas](https://github.com/yunzhishi/seismic-canvas) and has been further developed upon this foundation.
 
-**CIGVis: An open-source Python tool for the real-time interactive visualization of multidimensional geophysical data**
-Jintao Li, Yunzhi Shi, Xinming Wu
-Paper: [https://library.seg.org/doi/abs/10.1190/geo2024-0041.1](https://library.seg.org/doi/abs/10.1190/geo2024-0041.1)
+**CIGVis: An open-source Python tool for the real-time interactive visualization of multidimensional geophysical data**    
+Jintao Li, Yunzhi Shi, Xinming Wu    
+Paper: [https://library.seg.org/doi/abs/10.1190/geo2024-0041.1](https://library.seg.org/doi/abs/10.1190/geo2024-0041.1)    
+
 
 ## Installation
 
