@@ -9,7 +9,7 @@ authors = [
     {name = "Jintao Li", email = "lijintaobt@gmail.com"},
 ]
 
-version = "0.1.5"
+version = "0.1.6"
 
 description = "CIGVis is a tool for geophysical data visualization"
 readme = "README.md"

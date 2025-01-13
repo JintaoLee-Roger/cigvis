@@ -1,6 +1,11 @@
 # Changelog
 
 
+### v0.1.6
+
+- improved documents and add blogs
+
+
 ### v0.1.5
 
 - added `shading` and `dyn_light` to control the mesh's shadingfilter and dyanmic lightning
