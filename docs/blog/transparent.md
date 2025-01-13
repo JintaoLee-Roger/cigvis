@@ -78,19 +78,8 @@ if __name__ == "__main__":
 python make_transparent.py raw.png transparent.png
 ```
 
-<!-- ![]() -->
+![ex](https://raw.githubusercontent.com/JintaoLee-Roger/images/main/cigvis/blogs/transparent.png)
 
-## 推荐颜色
-
-
-| Colormap        | 推荐背景颜色     |
-|-----------------|------------------|
-| gray            | (0, 0, 0)     |
-| jet             | (255, 255, 255) |
-| hot             | (0, 0, 255)  |
-| cool            | (255, 0, 255)  |
-| viridis         | (255, 255, 0) |
-| plasma          | (0, 255, 0)   |
 
 
 

@@ -101,6 +101,30 @@ cigvis内部的这些功能允许以多种方式交互可视化各种地球物�
 这些功能为使用cigvis在一个单一画布内强大地可视化和比较多个独立的3D数据集提供了有效的方式。
 
 
+## Citations
+
+If you find this work useful in your research and want to cite it, please consider use this:
+
+Plain Text
+```text
+Li, J., Shi, Y. and Wu, X., 2024. CIGVis: an open-source python tool for real-time interactive visualization of multidimensional geophysical data. Geophysics, 90(1), pp.1-37.
+```
+
+BibTex
+```
+@article{li2024cigvis,
+  title={CIGVis: an open-source python tool for real-time interactive visualization of multidimensional geophysical data},
+  author={Li, Jintao and Shi, Yunzhi and Wu, Xinming},
+  journal={Geophysics},
+  volume={90},
+  number={1},
+  pages={1--37},
+  year={2024},
+  publisher={Society of Exploration Geophysicists}
+}
+```
+
+
 ## 示例所用的数据
 
 所有示例所用到的数据可以在 [https://rec.ustc.edu.cn/share/19a16120-5c42-11ee-a0d4-4329aa6b754b](https://rec.ustc.edu.cn/share/19a16120-5c42-11ee-a0d4-4329aa6b754b) 下载，密码：`1234`

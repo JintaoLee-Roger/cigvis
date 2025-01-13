@@ -183,6 +183,24 @@ class LoadBtn(qtw.QPushButton):
 
         self.data.emit(data)  # 发送数据加载完成的信号
 
+    def sent_data(self, data: np.ndarray):
+        assert data.ndim == 3
+        nx, ny, nz = data.shape
+        self.gstates.nx = nx
+        self.gstates.ny = ny
+        self.gstates.nz = nz
+        self.nx.emit(f'{nx}')
+        self.ny.emit(f'{ny}')
+        self.nz.emit(f'{nz}')
+
+        self.gstates.dataLoaded = True
+
+        v1, v2 = utils.auto_clim(data)
+        self.vmin.emit(_format(v1))
+        self.vmax.emit(_format(v2))
+
+        self.data.emit(data)
+
 
 class OthersWidget(qtw.QWidget):
 

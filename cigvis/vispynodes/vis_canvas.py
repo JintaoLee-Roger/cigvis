@@ -358,3 +358,21 @@ class VisCanvas(scene.SceneCanvas, EventMixin, LightMixin, AxisMixin):
         if hasattr(node, 'shading_filter'):
             node.shading_filter.light_dir = self.view[0].camera.transform.map(self.initial_light_dir)[:3] # yapf: disable
         self.freeze()
+
+    def remove_node(self, node, delete=True):
+        """
+        Remove a node from the canvas.
+        NOTE: this function is valid only when one canvas, i.e., self.nrows and self.ncols are both 1
+        """
+        if self.nrows != 1 or self.ncols != 1:
+            raise ValueError(
+                "This function is valid only when one canvas, i.e., self.nrows and self.ncols are both 1"
+            )
+
+        node.parent = None
+        for n in reversed(self.nodes['0,0']):
+            if n == node:
+                self.nodes['0,0'].remove(n)
+                break
+        if delete:
+            del node

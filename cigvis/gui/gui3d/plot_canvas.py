@@ -262,8 +262,8 @@ class HorizonMixin:
 
     def remove_horz(self, idx):
         node = self.horz_nodes.pop(idx)
-        node.parent = None
-        del node
+        self.canvas.remove_node(node)
+
         hz = self.horzs.pop(idx)
         del hz
         param = self.horz_params.pop(idx)

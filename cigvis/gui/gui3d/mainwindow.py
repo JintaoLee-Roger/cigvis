@@ -94,13 +94,15 @@ class MyMainWindow(qtw.QMainWindow):
             self.close()
 
 
-def gui3d(nx=None, ny=None, nz=None, clear_dim=True):
+def gui3d(nx=None, ny=None, nz=None, clear_dim=True, data=None):
     QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
     system = platform.system()
 
     app = use_app("pyqt5")
     app.create()
     win = MyMainWindow(nx, ny, nz, clear_dim)
+    if data is not None:
+        win.controlP.loadBtn.sent_data(data)
 
     if system == 'Linux':
         font = QtGui.QFont('Ubuntu')

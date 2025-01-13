@@ -31,6 +31,13 @@ The 3D visualization component is heavily based on the code from
 `yunzhishi/seismic-canvas <https://github.com/yunzhishi/seismic-canvas>`_ 
 and has been further developed upon this foundation.
 
+
+**CIGVis: An open-source Python tool for the real-time interactive visualization of multidimensional geophysical data**
+Jintao Li, Yunzhi Shi, Xinming Wu
+Paper: `https://library.seg.org/doi/abs/10.1190/geo2024-0041.1 <https://library.seg.org/doi/abs/10.1190/geo2024-0041.1>`_
+
+
+
 Installation
 ----------------
 
@@ -237,8 +244,36 @@ browser to see the image. If you are running the code on a remote server
 you can enter ``{ip}:8080`` in the browser to see the 
 visualization (``ip`` is the ip of remote server, e.g., ``222.195.77.88:8080``).
 
-There are sevreal examples in ``examples/viser/`` for reference.
+There are several examples in `gallery/viser <https://cigvis.readthedocs.io/en/latest/gallery/viser/index.html>`_ for reference.
 
+
+Citations
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+If you find this work useful in your research and want to cite it, please consider use this:
+
+Plain Text
+
+.. code-block:: latex
+
+   Li, J., Shi, Y. and Wu, X., 2024. CIGVis: an open-source python tool for real-time interactive visualization of multidimensional geophysical data. Geophysics, 90(1), pp.1-37.
+
+
+
+BibTex
+
+.. code-block:: latex
+
+   @article{li2024cigvis,
+   title={CIGVis: an open-source python tool for real-time interactive visualization of multidimensional geophysical data},
+   author={Li, Jintao and Shi, Yunzhi and Wu, Xinming},
+   journal={Geophysics},
+   volume={90},
+   number={1},
+   pages={1--37},
+   year={2024},
+   publisher={Society of Exploration Geophysicists}
+   }
 
 
 

@@ -27,7 +27,7 @@ def download_image():
     shutil.rmtree(down_path)
 
 
-# download_image()
+download_image()
 
 from sphinx_gallery.scrapers import figure_rst
 
