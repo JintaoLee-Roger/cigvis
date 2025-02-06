@@ -128,6 +128,9 @@ def get_cmap_from_str(cmap: str, includevispy: bool = False):
     if includevispy:
         warnings.warn("`includevispy` is deprecated and will be removed in a future version. Vispy's cmaps are automatically included.",DeprecationWarning,stacklevel=2)
 
+    if not isinstance(cmap, str):
+        return cmap
+
     reverse = False
     if cmap.endswith('_r'):
         reverse = True

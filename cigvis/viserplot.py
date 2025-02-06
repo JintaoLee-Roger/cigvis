@@ -11,6 +11,9 @@ from cigvis.visernodes import (
     VolumeSlice,
     SurfaceNode,
     MeshNode,
+    LogPoints,
+    LogLineSegments,
+    LogBase,
 )
 from cigvis.meshs import surface2mesh
 import cigvis.utils as utils
@@ -235,6 +238,49 @@ def create_surfaces(surfs: List[np.ndarray],
     return mesh_nodes
 
 
+def create_well_logs(
+    logs: Union[List, np.ndarray],
+    logs_type: str = 'point',
+    cmap: str = 'jet',
+    clim: List = None,
+    width: float = 1,
+    point_shape: str = 'square',
+    **kwargs,
+):
+    if not isinstance(logs, List):
+        logs = [logs]
+
+    nodes = []
+    for log in logs:
+        assert log.ndim == 2 and log.shape[1] in [3, 4, 6, 7]
+        points = log[:, :3]
+        values = None
+        colors = None
+        if log.shape[1] == 3:
+            values = log[:, 2]
+        elif log.shape[1] == 4:
+            values = log[:, 3]
+        else:
+            colors = log[:, 3:]
+
+        if logs_type == 'line':
+            logs = LogLineSegments
+        else:
+            logs = LogPoints
+        nodes.append(
+            logs(
+                points,
+                values,
+                colors,
+                cmap,
+                clim,
+                width,
+                point_shape=point_shape,
+            ))
+
+    return nodes
+
+
 def plot3D(
     nodes,
     axis_scales=[1, 1, 1],
@@ -247,7 +293,9 @@ def plot3D(
     **kwargs,
 ):
     if server is None:
-        server = viser.ViserServer(label='cigvis-viser', port=8080, verbose=False)
+        server = viser.ViserServer(label='cigvis-viser',
+                                   port=8080,
+                                   verbose=False)
     server.scene.reset()
     server.gui.reset()
 
@@ -270,12 +318,16 @@ def plot3D(
         init_scale = [init_scale] * 3
 
     # update scale of meshes
-    meshid = 0
+    meshid, logsid = 0, 0
     for node in nodes:
         if isinstance(node, MeshNode):
             node.scale = [s * x for s, x in zip(init_scale, axis_scales)]
             node.name = f'mesh{meshid}'
             meshid += 1
+        elif isinstance(node, LogBase):
+            node.scale = [s * x for s, x in zip(init_scale, axis_scales)]
+            node.name = f'logs{logsid}-{node.base_name}'
+            logsid += 1
         node.server = server
 
     # gui slices slibers to control slices position
