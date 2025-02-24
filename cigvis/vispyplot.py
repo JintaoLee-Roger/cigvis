@@ -80,6 +80,7 @@ def create_slices(volume: np.ndarray,
                   cmap: str = 'Petrel',
                   interpolation: str = 'cubic',
                   texture_format=None,
+                  intersection_lines: bool = True,
                   line_color=(1, 1, 1),
                   line_width=2.0,
                   **kwargs) -> List:
@@ -161,6 +162,9 @@ def create_slices(volume: np.ndarray,
     image_nodes += image_dict['z']
 
     lines_nodes = []
+
+    if not intersection_lines:
+        return image_nodes
 
     # X-Y intersection lines
     for x_img, y_img in product(image_dict['x'], image_dict['y']):

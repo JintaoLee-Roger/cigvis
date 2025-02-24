@@ -1,5 +1,10 @@
 # Changelog
 
+### v0.1.7
+
+- added function `create_well_logs` for viser backend
+- added intersection lines and border lines for volume slices
+
 
 ### v0.1.6
 
