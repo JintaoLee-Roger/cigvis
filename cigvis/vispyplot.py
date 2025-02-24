@@ -22,6 +22,7 @@ In plotly, for a seismic volume,
 
 """
 
+from itertools import product
 from typing import Callable, List, Tuple, Dict, Union
 import warnings
 import os
@@ -30,6 +31,7 @@ from cigvis.vispynodes import (
     VisCanvas,
     volume_slices,
     AxisAlignedImage,
+    InteractiveLine,
     Colorbar,
     WellLog,
     XYZAxis,
@@ -78,7 +80,8 @@ def create_slices(volume: np.ndarray,
                   cmap: str = 'Petrel',
                   interpolation: str = 'cubic',
                   texture_format=None,
-                  return_cbar: bool = False,
+                  line_color=(1, 1, 1),
+                  line_width=2.0,
                   **kwargs) -> List:
     """
     create a slice node
@@ -105,8 +108,10 @@ def create_slices(volume: np.ndarray,
         if use None, the NaNs will be clip to clim[1],
         and if use 'auto', the NaNs will be discarded, i.e., transparent
     
-    return_cbar : bool
-        return a colorbar
+    line_color : Tuple
+        color for intersection lines and border lines, default is white
+    line_width : float
+        width for intersection lines and border lines, default is 2.0
 
     kwargs : Dict
         other kwargs for `volume_slices`
@@ -120,8 +125,10 @@ def create_slices(volume: np.ndarray,
     line_first = cigvis.is_line_first()
     if line_first:
         nt = volume.shape[2]
+        shape = volume.shape
     else:
         nt = volume.shape[0]
+        shape = volume.shape[::-1]
 
     # set pos
     if pos is None:
@@ -139,22 +146,104 @@ def create_slices(volume: np.ndarray,
         clim = utils.auto_clim(volume)
     cmap = colormap.cmap_to_vispy(cmap)
 
-    nodes = volume_slices(volume,
-                          pos['x'],
-                          pos['y'],
-                          pos['z'],
-                          cmaps=cmap,
-                          clims=clim,
-                          interpolation=interpolation,
-                          texture_format=texture_format)
+    image_dict = volume_slices(volume,
+                               pos['x'],
+                               pos['y'],
+                               pos['z'],
+                               cmaps=cmap,
+                               clims=clim,
+                               interpolation=interpolation,
+                               texture_format=texture_format)
 
-    if return_cbar:
-        warnings.warn("`return_cbar` is deprecated and will be remove in the future version. To create colorbar for slices, you can use `nodes += cigvis.create_colorbar_from_nodes(nodes, 'Amplitude', select='slices')`", DeprecationWarning, stacklevel=2) # yapf: disable
-        cbar_kwargs = vispyutils.get_valid_kwargs('colorbar', **kwargs)
-        cbar = create_colorbar(cmap, clim, **cbar_kwargs)
-        return nodes, cbar
+    image_nodes = []
+    image_nodes += image_dict['x']
+    image_nodes += image_dict['y']
+    image_nodes += image_dict['z']
 
-    return nodes
+    lines_nodes = []
+
+    # X-Y intersection lines
+    for x_img, y_img in product(image_dict['x'], image_dict['y']):
+        line = InteractiveLine(
+            ('x', 'y'),
+            shape,
+            color=line_color,
+            width=line_width,
+            antialias=True,
+        )
+        line.link_image(x_img)
+        line.link_image(y_img)
+        line.refresh()
+        lines_nodes.append(line)
+
+    # X-Z intersection lines
+    for x_img, z_img in product(image_dict['x'], image_dict['z']):
+        line = InteractiveLine(
+            ('x', 'z'),
+            shape,
+            color=line_color,
+            width=line_width,
+            antialias=True,
+        )
+        line.link_image(x_img)
+        line.link_image(z_img)
+        line.refresh()
+        lines_nodes.append(line)
+
+    # Y-Z intersection lines
+    for y_img, z_img in product(image_dict['y'], image_dict['z']):
+        line = InteractiveLine(
+            ('y', 'z'),
+            shape,
+            color=line_color,
+            width=line_width,
+            antialias=True,
+        )
+        line.link_image(y_img)
+        line.link_image(z_img)
+        line.refresh()
+        lines_nodes.append(line)
+
+    # contour lines for X Images
+    for x_img in image_dict['x']:
+        line = InteractiveLine(
+            ('x', ),
+            shape,
+            color=line_color,
+            width=line_width,
+            antialias=True,
+        )
+        line.link_image(x_img)
+        line.refresh()
+        lines_nodes.append(line)
+
+    # contour lines for Y Images
+    for y_img in image_dict['y']:
+        line = InteractiveLine(
+            ('y', ),
+            shape,
+            color=line_color,
+            width=line_width,
+            antialias=True,
+        )
+        line.link_image(y_img)
+        line.refresh()
+        lines_nodes.append(line)
+
+    # contour lines for Z Images
+    for z_img in image_dict['z']:
+        line = InteractiveLine(
+            ('z', ),
+            shape,
+            color=line_color,
+            width=line_width,
+            antialias=True,
+        )
+        line.link_image(z_img)
+        line.refresh()
+        lines_nodes.append(line)
+
+    return image_nodes + lines_nodes
 
 
 def add_mask(nodes: List,
@@ -331,13 +420,19 @@ def create_overlay(bg_volume: np.ndarray,
     if isinstance(fg_interpolation, str):
         fg_interpolation = [fg_interpolation] * len(fg_volume)
 
-    nodes = volume_slices([bg_volume, *fg_volume],
-                          pos['x'],
-                          pos['y'],
-                          pos['z'],
-                          cmaps=[bg_cmap, *fg_cmap],
-                          clims=[bg_clim, *fg_clim],
-                          interpolation=[bg_interpolation, *fg_interpolation])
+    nodes_dict = volume_slices(
+        [bg_volume, *fg_volume],
+        pos['x'],
+        pos['y'],
+        pos['z'],
+        cmaps=[bg_cmap, *fg_cmap],
+        clims=[bg_clim, *fg_clim],
+        interpolation=[bg_interpolation, *fg_interpolation])
+
+    nodes = []
+    nodes += nodes_dict['x']
+    nodes += nodes_dict['y']
+    nodes += nodes_dict['z']
 
     if return_cbar:
         if cbar_type == 'fg':
@@ -1025,7 +1120,14 @@ def create_well_logs(points: np.ndarray,
         r = _cal_radius(values[:, i], radius_line)
         radius.append(r)
 
-    node = WellLog(points, radius, colors, index, tube_points, mode, shading=shading, dyn_light=dyn_light)
+    node = WellLog(points,
+                   radius,
+                   colors,
+                   index,
+                   tube_points,
+                   mode,
+                   shading=shading,
+                   dyn_light=dyn_light)
     node.cmap = cmap
     node.clim = clim
 

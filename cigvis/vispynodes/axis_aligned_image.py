@@ -11,20 +11,17 @@
 
 from typing import Callable, List
 import numpy as np
-from vispy import scene
+from vispy.scene.visuals import Image, Line, Plane
 from vispy.visuals.transforms import MatrixTransform, STTransform
+from vispy.gloo.wrappers import set_polygon_offset
 import cigvis
 
 
-class AxisAlignedImage(scene.visuals.Image):
+class AxisAlignedImage(Image):
     """
     Visual subclass displaying an image that aligns to an axis.
     This image should be able to move along the perpendicular direction when
     user gives corresponding inputs.
-
-    TODO: It will support the case where `pos` is a triplet 
-    (the starting position of the slice), meaning it's not 
-    a complete slice (only a portion of it).
 
     Parameters
     ----------
@@ -56,37 +53,47 @@ class AxisAlignedImage(scene.visuals.Image):
                  clims=None,
                  interpolation=['linear'],
                  method='auto',
-                 texture_format=None):
+                 texture_format=None,
+                 offset_factor=2.0,
+                 offset_units=2.0):
 
         assert clims is not None, 'clim must be specified explicitly.'
 
         # Create an Image obj and unfreeze it so we can add more
         # attributes inside.
         # First image (from image_funcs[0])
-        scene.visuals.Image.__init__(
+        Image.__init__(
             self,
             parent=None,  # no image func yet
             cmap=cmaps[0],
             clim=clims[0],
             interpolation=interpolation[0],
             method=method,
-            texture_format=texture_format)
+            texture_format=texture_format,
+        )
         self.unfreeze()
 
         self.ids = f'{axis}{pos}'
 
         self.interactive = True
 
+        self._offset_factor = offset_factor
+        self._offset_units = offset_units
+
+        # lines
+        self._observers = []  # observer the intersection lines
+
         # Other images ...
         self.overlaid_images = [self]
         for i_img in range(1, len(image_funcs)):
-            overlaid_image = scene.visuals.Image(
+            overlaid_image = Image(
                 parent=self,
                 cmap=cmaps[i_img],
                 clim=clims[i_img],
                 interpolation=interpolation[i_img],
                 method=method,
-                texture_format=texture_format)
+                texture_format=texture_format,
+            )
             self.overlaid_images.append(overlaid_image)
 
         # Set GL state. Must check depth test, otherwise weird in 3D.
@@ -107,15 +114,17 @@ class AxisAlignedImage(scene.visuals.Image):
         # Get the image_func that returns either image or image shape.
         self.image_funcs = image_funcs  # a list of functions!
         shape = self.image_funcs[0](self.pos, get_shape=True)
+        # self._shape = shape
 
         # The selection highlight (a Plane visual with transparent color).
         # The plane is initialized before any rotation, on '+z' direction.
-        self.highlight = scene.visuals.Plane(
+        self.highlight = Plane(
             parent=self,
             width=shape[0],
             height=shape[1],
             direction='+z',
-            color=(1, 1, 0, 0.1))  # transparent yellow color
+            color=(1, 1, 0, 0.1),  # transparent yellow color
+        )
         # Move the plane to align with the image.
         self.highlight.transform = STTransform(translate=(shape[0] / 2,
                                                           shape[1] / 2, 0))
@@ -148,7 +157,7 @@ class AxisAlignedImage(scene.visuals.Image):
         self.image_funcs.append(image_func)
 
         self.overlaid_images.append(
-            scene.visuals.Image(
+            Image(
                 parent=self,
                 cmap=cmap,
                 clim=clim,
@@ -218,7 +227,13 @@ class AxisAlignedImage(scene.visuals.Image):
         # The following equation can be derived by Eq 1 and Eq 2.
         distance = (0. - click_pos[2]) / view_vector[2]
         # only need vec2
-        return click_pos[:2] + distance * view_vector[:2]
+        pos = click_pos[:2] + distance * view_vector[:2]
+        if pos[0] > self.size[0] - 1:
+            pos[0] = self.size[0] - 1
+        if pos[1] > self.size[1] - 1:
+            pos[1] = self.size[1] - 1
+        pos = [round(float(pos[0]), 4), round(float(pos[1]), 4)]
+        return pos
 
     def set_anchor(self, mouse_press_event):
         """
@@ -323,20 +338,24 @@ class AxisAlignedImage(scene.visuals.Image):
             if self.pos > self.limit[1]:
                 self.pos = self.limit[1]
 
+        pos2 = self.pos
+        if pos2 == self.limit[1]:
+            pos2 = self.limit[1] + 1
+
         # Update the transformation in order to move to new location.
         self.transform.reset()
         if self.axis == 'z':
             # 1. No rotation to do for z axis (y-x) slice. Only translate.
-            self.transform.translate((0, 0, self.pos))
+            self.transform.translate((0, 0, pos2))
         elif self.axis == 'y':
             # 2. Rotation(s) for the y axis (z-x) slice, then translate:
             self.transform.rotate(90, (1, 0, 0))
-            self.transform.translate((0, self.pos, 0))
+            self.transform.translate((0, pos2, 0))
         elif self.axis == 'x':
             # 3. Rotation(s) for the x axis (z-y) slice, then translate:
             self.transform.rotate(90, (1, 0, 0))
             self.transform.rotate(90, (0, 0, 1))
-            self.transform.translate((self.pos, 0, 0))
+            self.transform.translate((pos2, 0, 0))
 
         # Update image on the slice based on current position. The numpy array
         # is transposed due to a conversion from i-j to x-y axis system.
@@ -344,8 +363,9 @@ class AxisAlignedImage(scene.visuals.Image):
         self.set_data(self.image_funcs[0](self.pos))  # remove .T
         # Other images, overlaid on the primary image:
         for i_img in range(1, len(self.image_funcs)):
-            self.overlaid_images[i_img].set_data(self.image_funcs[i_img](
-                self.pos))
+            self.overlaid_images[i_img].set_data(self.image_funcs[i_img](self.pos)) # yapf: disable
+
+        self.update_lines()
         # Reset attributes after dragging completes.
         self.offset = 0
         self._bounds_changed()  # update the bounds with new self.pos
@@ -390,12 +410,104 @@ class AxisAlignedImage(scene.visuals.Image):
         super()._set_clipper(node, clipper)
 
         for im in self.children:
-            if isinstance(im, scene.visuals.Image):
+            if isinstance(im, Image):
                 if node in im._clippers:
                     im.detach(self._clippers.pop(node))
                 if clipper is not None:
                     im.attach(clipper)
                     im._clippers[node] = clipper
+
+    def _prepare_draw(self, view):
+        super()._prepare_draw(view)
+        self.update_gl_state(polygon_offset_fill=True)
+        set_polygon_offset(self._offset_factor, self._offset_units)
+
+    def update_lines(self):
+        for line in self._observers:
+            line.refresh()
+
+    def add_observer(self, line):
+        self._observers.append(line)
+
+
+class InteractiveLine(Line):
+
+    def __init__(
+        self,
+        axis_pair,
+        shape,
+        pos=None,
+        color=(1, 1, 1),
+        width=1,
+        connect='strip',
+        method='gl',
+        antialias=False,
+    ):
+        super().__init__(pos, color, width, connect, method, antialias)
+        """
+        """
+        self.unfreeze()
+        self.axis_pair = axis_pair
+        self.shape = shape
+        self._linked_images = {}  # {axis: Image}
+        self.freeze()
+
+    def link_image(self, image):
+        if image.axis not in self.axis_pair:
+            raise ValueError("Image axis does not match line type")
+        self._linked_images[image.axis] = image
+        image.add_observer(self)
+
+    def refresh(self):
+        if len(self._linked_images.keys()) == 2:
+            self._refresh2()
+        else:
+            self._refresh1()
+
+    def _refresh1(self):
+        """ update image border """
+        axis = self.axis_pair[0]
+        pos = self._linked_images[axis].pos
+        # fmt: off
+        if axis == 'x':
+            if pos == self.shape[0] - 1:
+                pos += 1
+            lines = [[pos, 0, 0], [pos, 0, self.shape[2]], [pos, self.shape[1], self.shape[2]], [pos, self.shape[1], 0], [pos, 0, 0]]
+        elif axis == 'y':
+            if pos == self.shape[1] - 1:
+                pos += 1
+            lines = [[0, pos, 0], [0, pos, self.shape[2]], [self.shape[0], pos, self.shape[2]], [self.shape[0], pos, 0], [0, pos, 0]]
+        else:
+            if pos == self.shape[2] - 1:
+                pos += 1
+            lines = [[0, 0, pos], [0, self.shape[1], pos], [self.shape[0], self.shape[1], pos], [self.shape[0], 0, pos], [0, 0, pos]]
+        # fmt: on
+        self.set_data(np.array(lines))
+
+    def _refresh2(self):
+        """ update intersection line """
+        # obtain the position of the two images
+        axis_a, axis_b = self.axis_pair
+        pos_a = self._linked_images[axis_a].pos if axis_a in self._linked_images else 0 # yapf: disable
+        pos_b = self._linked_images[axis_b].pos if axis_b in self._linked_images else 0 # yapf: disable
+
+        axis_order = {'x': 0, 'y': 1, 'z': 2}
+        a_idx = axis_order[self.axis_pair[0]]
+        b_idx = axis_order[self.axis_pair[1]]
+        third_axis = 3 - a_idx - b_idx
+        if pos_a == self.shape[a_idx] - 1:
+            pos_a += 1
+        if pos_b == self.shape[b_idx] - 1:
+            pos_b += 1
+
+        start = [0] * 3
+        start[a_idx] = pos_a
+        start[b_idx] = pos_b
+
+        end = list(start)
+        end[third_axis] = self.shape[third_axis]
+
+        self.set_data(np.array([start, end]))
 
 
 def get_image_func(axis: str,

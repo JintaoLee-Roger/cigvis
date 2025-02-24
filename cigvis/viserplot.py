@@ -26,6 +26,27 @@ def create_slices(volume: np.ndarray,
                   cmap: str = 'Petrel',
                   nancolor=None,
                   **kwargs) -> List:
+    """
+    create a slice node
+
+    Parameters
+    ----------
+    volume : array-like
+        3D array
+    pos : List or Dict
+        init position of the slices, can be a List or Dict, such as:
+        ```
+        pos = [0, 0, 200] # x: 0, y: 0, z: 200
+        pos = [[0, 200], [9], []] # x: 0 and 200, y: 9, z: None
+        pos = {'x': [0, 200], 'y': [1], z: []}
+        ```
+    clim : List
+        [vmin, vmax] for plotting 
+    cmap : str or Colormap
+        colormap, it can be str or matplotlib's Colormap
+    nancolor : str or color
+        color for nan values, default is None (i.e., transparent)
+    """
     # set pos
     ni, nx, nt = volume.shape
     if pos is None:
@@ -247,6 +268,30 @@ def create_well_logs(
     point_shape: str = 'square',
     **kwargs,
 ):
+    """
+    create well logs nodes
+
+    Parameters
+    ----------
+    logs : List or array-like
+        List (multi-logs) or np.ndarray (one log). For a log,
+        its shape is like (N, 3) or (N, 4) or (N, 6) or (N, 7),
+        the first 3 columns are (x, y, z) coordinates. If 3 columns,
+        use the third column (z) as the color value (mapped by `cmap`), 
+        if 4 columns, the 4-th column is the color value (mapped by `cmap`),
+        if 6 or 7 columns, colors are RGB format.
+    logs_type : str
+        'point' or 'line', draw points or line segments
+    cmap : str
+        colormap for logs
+    clim : List
+        [vmin, vmax] of logs
+    width : float
+        width of line segments or points
+    point_shape : str
+        point shape for points, 'square', 'circle' or others, only when logs_type is 'point'
+    
+    """
     if not isinstance(logs, List):
         logs = [logs]
 

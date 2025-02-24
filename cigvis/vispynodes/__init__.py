@@ -5,7 +5,7 @@
 # University of Science and Technology of China (USTC)
 # -----------------------------------------------------------------------------
 
-from .axis_aligned_image import AxisAlignedImage
+from .axis_aligned_image import AxisAlignedImage, InteractiveLine
 from .fixed_image import FixedImage
 from .volume_slices import volume_slices
 from .indicator import XYZAxis, NorthPointer

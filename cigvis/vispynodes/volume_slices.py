@@ -9,13 +9,11 @@
 # Distributed under the MIT License. See LICENSE for more info.
 # -----------------------------------------------------------------------------
 
-from typing import List, Callable, Tuple, Union
+from typing import Dict, List, Callable, Tuple, Union
 import numpy as np
 from vispy.color import Colormap
 from cigvis import is_line_first
 from cigvis.utils import utils
-
-
 from .axis_aligned_image import AxisAlignedImage, get_image_func
 
 __all__ = ["volume_slices"]
@@ -30,7 +28,7 @@ def volume_slices(volumes: Union[np.ndarray, List],
                   clims: Union[List, Tuple] = None,
                   interpolation: str = 'linear',
                   method: str = 'auto',
-                  texture_format=None) -> List[AxisAlignedImage]:
+                  texture_format=None) -> Dict:
     """ 
     Acquire a list of slices in the form of AxisAlignedImage.
     The list can be attached to a VisCanvas to visualize the volume
@@ -66,7 +64,8 @@ def volume_slices(volumes: Union[np.ndarray, List],
     volumes, preproc_funcs, cmaps, clims, interpolation, n_vol, shape = _process_args(
         volumes, preproc_funcs, cmaps, clims, interpolation)
 
-    slices_list = []
+    # slices_list = []
+    slices_dict = {'x': [], 'y': [], 'z': []}
 
     # Function that returns the limitation of slice movement.
     def limit(axis):
@@ -76,10 +75,8 @@ def volume_slices(volumes: Union[np.ndarray, List],
 
     # Organize the slice positions.
     for xyz_pos in (x_pos, y_pos, z_pos):
-        if not (isinstance(xyz_pos,
-                           (list, tuple, int, float)) or xyz_pos is None):
-            raise ValueError(
-                'Wrong type of x_pos/y_pos/z_pos={}'.format(xyz_pos))
+        if not (isinstance(xyz_pos, (list, tuple, int, float)) or xyz_pos is None): # yapf: disable
+            raise ValueError('Wrong type of x_pos/y_pos/z_pos={}'.format(xyz_pos)) # yapf: disable
     axis_slices = {'x': x_pos, 'y': y_pos, 'z': z_pos}
 
     # Create AxisAlignedImage nodes and append to the slices_list.
@@ -107,10 +104,9 @@ def volume_slices(volumes: Union[np.ndarray, List],
                                               interpolation=interpolation,
                                               method=method,
                                               texture_format=texture_format)
+                slices_dict[f'{axis}'].append(image_node)
 
-                slices_list.append(image_node)
-
-    return slices_list
+    return slices_dict
 
 
 def _process_args(volumes: Union[np.ndarray, List],
