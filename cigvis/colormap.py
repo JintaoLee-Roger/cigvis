@@ -38,10 +38,20 @@ from .customcmap import *
 def _is_vispy_cmap(cmap):
     return 'vispy' in cmap.__class__.__module__
 
+def _eq_3_or_4(k):
+    return k == 3 or k == 4
 
 def arrs_to_image(arr, cmap, clim, as_uint8=False, nancolor=None):
 
     def _to_image(arr, cmap, clim, nancolor=None):
+        if arr.ndim == 3: # RGB image, (h, w, 3/4) or (3/4, h, w)
+            if _eq_3_or_4(arr.shape[0]):
+                arr = np.transpose(arr, (1, 2, 0))
+
+            if arr.dtype == np.uint8:
+                arr = arr.astype(np.float32) / 255
+            return arr
+
         norm = plt.Normalize(vmin=clim[0], vmax=clim[1])
         cmap = cmap_to_mpl(cmap)
         if nancolor is not None:
@@ -112,6 +122,24 @@ def blend_multiple(bg, fg, bg_cmap, fg_cmap, bg_clim, fg_clim):
     out = arrs_to_image([bg] + fg, [bg_cmap] + fg_cmap, [bg_clim] + fg_clim)
 
     return out
+
+
+
+def fast_set_cmap(cmap, alpha, excpt):
+    """
+    fast set cmap by name, alpha and excpt,
+    excpt could be one of [None, 'min', 'max', 'ramp']
+    """
+    if excpt == 'min':
+        cmap = set_alpha_except_min(cmap, alpha)
+    elif excpt == 'max':
+        cmap = set_alpha_except_max(cmap, alpha)
+    elif excpt == 'ramp':
+        cmap = ramp(cmap, alpha_max=alpha)
+    else:
+        cmap = set_alpha(cmap, alpha)
+    
+    return cmap
 
 
 def get_cmap_from_str(cmap: str, includevispy: bool = False):
@@ -359,6 +387,8 @@ def ramp(cmap, blow=0, up=1, alpha_min=0, alpha_max=1, forvispy=True):
         warnings.warn("The `forvispy` parameter is deprecated and will be removed in a future version.", DeprecationWarning, stacklevel=2)
 
     cmap = get_cmap_from_str(cmap)
+    if _is_vispy_cmap(cmap):
+        cmap = cmap_to_mpl(cmap)
     slope = (alpha_max - alpha_min) / (up - blow)
     N = cmap.N
     arr = cmap(np.arange(N))
@@ -367,7 +397,8 @@ def ramp(cmap, blow=0, up=1, alpha_min=0, alpha_max=1, forvispy=True):
     arr[:istart, 3] = alpha_min
     arr[iend:, 3] = alpha_max
     arr[istart:iend, 3] = np.arange(iend - istart) / N * slope + alpha_min
-    cmap = ListedColormap(arr)
+    cmap = ListedColormap(arr, name=cmap.name)
+    cmap.excpt = 'ramp'
     return cmap
 
 
@@ -385,7 +416,7 @@ def set_up_as(cmap, color, forvispy=True):
     elif isinstance(cmap, mplColormap):
         rgba = cmap(np.arange(cmap.N))
         rgba[-1] = mpl.colors.to_rgba(color)
-        cmap = ListedColormap(rgba)
+        cmap = ListedColormap(rgba, name=cmap.name)
         return cmap
     else:
         raise ValueError("unkown cmap")
@@ -405,7 +436,7 @@ def set_down_as(cmap, color, forvispy=True):
     elif isinstance(cmap, mplColormap):
         rgba = cmap(np.arange(cmap.N))
         rgba[0] = mpl.colors.to_rgba(color)
-        cmap = ListedColormap(rgba)
+        cmap = ListedColormap(rgba, name=cmap.name)
         return cmap
     else:
         raise ValueError("unkown cmap")
@@ -441,7 +472,7 @@ def set_alpha(cmap, alpha: float, forvispy: bool = True):
         colors[:, -1] = alpha
         return vispyColormap(colors)
     elif isinstance(cmap, mplColormap):
-        cmap = ListedColormap(cmap(np.arange(cmap.N), alpha=alpha))
+        cmap = ListedColormap(cmap(np.arange(cmap.N), alpha=alpha), name=cmap.name)
         return cmap
     else:
         raise ValueError("unkown cmap")
@@ -467,7 +498,8 @@ def set_alpha_except_min(cmap, alpha: float, forvispy: bool = True):
     elif isinstance(cmap, mplColormap):
         colors = cmap(np.arange(cmap.N), alpha=alpha)
         colors[0, 3] = 0
-        cmap = ListedColormap(colors)
+        cmap = ListedColormap(colors, name=cmap.name)
+        cmap.excpt = 'min'
         return cmap
     else:
         raise ValueError("unkown cmap")
@@ -493,7 +525,8 @@ def set_alpha_except_max(cmap, alpha: float, forvispy: bool = True):
     elif isinstance(cmap, mplColormap):
         colors = cmap(np.arange(cmap.N), alpha=alpha)
         colors[-1, 3] = 0
-        cmap = ListedColormap(colors)
+        cmap = ListedColormap(colors, name=cmap.name)
+        cmap.excpt = 'max'
         return cmap
     else:
         raise ValueError("unkown cmap")
@@ -542,7 +575,7 @@ def set_alpha_except_values(cmap,
     colors[ceil, 3] = 0
     colors[floor, 3] = 0
 
-    return ListedColormap(colors)
+    return ListedColormap(colors, name=cmap.name)
 
 
 def set_alpha_except_top(cmap, alpha, clim, segm, forvispy=True):
@@ -563,7 +596,7 @@ def set_alpha_except_top(cmap, alpha, clim, segm, forvispy=True):
                       np.arange(cmap.N)).astype(int)
     colors[index:, 3] = 0
 
-    return ListedColormap(colors)
+    return ListedColormap(colors, name=cmap.name)
 
 
 def set_alpha_except_bottom(cmap, alpha, clim, segm, forvispy=True):
@@ -584,7 +617,7 @@ def set_alpha_except_bottom(cmap, alpha, clim, segm, forvispy=True):
                       np.arange(cmap.N)).astype(int)
     colors[:index, 3] = 0
 
-    return ListedColormap(colors)
+    return ListedColormap(colors, name=cmap.name)
 
 
 def set_alpha_except_ranges(cmap, alpha, clim, r, forvispy=True):
@@ -618,7 +651,7 @@ def set_alpha_except_ranges(cmap, alpha, clim, r, forvispy=True):
     for c in index:
         colors[c[0]:c[1], 3] = 0
 
-    return ListedColormap(colors)
+    return ListedColormap(colors, name=cmap.name)
 
 
 def list_custom_cmap() -> List:

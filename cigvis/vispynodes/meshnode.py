@@ -171,8 +171,11 @@ class SurfaceNode(Mesh):
         assert len(self._cmaps) == len(self.values), "cmaps must be the same length as values" # yapf: disable
 
         for i, value in enumerate(self.values):
+            # depth, use vertices[:, 2] as value/color
             if isinstance(value, str) and value == 'depth':
                 self.values[i] = self.surf
+
+            # amplitude, use seis volume's amplitude as value/color
             elif isinstance(value, str) and value == 'amp':
                 self.interp_value()
                 self.values[i] = self.seis_value
@@ -181,30 +184,36 @@ class SurfaceNode(Mesh):
                         np.nanmin(self.volume),
                         np.nanmax(self.volume)
                     ]
+
+            # render the whole mesh with a single color, e.g., 'red'
             elif isinstance(value, str):
                 try:
                     c = mcolors.to_rgb(value)
                     self.values[i] = c
                 except:
                     raise ValueError(f"Invalid value {value}")
-            elif isinstance(value, tuple) and isinstance(
-                    value[0], str) and len(value) == 2:
+
+            # a single color with alpha, e.g., ('red', 0.5)
+            elif isinstance(value, tuple) and isinstance(value[0], str) and len(value) == 2:
                 try:
-                    assert value[1] <= 1 and value[
-                        1] >= 0, "alpha must between 0 and 1"
+                    assert value[1] <= 1 and value[1] >= 0, "alpha must between 0 and 1" # yapf: disable
                     c = mcolors.to_rgba(value[0], value[1])
                     self.values[i] = c
                 except:
                     raise ValueError(f"Invalid value {value}")
-            elif isinstance(value,
-                            tuple) and len(value) >= 3 and len(value) <= 4:
+            
+            # rgb/rgba color, e.g., (0.5, 0.5, 0.5) or (0.5, 0.5, 0.5, 0.6)
+            elif isinstance(value, tuple) and len(value) >= 3 and len(value) <= 4:
                 assert all([isinstance(v, (int, float)) for v in value]), "value must be a tuple of numbers" # yapf: disable
                 assert all([v <= 1 and v >= 0 for v in value]), "value must be a tuple of numbers between 0 and 1" # yapf: disable
                 self.values[i] = value
+
+            # a numpy array of values, e.g., np.random.rand(ni, nx)
             elif not isinstance(value, np.ndarray):
                 raise ValueError(
                     f"value must be 'depth', 'amp', or np.ndarray, but got {value}"
                 )
+
             if self._clims[i] is None:
                 self._clims[i] = [
                     np.nanmin(self.values[i]),
@@ -265,6 +274,65 @@ class SurfaceNode(Mesh):
         self._clims = clims
         self.values = values
         self.process_values()
+
+    # TODO:
+    def apply_filter_ops(self, ops: Callable[[np.ndarray, np.ndarray],Tuple[np.ndarray, np.ndarray]]):
+        """
+        Apply custom operation function to process vertices and faces, and update mesh data.
+        
+        Parameters:
+            ops: A callable function that takes current vertices and faces arrays as input,
+                 returns updated vertices and faces arrays.
+                 Function signature should be: fn(vertices: np.ndarray, faces: np.ndarray) -> Tuple[np.ndarray, np.ndarray]
+        
+        Returns:
+            Tuple[np.ndarray, np.ndarray]: Updated vertices and faces
+            
+        Example:
+            # Example operation: Move all vertices 1 unit along Y axis
+            def move_vertices_y(vertices, faces):
+                new_vertices = vertices.copy()
+                new_vertices[:, 1] += 1.0  # Increase Y coordinate
+                return new_vertices, faces
+                
+            surface_node.apply_filter_ops(move_vertices_y)
+        """
+        raise NotImplementedError("This method is still in development")
+        if not callable(ops):
+            raise TypeError("ops must be a callable function")
+
+        # Get current vertices and faces data
+        vertices = self._meshdata.get_vertices()
+        faces = self._meshdata.get_faces()
+
+        # Apply custom operation
+        try:
+            new_vertices, new_faces = ops(vertices, faces)
+
+            # Check if returned data types and dimensions are valid
+            if not isinstance(new_vertices, np.ndarray) or not isinstance(
+                    new_faces, np.ndarray):
+                raise TypeError("ops function must return two numpy arrays")
+
+            if new_vertices.ndim != 2 or new_vertices.shape[1] < 3:
+                raise ValueError(
+                    f"Vertex array must be a 2D array with shape (N, 3+) but got {new_vertices.shape}"
+                )
+
+            if new_faces.ndim != 2 or new_faces.shape[1] != 3:
+                raise ValueError(
+                    f"Face array must be a 2D array with shape (M, 3) but got {new_faces.shape}"
+                )
+
+            # Update mesh data
+            self._meshdata.set_vertices(new_vertices)
+            self._meshdata.set_faces(new_faces)
+            self.mesh_data_changed()
+
+            return new_vertices, new_faces
+
+        except Exception as e:
+            raise RuntimeError(f"An error occurred while applying mesh operations: {str(e)}")
 
 
 class ArbLineNode(Mesh):

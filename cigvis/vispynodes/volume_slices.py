@@ -140,10 +140,8 @@ def _process_args(volumes: Union[np.ndarray, List],
         interpolation = [interpolation] * len(volumes)
     assert len(interpolation) == len(volumes)
 
-    shape = volumes[0].shape
     line_first = is_line_first()
-    if not line_first:
-        shape = shape[::-1]
+    shape, _ = utils.get_shape(volumes[0], line_first)
 
     # Automatically set clim (cmap range) if not specified.
     for i_vol in range(n_vol):

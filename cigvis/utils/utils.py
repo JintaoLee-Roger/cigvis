@@ -127,3 +127,26 @@ def _format(v):
         return round(v, 2)
     else:
         return float(f"{v:.2g}")
+
+
+def get_shape(vol, line_first):
+    def _eq_3_or_4(k):
+        return k == 3 or k == 4
+
+    assert _eq_3_or_4(vol.ndim), f"Volume's dims must be 3 or 4 (RGB), but got {vol.ndim}"
+    rgb_type = 0
+    shape = list(vol.shape)
+    if len(shape) == 4: # RGB volumes
+        if _eq_3_or_4(shape[-1]):
+            shape = shape[:3]
+            rgb_type = 1
+        elif _eq_3_or_4(shape[0]):
+            shape = shape[1:]
+            rgb_type = 2
+        else:
+            raise ValueError(f"Unknow input type (shape={shape}).")
+
+    if not line_first:
+        shape = shape[::-1]
+
+    return shape, rgb_type

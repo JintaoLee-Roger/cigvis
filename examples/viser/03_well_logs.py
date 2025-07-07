@@ -6,13 +6,13 @@
 well logs
 ==============================================================
 
-.. image:: ../../_static/cigvis/viser/01.png
+.. image:: ../../_static/cigvis/viser/03.jpg
     :alt: image
     :align: center
 
 """
 
-# sphinx_gallery_thumbnail_path = '_static/cigvis/viser/01.png'
+# sphinx_gallery_thumbnail_path = '_static/cigvis/viser/03.jpg'
 
 import numpy as np
 from cigvis import colormap, viserplot

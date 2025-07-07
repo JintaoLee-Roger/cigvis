@@ -139,11 +139,8 @@ class VDSReader:
     def close(self) -> None:
         self._close(self.vds)
 
-    def close(self) -> None:
-        self.segy.close_file()
-
     def __array__(self):
-        """To support np.array(SegyNP(xxx))"""
+        """To support np.array(VDSReader(xxx))"""
         return self[...]
         
     def to_numpy(self):
@@ -155,7 +152,7 @@ class VDSReader:
             return self.min()
         elif func is np.nanmax:
             return self.max()
-        raise NotImplementedError(f"Function {func} is not implemented for SegyNP")
+        raise NotImplementedError(f"Function {func} is not implemented for VDSReader")
 
 
 def create_vds_from_array(d: np.ndarray,

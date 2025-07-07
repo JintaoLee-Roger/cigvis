@@ -360,7 +360,7 @@ class AxisAlignedImage(Image):
         # Update image on the slice based on current position. The numpy array
         # is transposed due to a conversion from i-j to x-y axis system.
         # First image, the primary one:
-        self.set_data(self.image_funcs[0](self.pos))  # remove .T
+        self.set_data(self.image_funcs[0](self.pos))
         # Other images, overlaid on the primary image:
         for i_img in range(1, len(self.image_funcs)):
             self.overlaid_images[i_img].set_data(self.image_funcs[i_img](self.pos)) # yapf: disable
@@ -418,6 +418,9 @@ class AxisAlignedImage(Image):
                     im._clippers[node] = clipper
 
     def _prepare_draw(self, view):
+        """
+        set offet to facilitate the superimposition of lines on the image 
+        """
         super()._prepare_draw(view)
         self.update_gl_state(polygon_offset_fill=True)
         set_polygon_offset(self._offset_factor, self._offset_units)
@@ -522,12 +525,26 @@ def get_image_func(axis: str,
     i_vol : int
         index of the volumes
     """
+    def _eq_3_or_4(k):
+        return k == 3 or k == 4
     line_first = cigvis.is_line_first()
-    shape = list(vol.shape)
-    if not line_first:
-        shape = shape[::-1]
+    assert _eq_3_or_4(vol.ndim), f"Volume's dims must be 3 or 4 (RGB), but got {vol.ndim}"
+    # rgb_type, 0 for (n1, n2, n3), 1 for (n1, n2, n3, 3/4), 2 for (3/4, n1, n2, n3)
+    ndim = vol.ndim
+    channel_dim = None
+    dim_x, dim_y, dim_z = (0, 1, 2) if line_first else (2, 1, 0)
+    axis_to_dim = {'x': dim_x, 'y': dim_y, 'z': dim_z}
+    shape, rgb_type = cigvis.utils.get_shape(vol, line_first)
+    if rgb_type == 1:
+        channel_dim = 3
+    elif rgb_type == 2:
+        channel_dim = 0
 
     def wrap_preproc_f(x, func=None, forcefp32=False):
+        if line_first and rgb_type == 1:
+            x = np.transpose(x, (1, 2, 0))
+        elif (not line_first) and rgb_type == 2:
+            x = np.transpose(x, (1, 2, 0))
         if func is not None:
             x = func(x)
         if not forcefp32:
@@ -540,6 +557,15 @@ def get_image_func(axis: str,
 
     _preproc_f = lambda x: wrap_preproc_f(x, preproc_f, forcefp32)
 
+    def _get_slices(axis, pos):
+        dim = axis_to_dim.get(axis)
+        slices = [slice(None)] * ndim
+        if channel_dim is not None and dim >= channel_dim:
+            slices[dim + 1] = pos
+        else:
+            slices[dim] = pos
+        return tuple(slices)
+
     def slicing_at_axis(pos, get_shape=False):
         if get_shape:  # just return the shape information
             if axis == 'x': return shape[1], shape[2]
@@ -547,25 +573,22 @@ def get_image_func(axis: str,
             elif axis == 'z': return shape[0], shape[1]
         else:  # will slice the volume and return an np array image
             pos = int(np.round(pos))
-            # vol = volumes[i_vol]
-            # preproc_f = preproc_funcs[i_vol]
-            # if preproc_f is not None:
+            s = _get_slices(axis, pos)
             if line_first:
-                if axis == 'x': return _preproc_f(vol[pos, :, :].T)
-                elif axis == 'y': return _preproc_f(vol[:, pos, :].T)
-                elif axis == 'z': return _preproc_f(vol[:, :, pos].T)
+                return _preproc_f(vol[s].T)
             else:
-                if axis == 'x': return _preproc_f(vol[:, :, pos])
-                elif axis == 'y': return _preproc_f(vol[:, pos, :])
-                elif axis == 'z': return _preproc_f(vol[pos, :, :])
+                return _preproc_f(vol[s])
+            # if line_first:
+            #     if axis == 'x': 
+            #         if rgb_type == 2:
+            #             return _preproc_f(vol[:, pos, :, :].T)
+            #         else:
+            #             return _preproc_f(vol[pos, :, :].T)
+            #     elif axis == 'y': return _preproc_f(vol[:, pos, :].T)
+            #     elif axis == 'z': return _preproc_f(vol[:, :, pos].T)
             # else:
-            #     if line_first:
-            #         if axis == 'x': return vol[pos, :, :].T
-            #         elif axis == 'y': return vol[:, pos, :].T
-            #         elif axis == 'z': return vol[:, :, pos].T
-            #     else:
-            #         if axis == 'x': return vol[:, :, pos]
-            #         elif axis == 'y': return vol[:, pos, :]
-            #         elif axis == 'z': return vol[pos, :, :]
+            #     if axis == 'x': return _preproc_f(vol[:, :, pos])
+            #     elif axis == 'y': return _preproc_f(vol[:, pos, :])
+            #     elif axis == 'z': return _preproc_f(vol[pos, :, :])
 
     return slicing_at_axis

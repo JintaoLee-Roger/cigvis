@@ -81,7 +81,7 @@ class MaskImageMixin:
                 'alpha': 0.5,
                 'excpt': 'None',
             })
-            return
+            # return
 
         if mode == 'vmin':
             vmin = float(value)
@@ -148,6 +148,8 @@ class MaskImageMixin:
                 cmap = colormap.set_alpha(cmap, alpha)
             elif excpt == 'min':
                 cmap = colormap.set_alpha_except_min(cmap, alpha)
+            elif excpt == 'ramp':
+                cmap = colormap.ramp(cmap)
             elif excpt == 'max':
                 cmap = colormap.set_alpha_except_max(cmap, alpha)
             else:
@@ -160,7 +162,7 @@ class MaskImageMixin:
             qtw.QMessageBox.critical(self, "Error", f"Error colormap: {e}")
             return
 
-        return cmap
+        return colormap.cmap_to_vispy(cmap)
 
     def remove_mask(self, idx):
         for node in self.nodes:

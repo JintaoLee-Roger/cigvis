@@ -1,5 +1,17 @@
 # Changelog
 
+### v0.1.8
+
+- added support for RGB/RGBA format 3D volumes as input
+- improved viser-based experience by enhancing GUI panel, including:
+    - added mask parameter controls
+    - added region selection for screenshots
+    - added ability to compare multiple results
+- updated add_masks function to support quick colormap setup via `alpha` and `excpt` parameters
+- separated installation dependencies: `vispy` and `PyQt5` are no longer installed with `cigvis[plotly]` or `cigvis[viser]`
+- fixed several bugs
+
+
 ### v0.1.7
 
 - added function `create_well_logs` for viser backend

@@ -373,5 +373,18 @@ def plot2d(
         plt.show()
 
 
+def flattened_view(volume, axis_scales=[1, 1, 1]):
+    """
+    Plot a flattened view of the volume
+
+    Parameters
+    -----------
+    volume : np.ndarray
+        volume, shape=(n1, n2, n3)
+    """
+    # TODO:
+    pass
+
+
 if __name__ == '__main__':
     pass

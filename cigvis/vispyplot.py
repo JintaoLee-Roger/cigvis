@@ -124,12 +124,8 @@ def create_slices(volume: np.ndarray,
     """
     utils.check_mmap(volume)
     line_first = cigvis.is_line_first()
-    if line_first:
-        nt = volume.shape[2]
-        shape = volume.shape
-    else:
-        nt = volume.shape[0]
-        shape = volume.shape[::-1]
+    shape, _ = utils.get_shape(volume, line_first)
+    nt = shape[2]
 
     # set pos
     if pos is None:
@@ -255,6 +251,8 @@ def add_mask(nodes: List,
              clims: Union[List, Tuple] = None,
              cmaps: Union[str, List] = None,
              interpolation: str = 'linear',
+             alpha = None,
+             excpt = None,
              method: str = 'auto',
              texture_format: str = 'auto',
              preproc_funcs: Callable = None,
@@ -275,6 +273,10 @@ def add_mask(nodes: List,
     interpolation : str
         interpolation method. If the values of the slices is discrete, we recommand 
         set as 'nearest'
+    alpha : float or List[float]
+        if alpha is not None, using `colormap.fast_set_cmap` to set cmap
+    excpt : None or str
+        it could be one of [None, 'min', 'max', 'ramp']
 
     Returns
     -------
@@ -298,7 +300,13 @@ def add_mask(nodes: List,
         raise ValueError("'cmaps' cannot be 'None'")
     if not isinstance(cmaps, List):
         cmaps = [cmaps] * len(volumes)
+    if not isinstance(alpha, List):
+        alpha = [alpha] * len(volumes)
+    if not isinstance(excpt, List):
+        excpt = [excpt] * len(volume)
     for i in range(len(cmaps)):
+        if alpha[i] is not None:
+            cmaps[i] = colormap.fast_set_cmap(cmaps[i], alpha[i], excpt[i])
         cmaps[i] = colormap.cmap_to_vispy(cmaps[i])
 
     if isinstance(interpolation, str):

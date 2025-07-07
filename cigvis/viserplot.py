@@ -1,9 +1,14 @@
 import time
 
 from typing import List, Dict, Tuple, Union
+import re
 import matplotlib.pyplot as plt
 import numpy as np
 import viser
+from PIL import Image, ImageDraw
+import imageio.v3 as iio
+from packaging import version
+
 
 import cigvis
 from cigvis import colormap
@@ -48,7 +53,9 @@ def create_slices(volume: np.ndarray,
         color for nan values, default is None (i.e., transparent)
     """
     # set pos
-    ni, nx, nt = volume.shape
+    # ni, nx, nt = volume.shape
+    shape, _ = utils.get_shape(volume, cigvis.is_line_first())
+    nt = shape[2]
     if pos is None:
         pos = dict(x=[0], y=[0], z=[nt - 1])
     if isinstance(pos, List):
@@ -84,7 +91,32 @@ def add_mask(nodes: List,
              volumes: Union[List, np.ndarray],
              clims: Union[List, Tuple] = None,
              cmaps: Union[str, List] = None,
+             alpha=None,
+             excpt=None,
              **kwargs) -> List:
+    """
+    Add Mask/Overlay volumes
+    
+    Parameters
+    -----------
+    nodes: List[Node]
+        A List that contains `AxisAlignedImage` (may be created by `create_slices`)
+    volumes : array-like or List
+        3D array(s), foreground volume(s)/mask(s)
+    clims : List
+        [vmin, vmax] for foreground slices plotting
+    cmaps : str or Colormap
+        colormap for foreground slices, it can be str or matplotlib's Colormap or vispy's Colormap
+    alpha : float or List[float]
+        if alpha is not None, using `colormap.fast_set_cmap` to set cmap
+    excpt : None or str
+        it could be one of [None, 'min', 'max', 'ramp']
+
+    Returns
+    -------
+    slices_nodes : List
+        list of slice nodes
+    """
     if not isinstance(volumes, List):
         volumes = [volumes]
 
@@ -101,8 +133,14 @@ def add_mask(nodes: List,
         raise ValueError("'cmaps' cannot be 'None'")
     if not isinstance(cmaps, List):
         cmaps = [cmaps] * len(volumes)
+    if not isinstance(alpha, List):
+        alpha = [alpha] * len(volumes)
+    if not isinstance(excpt, List):
+        excpt = [excpt] * len(volumes)
     for i in range(len(cmaps)):
         cmaps[i] = colormap.get_cmap_from_str(cmaps[i])
+        if alpha[i] is not None:
+            cmaps[i] = colormap.fast_set_cmap(cmaps[i], alpha[i], excpt[i])
 
     for node in nodes:
         if not isinstance(node, VolumeSlice):
@@ -326,6 +364,36 @@ def create_well_logs(
     return nodes
 
 
+
+
+def _region2image(pts2d, server: viser.ViserServer):
+    client = list(server.get_clients().values())[0]
+
+    h, w = client.camera.image_height, client.camera.image_width
+
+    # Convert normalized box to pixel coordinates
+    (u0, v0), (u1, v1) = pts2d
+    x0, y0 = int(u0 * w), int(v0 * h)
+    x1, y1 = int(u1 * w), int(v1 * h)
+
+    # Clamp + order
+    lx, rx = sorted((max(0, x0), min(w, x1)))
+    ly, ry = sorted((max(0, y0), min(h, y1)))
+
+    # Create white canvas
+    canvas = Image.new('RGB', (w, h), (255, 255, 255))
+    draw = ImageDraw.Draw(canvas)
+
+    # Draw rectangle
+    draw.rectangle([(lx, ly), (rx, ry)], outline=(255, 0, 255), width=2)
+
+    # Draw filled circles at each corner (green)
+    for px, py in [(lx, ly), (rx, ly), (rx, ry), (lx, ry)]:
+        draw.ellipse([(px-4, py-4), (px+4, py+4)], fill=(0, 255, 0))
+
+    return np.array(canvas)
+
+
 def plot3D(
     nodes,
     axis_scales=[1, 1, 1],
@@ -346,14 +414,17 @@ def plot3D(
 
     fov = fov * np.pi / 180
 
+    global Background_image
+    Background_image = None
+
     # update scale of slices
-    draw_slices = False
+    draw_slices = -1
     init_scale = -1
-    for node in nodes:
+    for i, node in enumerate(nodes):
         if isinstance(node, VolumeSlice):
             init_scale = node.init_scale
             node.update_scale(axis_scales)
-            draw_slices = True
+            draw_slices = i
 
     if init_scale == -1:  # no slices # TODO: for other types, Well logs?
         init_scale = 100
@@ -374,6 +445,8 @@ def plot3D(
             node.name = f'logs{logsid}-{node.base_name}'
             logsid += 1
         node.server = server
+
+    mask_num = len(nodes[draw_slices].masks)
 
     # gui slices slibers to control slices position
     with server.gui.add_folder("slices pos"):
@@ -423,96 +496,220 @@ def plot3D(
             guiz.on_update(lambda _: nodez.update_node(guiz.value))
 
     # gui to control slices clim and cmap
-    if draw_slices:
-        [vmin, vmax] = utils.auto_clim(nodes[0].volume)
+    if draw_slices >= 0:
+        [vmin, vmax] = utils.auto_clim(nodes[draw_slices].volume)
         if vmin == vmax:
             vmax = vmin + 1
         step = (vmax - vmin) / 100
 
-    def update_clim(vmin, vmax):
+    def update_clim(vmin, vmax, type, num):
         if vmin >= vmax:
             return
         for node in nodes:
-            if hasattr(node, 'update_clim'):
-                node.update_clim([vmin, vmax])
+            if type == 'bg':
+                if hasattr(node, 'update_clim'):
+                    node.update_clim([vmin, vmax])
+            elif type == 'fg':
+                if hasattr(node, 'update_mask_clim'):
+                    node.update_mask_clim([vmin, vmax], num)
 
     def update_cmap(cmap):
         for node in nodes:
             if hasattr(node, 'update_cmap'):
+                if cmap=='pre-set':
+                    cmap = None
                 node.update_cmap(cmap)
+    
+    def update_mask_cmap(cmapname, alpha, excpt, num, first):
+        if cmapname == 'pre-set':
+            cmap = nodes[first]._fg_cmaps_preset[num]
+        else:
+            cmap = cmapname
+        cmap = colormap.fast_set_cmap(cmap, alpha, excpt)
 
-    if draw_slices:
-        with server.gui.add_folder("paramters"):
-            guivmin = server.gui.add_slider(
-                'vmin',
-                min=vmin,
-                max=vmax,
-                step=step,
-                initial_value=nodes[0].clim[0],
-            )
+        for node in nodes:
+            if hasattr(node, 'update_mask_cmap'):
+                node.update_mask_cmap(cmap, num)
 
-            guivmax = server.gui.add_slider(
-                'vmax',
-                min=vmin,
-                max=vmax,
-                step=step,
-                initial_value=nodes[0].clim[1],
-            )
-
-            guivmin.on_update(
-                lambda _: update_clim(guivmin.value, guivmax.value))
-            guivmax.on_update(
-                lambda _: update_clim(guivmin.value, guivmax.value))
+    with server.gui.add_folder("paramters"):
+        if draw_slices >= 0:
+            guiclim = server.gui.add_vector2('clim', initial_value=tuple(nodes[draw_slices].clim), step=step)
+            guiclim.on_update(lambda _: update_clim(*guiclim.value, 'bg', -1))
 
             guicmap = server.gui.add_dropdown(
                 'cmap',
                 options=[
-                    'gray', 'seismic', 'Petrel', 'stratum', 'jet', 'bwp',
-                    'od_seismic1', 'od_seismic2', 'od_seismic3'
+                    'pre-set', 'gray', 'seismic', 'Petrel', 'stratum', 'jet', 'bwp'
                 ],
-                initial_value='gray',
+                initial_value='pre-set',
             )
             guicmap.on_update(lambda _: update_cmap(guicmap.value))
 
-    # gui to control aspect
-    def update_scale(scale):
-        for node in nodes:
-            if isinstance(node, VolumeSlice):
-                node.update_scale(scale)
-            elif isinstance(node, MeshNode):
-                node.scale = [s * x for s, x in zip(init_scale, scale)]
+            if mask_num > 0:
+                step1 = (nodes[draw_slices].fg_clims[0][1] - nodes[draw_slices].fg_clims[0][0] + 1e-6) / 100
+                maskclim1 = server.gui.add_vector2('mask_clim1', initial_value=tuple(nodes[draw_slices].fg_clims[0]), step=step1)
+                maskclim1.on_update(lambda _: update_clim(*maskclim1.value, 'fg', 0))
+                maskcmap1 = server.gui.add_dropdown('mask_cmap1', options=['pre-set', 'jet', 'stratum', 'Faults', 'gray'], initial_value='pre-set')
+                alpha1 = nodes[draw_slices].fg_cmaps[0](0.5)[-1]
+                maskalpha1 = server.gui.add_slider('mask_alpha1', min=0, max=1, step=0.05, initial_value=alpha1)
+                excpt1 = nodes[draw_slices].fg_cmaps[0].excpt if hasattr(nodes[draw_slices].fg_cmaps[0], 'excpt') else 'none'
+                maskexcpt1 = server.gui.add_dropdown('mask_excpt1', options=['none', 'min', 'max', 'ramp'], initial_value=excpt1)
+                maskcmap1.on_update(lambda _: update_mask_cmap(maskcmap1.value, maskalpha1.value, maskexcpt1.value, 0, draw_slices))
+                maskalpha1.on_update(lambda _: update_mask_cmap(maskcmap1.value, maskalpha1.value, maskexcpt1.value, 0, draw_slices))
+                maskexcpt1.on_update(lambda _: update_mask_cmap(maskcmap1.value, maskalpha1.value, maskexcpt1.value, 0, draw_slices))
 
-    with server.gui.add_folder('Aspect'):
-        gui_scalex = server.gui.add_slider(
-            'scale_x',
-            min=0.25,
-            max=2.5,
-            step=0.25,
-            initial_value=1,
-        )
+            if mask_num > 1:
+                step2 = (nodes[draw_slices].fg_clims[1][1] - nodes[draw_slices].fg_clims[1][0] + 1e-6) / 100
+                maskclim2 = server.gui.add_vector2('maskclim2', initial_value=tuple(nodes[draw_slices].fg_clims[1]), step=step2)
+                maskclim2.on_update(lambda _: update_clim(*maskclim2.value, 'fg', 1))
+                maskcmap2 = server.gui.add_dropdown('mask_cmap2', options=['pre-set', 'jet', 'stratum', 'Faults', 'gray'], initial_value='pre-set')
+                alpha2 = nodes[draw_slices].fg_cmaps[1](0.5)[-1]
+                maskalpha2 = server.gui.add_slider('mask_alpha2', min=0, max=1, step=0.05, initial_value=alpha2)
+                excpt2 = nodes[draw_slices].fg_cmaps[1].excpt if hasattr(nodes[draw_slices].fg_cmaps[1], 'excpt') else 'none'
+                maskexcpt2 = server.gui.add_dropdown('mask_excpt2', options=['none', 'min', 'max', 'ramp'], initial_value=excpt2)
+                maskcmap2.on_update(lambda _: update_mask_cmap(maskcmap2.value, maskalpha2.value, maskexcpt2.value, 1, draw_slices))
+                maskalpha2.on_update(lambda _: update_mask_cmap(maskcmap2.value, maskalpha2.value, maskexcpt2.value, 1, draw_slices))
+                maskexcpt2.on_update(lambda _: update_mask_cmap(maskcmap2.value, maskalpha2.value, maskexcpt2.value, 1, draw_slices))
 
-        gui_scaley = server.gui.add_slider(
-            'scale_y',
-            min=0.25,
-            max=2.5,
-            step=0.25,
-            initial_value=1,
-        )
 
-        gui_scalez = server.gui.add_slider(
-            'scale_z',
-            min=0.1,
-            max=3,
-            step=0.1,
-            initial_value=1,
-        )
+            if mask_num > 2:
+                step3 = (nodes[draw_slices].fg_clims[2][1] - nodes[draw_slices].fg_clims[2][0] + 1e-6) / 100
+                maskclim3 = server.gui.add_vector2('maskclim3', initial_value=tuple(nodes[draw_slices].fg_clims[2]), step=step3)
+                maskclim3.on_update(lambda _: update_clim(*maskclim3.value, 'fg', 2))
+                maskcmap3 = server.gui.add_dropdown('mask_cmap3', options=['pre-set', 'jet', 'stratum', 'Faults', 'gray'], initial_value='pre-set')
+                alpha3 = nodes[draw_slices].fg_cmaps[2](0.5)[-1]
+                maskalpha3 = server.gui.add_slider('mask_alpha3', min=0, max=1, step=0.05, initial_value=alpha3)
+                excpt3 = nodes[draw_slices].fg_cmaps[2].excpt if hasattr(nodes[draw_slices].fg_cmaps[2], 'excpt') else 'none'
+                maskexcpt3 = server.gui.add_dropdown('mask_excpt3', options=['none', 'min', 'max', 'ramp'], initial_value=excpt3)
+                maskcmap3.on_update(lambda _: update_mask_cmap(maskcmap3.value, maskalpha3.value, maskexcpt3.value, 2, draw_slices))
+                maskalpha3.on_update(lambda _: update_mask_cmap(maskcmap3.value, maskalpha3.value, maskexcpt3.value, 2, draw_slices))
+                maskexcpt3.on_update(lambda _: update_mask_cmap(maskcmap3.value, maskalpha3.value, maskexcpt3.value, 2, draw_slices))
 
-        gui_scalex.on_update(lambda _: update_scale(
-            [gui_scalex.value, gui_scaley.value, gui_scalez.value]))
-        gui_scaley.on_update(lambda _: update_scale(
-            [gui_scalex.value, gui_scaley.value, gui_scalez.value]))
-        gui_scalez.on_update(lambda _: update_scale(
-            [gui_scalex.value, gui_scaley.value, gui_scalez.value]))
+        # gui to control aspect
+        def update_scale(scale):
+            for node in nodes:
+                if isinstance(node, VolumeSlice):
+                    node.update_scale(scale)
+                elif isinstance(node, MeshNode):
+                    node.scale = [s * x for s, x in zip(init_scale, scale)]
+
+        gui_scale = server.gui.add_vector3('scale', initial_value=(1, 1, 1), step=0.05, min=(0.1, 0.1, 0.1))
+        gui_scale.on_update(lambda _: update_scale(gui_scale.value))
+
+    _has_image_height = version.parse(viser.__version__) > version.parse("0.2.23")
+
+    if _has_image_height:
+        with server.gui.add_folder("screenshot"):
+            select_btn = server.gui.add_button("Select rectangular region")
+            show_region = server.gui.add_checkbox("show boundary", False)
+            region_left = server.gui.add_vector2("left_up", initial_value=(0, 0), min=(0, 0), max=(1, 1), step=0.001)
+            region_right = server.gui.add_vector2("right_down", initial_value=(1, 1), min=(0, 0), max=(1, 1), step=0.001)
+            render_btn = server.gui.add_button("Render and get PNG")
+
+
+    def _select_region(server: viser.ViserServer):
+        @server.scene.on_pointer_event(event_type="rect-select")
+        def _box(event: viser.ScenePointerEvent) -> None:  # type: ignore[name-defined]
+            # event.screen_pos is ((u_min, v_min), (u_max, v_max)), each in [0, 1]
+            region_left.value = event.screen_pos[0]
+            region_right.value = event.screen_pos[1]
+            server.scene.remove_pointer_callback()
+
+    def _draw_render_boundary(server: viser.ViserServer):
+        global Background_image
+        region = (region_left.value, region_right.value)
+        Background_image = _region2image(region, server)
+        if not show_region.value:
+            return
+        server.scene.set_background_image(Background_image, format='png')
+
+    def _update_box(server: viser.ViserServer):
+        if not show_region.value:
+            server.scene.set_background_image(None)
+        else:
+            global Background_image
+            if Background_image is None:
+                region = (region_left.value, region_right.value)
+                Background_image = _region2image(region, server)
+            server.scene.set_background_image(Background_image, format='png')
+
+    def _render_save(server: viser.ViserServer):
+        client = list(server.get_clients().values())[0]
+
+        if show_region.value:
+            server.scene.set_background_image(None)
+
+        region = (region_left.value, region_right.value)
+        # Full-res render at current camera resolution
+        h, w = client.camera.image_height, client.camera.image_width
+        image = client.get_render(height=h, width=w, transport_format='png')
+
+        if show_region.value:
+            global Background_image
+            server.scene.set_background_image(Background_image)
+
+        # Convert normalized box to pixel coordinates
+        (u0, v0), (u1, v1) = region
+        x0, y0 = int(u0 * w), int(v0 * h)
+        x1, y1 = int(u1 * w), int(v1 * h)
+
+        # Clamp + order
+        x0, x1 = sorted((max(0, x0), min(w, x1)))
+        y0, y1 = sorted((max(0, y0), min(h, y1)))
+
+        if x1 <= x0 or y1 <= y0:
+            print(f"[{client.client_id}] Empty crop; aborting.")
+            return
+        cropped = image[y0:y1, x0:x1]  # HWC
+        # Encode & send
+        png_bytes = iio.imwrite("<bytes>", cropped, extension=".png")
+        client.send_file_download("selection.png", png_bytes)
+
+    if _has_image_height:
+        select_btn.on_click(lambda _: _select_region(server))
+        region_left.on_update(lambda _: _draw_render_boundary(server))
+        region_right.on_update(lambda _: _draw_render_boundary(server))
+        show_region.on_update(lambda _: _update_box(server))
+        render_btn.on_click(lambda _: _render_save(server))
+
+    with server.gui.add_folder("states"):
+        gui_camera = server.gui.add_text("camera", "fov", multiline=True)
+        gui_camera_update = server.gui.add_button("get_current_camera")
+        gui_states = server.gui.add_button('print states')
+
+    @server.on_client_connect
+    def _(client: viser.ClientHandle) -> None:
+        client.camera.fov = fov  # Or some other angle in radians, np.pi / 6 -> 30 degree
+        if look_at is None:
+            client.camera.look_at = (1, 1, 0)
+        else:
+            client.camera.look_at = tuple(look_at)
+        if wxyz is not None:
+            client.camera.wxyz = wxyz
+        if position is not None:
+            client.camera.position = tuple(position)
+        gui_camera.value = _fmt_camera_text(client.camera)
+
+    server.scene.set_up_direction((0.0, 0.0, -1.0))
+
+    def _update_camera(server, text):
+        client = list(server.get_clients().values())[-1]
+        try:
+            fov, look_at, wxyz, position = _parser_camera_text(text)
+            fov = fov * np.pi / 180
+        except Exception:
+            return
+        client.camera.fov = fov
+        client.camera.look_at = look_at
+        client.camera.wxyz = wxyz
+        client.camera.position = position
+
+    def _get_states(server: viser.ViserServer):
+        client = list(server.get_clients().values())[0]
+
+        camera = client.camera
+        text = _fmt_camera_text(camera)
+        gui_camera.value = text
 
     def _print_states(server: viser.ViserServer):
         client = list(server.get_clients().values())[0]
@@ -528,28 +725,35 @@ def plot3D(
         print(f'x: {guix.value}, y: {guiy.value}, z: {guiz.value}')
         print('----------- parameters ----------------')
         print(f'cmap: {guicmap.value}')
-        print(f'vmin: {guivmin.value:.2f}, vmax: {guivmax.value:.2f}')
+        print(f'clim: {guiclim.value}')
+        if mask_num > 0:
+            print(f'mask_clim1: {maskclim1.value}')
+            print(f'mask_cmap1: {maskcmap1.value}')
+            print(f'mask_alpha1: {maskalpha1.value}')
+            print(f'mask_excpt1: {maskexcpt1.value}')
+        if mask_num > 1:
+            print(f'mask_clim2: {maskclim2.value}')
+            print(f'mask_cmap2: {maskcmap2.value}')
+            print(f'mask_alpha2: {maskalpha2.value}')
+            print(f'mask_excpt2: {maskexcpt2.value}')
+        if mask_num > 2:
+            print(f'mask_clim3: {maskclim3.value}')
+            print(f'mask_cmap3: {maskcmap3.value}')
+            print(f'mask_alpha3: {maskalpha3.value}')
+            print(f'mask_excpt3: {maskexcpt3.value}')
         print('----------- Aspect Ratio --------------')
-        print(f'scale_x: {gui_scalex.value:.2f}, scale_y: {gui_scaley.value:.2f}, scale_z: {gui_scalez.value:.2f}') # yapf: disable
+        print(f'scale: {gui_scale.value}') # yapf: disable
+        if _has_image_height:
+            print('----------- Screenshot Region --------------')
+            print(f'left_up: {region_left.value}')
+            print(f'right_down: {region_right.value}')
+
         print('')
 
-    with server.gui.add_folder('states'):
-        gui_states = server.gui.add_button('print states')
-        gui_states.on_click(lambda _: _print_states(server))
-
-    @server.on_client_connect
-    def _(client: viser.ClientHandle) -> None:
-        client.camera.fov = fov  # Or some other angle in radians, np.pi / 6 -> 30 degree
-        if look_at is None:
-            client.camera.look_at = (1, 1, 0)
-        else:
-            client.camera.look_at = tuple(look_at)
-        if wxyz is not None:
-            client.camera.wxyz = wxyz
-        if position is not None:
-            client.camera.position = tuple(position)
-
-    server.scene.set_up_direction((0.0, 0.0, -1.0))
+        
+    gui_camera.on_update(lambda _: _update_camera(server, gui_camera.value))
+    gui_camera_update.on_click(lambda _: _get_states(server))
+    gui_states.on_click(lambda _: _print_states(server))
 
     if run_app and not cigvis.is_running_in_notebook():
         try:
@@ -580,3 +784,39 @@ def _round(f):
         return [round(x, 2) for x in f]
     if isinstance(f, np.ndarray):
         return np.round(f, 2)
+
+def _fmt_camera_text(camera):
+    fov = _round(camera.fov * 180 / np.pi)
+    look_at = camera.look_at
+    wxyz = camera.wxyz
+    position = camera.position
+    return f"fov: {fov}, look_at: {look_at}, wxyz: {wxyz}, position: {position}"
+
+def _parser_camera_text(text):
+    pattern = r"fov: (.*?), look_at: (.*?), wxyz: (.*?), position: (.*?)$"
+    match = re.fullmatch(pattern, text.strip())
+    if not match:
+        raise ValueError("字符串格式不正确")
+    fov_str, look_at_str, wxyz_str, position_str = match.groups()
+    try:
+        fov = float(fov_str)
+    except ValueError:
+        raise ValueError("fov 必须是浮点数")
+    
+    def _parse_float_list(s: str, expected_length: int = None) -> List[float]:
+        s = s.strip("[]")
+        parts = [x.strip() for x in s.split(" ") if x.strip()]
+        try:
+            lst = [float(x) for x in parts]
+        except ValueError:
+            raise ValueError(f"列表元素必须为浮点数，得到: {s}")
+        
+        if expected_length is not None and len(lst) != expected_length:
+            raise ValueError(f"列表长度必须为 {expected_length}，得到: {len(lst)}")
+        return lst
+    
+    look_at = _parse_float_list(look_at_str, 3)
+    wxyz = _parse_float_list(wxyz_str, 4)
+    position = _parse_float_list(position_str, 3)
+    
+    return fov, tuple(look_at), tuple(wxyz), tuple(position)

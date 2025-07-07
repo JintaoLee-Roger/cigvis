@@ -154,8 +154,8 @@ class LogPoints(LogBase):
             self._name,
             self.points,
             self.colors,
-            self.point_size * self.scale[2],
-            self.point_shape,
+            point_size=self.point_size * self.scale[2],
+            point_shape=self.point_shape,
         )
 
 
@@ -217,5 +217,5 @@ class LogLineSegments(LogBase):
             self._name,
             self.points,
             self.colors,
-            self.line_width,
+            line_width=self.line_width,
         )

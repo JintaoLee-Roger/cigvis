@@ -68,22 +68,31 @@ def is_running_in_notebook():
             return False
         else:
             return False
-    except NameError:
+    except Exception:
         return False
 
 
 import sys
+import importlib.util
+
+_has_viser = importlib.util.find_spec("viser") is not None
+_has_vispy = importlib.util.find_spec("vispy") is not None
+_has_plotly = importlib.util.find_spec("plotly") is not None
+_has_pyqt5 = importlib.util.find_spec("PyQt5") is not None
+
+
 from .config import *
 from . import io
 from . import colormap
 from . import meshs
-from . import gui
+if _has_vispy and _has_pyqt5:
+    from . import gui
 
 injupyter = is_running_in_notebook()
 
-if injupyter:
+if injupyter and _has_plotly:
     from .plotlyplot import *
-else:
+elif not injupyter and _has_vispy:
     from .vispyplot import *
 
 try:

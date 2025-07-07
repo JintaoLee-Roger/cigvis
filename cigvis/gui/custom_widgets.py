@@ -311,7 +311,7 @@ class MaskImageParams(ImageParams):
         self.alpha.setValue(0.5)
         exclude_l = qtw.QLabel('except')
         self.exclude = EditableComboBox()
-        exclude = ['None', 'min', 'max', 'blow(0)', 'above(1)']
+        exclude = ['None', 'min', 'ramp', 'max', 'blow(0)', 'above(1)']
         self.exclude.addItems(exclude)
         self.exclude.setCurrentText('None')
         self.addwidgets(
