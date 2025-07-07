@@ -2,7 +2,7 @@
 # University of Science and Technology of China (USTC).
 # All rights reserved.
 """
-viser comparision
+viser comparison
 ====================
 
 A demo to comarison different results in a browser.
