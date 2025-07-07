@@ -45,13 +45,13 @@ To install via PyPI, use
 
 .. code-block:: bash
 
-    # Minimal installation
+    # only with vispy and PyQt5, for desktop
     pip install cigvis
 
-    # include plotly 
+    # only with plotly, for jupyter 
     pip install "cigvis[plotly]"
 
-    # include viser
+    # only with viser, visualizing in browser
     pip install "cigvis[viser]"
 
     # install all dependencies
@@ -65,13 +65,13 @@ For local installation, clone the repository from GitHub and then install it usi
 
     git clone https://github.com/JintaoLee-Roger/cigvis.git
 
-    # Minimal installation
+    # only with vispy and PyQt5, for desktop
     pip install -e . --config-settings editable_mode=compat
 
-    # include plotly 
+    # only with plotly, for jupyter  
     pip install -e ".[plotly]" --config-settings editable_mode=compat
 
-    # include viser
+    # only with viser, visualizing in browser
     pip install -e ".[viser]" --config-settings editable_mode=compat
 
     # install all dependencies
@@ -243,6 +243,13 @@ browser to see the image. If you are running the code on a remote server
 (yes, cigvis also works when connected remotely using ssh!), 
 you can enter ``{ip}:8080`` in the browser to see the 
 visualization (``ip`` is the ip of remote server, e.g., ``222.195.77.88:8080``).
+
+It is not possible to divide multiple canvases in the browser, i.e. it is not possible to visualize multiple canvases in a tab, which may cause some trouble when comparing different results. But we can use some tricks to achieve this, see this example (`cigvis/gallery/viser/04 <https://cigvis.readthedocs.io/en/latest/gallery/viser/04_comparsion.html#sphx-glr-gallery-viser-04-comparsion-py>`_):
+
+.. image:: https://raw.githubusercontent.com/JintaoLee-Roger/images/main/cigvis/viser/04.gif
+   :alt: 04
+   :align: center
+
 
 There are several examples in `gallery/viser <https://cigvis.readthedocs.io/en/latest/gallery/viser/index.html>`_ for reference.
 
