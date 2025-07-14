@@ -3,6 +3,7 @@ import time
 import numpy as np
 from cigvis import colormap, ExceptionWrapper
 import matplotlib.pyplot as plt
+from matplotlib.colors import to_rgba as matplotlib_to_rgba
 from cigvis.utils import utils
 from cigvis import is_line_first
 
@@ -33,6 +34,10 @@ class VolumeSlice:
 
         self.init_scale = [1.5 / max(volume.shape)] * 3
         self.nancolor = nancolor
+
+        # lines
+        self._observers: PosObserver = None  # observer the intersection lines
+        self._img = None # save the original image (without white lines)
 
         # HACK: to deal with rgb or rgba image
         def _eq_3_or_4(k):
@@ -144,14 +149,38 @@ class VolumeSlice:
                                      self.nancolor)
         return self._auto_transpose(img)
 
+    def add_observer(self, observer):
+        self._observers = observer
+
     def update_node(self, pos):
         if self.server is None:
             return
         # startt = time.perf_counter()
         self.pos = int(pos)
         self._check_bound()
-        img = self.to_img()
+        self._img = self.to_img()
+        if self._observers is not None:
+            # margin line
+            color = self._observers.color
+            width = self._observers.width
+            self._img[:width, :, :] = color
+            self._img[-width:, :, :] = color
+            self._img[:, :width, :] = color
+            self._img[:, -width:, :] = color
+            self._observers.set_pos(self.axis, self.pos)
+            img = self._observers.update_line(self.axis, self._img, True)
+        else:
+            img = self._img
         # midt = time.perf_counter()
+        self._update(img)
+
+    def update_line(self):
+        if self.server is None:
+            return
+        img = self._observers.update_line(self.axis, self._img, False)
+        self._update(img)
+
+    def _update(self, img):
         self.nodes = self.server.scene.add_image(
             self.axis,
             img,
@@ -220,3 +249,80 @@ class VolumeSlice:
         self._fg_cmaps_preset.append(cmap)
         self.fg_clims.append(clim)
         self.update_node(self.pos)
+
+
+
+class PosObserver:
+    def __init__(self, color=(1, 1, 1), width=1) -> None:
+        self.color = self.to_rgba(color)
+        self.width = int(width)
+        self.xaxis = 0
+        self.yaxis = 0
+        self.zaxis = 0
+        self._shape = None
+        self._linked_images = {}
+
+    def set_pos(self, axis, pos):
+        if axis == 'x':
+            self.xaxis = pos 
+        elif axis == 'y':
+            self.yaxis = pos 
+        else:
+            self.zaxis = pos
+
+    def link_image(self, image: VolumeSlice):
+        self._linked_images[image.axis] = image
+        self.set_pos(image.axis, image.pos)
+        image.add_observer(self)
+        self._shape = image.vol_shape
+
+    def update_line(self, axis, img_orig: np.ndarray, update_others = False):
+        img = img_orig.copy()
+        half_width = self.width // 2
+
+        def draw_line(arr, index, is_row):
+            start = max(0, index - half_width)
+            end = min(arr.shape[0] if is_row else arr.shape[1], index + half_width + 1)
+            
+            if not is_row:
+                arr[start:end, :] = self.color
+            else:
+                arr[:, start:end] = self.color
+
+        if axis == 'x':
+            draw_line(img, self.yaxis, False)
+            draw_line(img, self.zaxis, True)
+            if update_others:
+                self._linked_images['y'].update_line()
+                self._linked_images['z'].update_line()
+        elif axis == 'y':
+            draw_line(img, self.xaxis, False)
+            draw_line(img, self.zaxis, True)
+            if update_others:
+                self._linked_images['x'].update_line()
+                self._linked_images['z'].update_line()
+        else:
+            draw_line(img, self.xaxis, False)
+            draw_line(img, self.yaxis, True)
+            if update_others:
+                self._linked_images['x'].update_line()
+                self._linked_images['y'].update_line()
+
+        return img
+
+    def to_rgba(self, color):
+        try:
+            if isinstance(color, str) or not any([c > 1 for c in color]):
+                rgba = matplotlib_to_rgba(color)
+                r, g, b, a = rgba
+                r = int(round(r * 255))
+                g = int(round(g * 255))
+                b = int(round(b * 255))
+                a = int(round(a * 255))
+                return [r, g, b, a]
+            else:
+                if len(color) == 3:
+                    color = list(color) + [1]
+                return color
+        except (ValueError, TypeError) as e:
+            raise ValueError(f"Unknow color: {color}, {e}") from e

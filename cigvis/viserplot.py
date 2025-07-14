@@ -14,6 +14,7 @@ import cigvis
 from cigvis import colormap
 from cigvis.visernodes import (
     VolumeSlice,
+    PosObserver,
     SurfaceNode,
     MeshNode,
     LogPoints,
@@ -30,6 +31,9 @@ def create_slices(volume: np.ndarray,
                   clim: List = None,
                   cmap: str = 'Petrel',
                   nancolor=None,
+                  intersection_lines: bool = True,
+                  line_color='white',
+                  line_width=1,
                   **kwargs) -> List:
     """
     create a slice node
@@ -83,6 +87,11 @@ def create_slices(volume: np.ndarray,
                     nancolor=nancolor,
                     **kwargs,
                 ))
+
+    if intersection_lines:
+        observer = PosObserver(color=line_color, width=line_width)
+        for node in nodes:
+            observer.link_image(node)
 
     return nodes
 
