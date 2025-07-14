@@ -31,6 +31,8 @@ fx = np.fromfile(fxp, np.float32).reshape(ni, nx, nt)
 s1 = viserplot.create_server(8080)
 s2 = viserplot.create_server(8081)
 
+viserplot.link_servers([s1, s2])
+
 nodes1 = viserplot.create_slices(sx, cmap='gray', pos=[20, 20, 100])
 nodes2 = viserplot.create_slices(sx, cmap='gray', pos=[20, 20, 100])
 nodes2 = viserplot.add_mask(nodes2, fx, cmaps='jet', alpha=1, excpt='min')
