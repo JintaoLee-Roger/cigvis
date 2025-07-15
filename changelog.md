@@ -1,5 +1,13 @@
 # Changelog
 
+
+### v0.1.9
+
+- added intersection lines to make slices easier to distinguish
+- added a function to link multiple servers, so that we can synchronize multiple canvases (in different tabs).
+- the changed can be refered from this example [cigvis/gallery/viser/04](https://cigvis.readthedocs.io/en/latest/gallery/viser/04_comparsion.html#sphx-glr-gallery-viser-04-comparsion-py).
+
+
 ### v0.1.8
 
 - added support for RGB/RGBA format 3D volumes as input
