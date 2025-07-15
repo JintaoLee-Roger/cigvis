@@ -183,7 +183,7 @@ After calling `viserplot.plot3D`, it will generate some logs like:
 
 If you are running the code on your local machine, just open `0.0.0.0:8080` in your browser to see the image. If you are running the code on a remote server (yes, cigvis also works when connected remotely using ssh!), you can enter `{ip}:8080` in the browser to see the visualization (`ip` is the ip of remote server, e.g., `222.195.77.88:8080`).
 
-It is not possible to divide multiple canvases in the browser, i.e. it is not possible to visualize multiple canvases in a tab, which may cause some trouble when comparing different results. But we can use some tricks to achieve this, see this example ([cigvis/gallery/viser/04](https://cigvis.readthedocs.io/en/latest/gallery/viser/04_comparsion.html#sphx-glr-gallery-viser-04-comparsion-py)):
+It is not possible to divide multiple canvases in the browser, i.e. it is not possible to visualize multiple canvases in a tab, which may cause some trouble when comparing different results. But we can use some tricks to achieve this, see this example ([cigvis/gallery/viser/04](https://cigvis.readthedocs.io/en/latest/gallery/viser/04_comparison.html#sphx-glr-gallery-viser-04-comparison-py)):
 
 ![04](https://raw.githubusercontent.com/JintaoLee-Roger/images/main/cigvis/viser/04.gif)
 

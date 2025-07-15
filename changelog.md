@@ -5,7 +5,7 @@
 
 - added intersection lines to make slices easier to distinguish
 - added a function to link multiple servers, so that we can synchronize multiple canvases (in different tabs).
-- the changed can be refered from this example [cigvis/gallery/viser/04](https://cigvis.readthedocs.io/en/latest/gallery/viser/04_comparsion.html#sphx-glr-gallery-viser-04-comparsion-py).
+- the changed can be refered from this example [cigvis/gallery/viser/04](https://cigvis.readthedocs.io/en/latest/gallery/viser/04_comparison.html#sphx-glr-gallery-viser-04-comparison-py).
 
 
 ### v0.1.8
