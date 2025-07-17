@@ -1,6 +1,11 @@
 # Changelog
 
 
+### v0.2.0
+
+- fixed `stratum` colormap.
+
+
 ### v0.1.9
 
 - added intersection lines to make slices easier to distinguish
