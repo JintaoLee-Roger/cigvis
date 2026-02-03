@@ -134,10 +134,16 @@ class VisCanvas(scene.SceneCanvas, EventMixin, LightMixin, AxisMixin):
         self.hover_on = None  # visual node that mouse hovers on, None by default
         self.selected2 = []
 
+        self._prompt_callback = None
+
         self.freeze()
 
         if visual_nodes is not None:
             self.add_nodes(visual_nodes, grid)
+
+    def set_prompt_callback(self, cb):
+        """cb signature: cb(xyz: tuple[int,int,int], hover_on, event)"""
+        self._prompt_callback = cb
 
     def update_camera(self, azimuth, elevation, fov):
         self.azimuth = azimuth

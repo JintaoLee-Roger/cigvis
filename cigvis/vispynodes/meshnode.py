@@ -12,7 +12,7 @@ import numpy as np
 from vispy.scene import Mesh
 import cigvis
 from cigvis import colormap
-from cigvis.meshs import surface2mesh, arbline2mesh
+from cigvis.meshs import surface2mesh, arbline2mesh, points2quad
 from cigvis.utils import surfaceutils
 from .axis_aligned_image import AxisAlignedImage
 import matplotlib.colors as mcolors
@@ -32,6 +32,7 @@ class SurfaceNode(Mesh):
                  offset: List = [0, 0, 0],
                  interval: List = [1, 1, 1],
                  interp: bool = True,
+                 quad: bool = False,
                  anti_rot: bool = True,
                  shading: str = 'smooth',
                  dyn_light: bool = True,
@@ -50,6 +51,7 @@ class SurfaceNode(Mesh):
         self._clims = clims
         self.is_instance = False
         self._interp = interp
+        self._quad = quad
         self.render_type = -1  # 0 for colors, 1 for vetex_values, and 2 for vetex_colors
         self.dyn_light = dyn_light
 
@@ -87,20 +89,27 @@ class SurfaceNode(Mesh):
         assert surf.ndim == 2, f"surface's shape must be (ni, nx), or (N, 3), but got {surf.shape}"
         if surf.shape[1] == 3:
             surf = (surf + self.offset) / self.interval
-            surf = surfaceutils.fill_grid(surf[:, :3], self.shape, self._interp, method, fill) # yapf: disable
+            if not self._quad:
+                surf = surfaceutils.fill_grid(surf[:, :3], self.shape, self._interp, method, fill) # yapf: disable
         else:
             surf = (surf + self.offset[2]) / self.interval[2]
-        assert surf.shape == self.shape, f"surf's shape {surf.shape} dosen't match the input shape {self.shape}"
-        self.surf = surf
+        
+        if not self._quad:
+            assert surf.shape == self.shape, f"surf's shape {surf.shape} dosen't match the input shape {self.shape}"
+            self.surf = surf
 
-        self.mask = np.logical_or(surf < 0, np.isnan(surf))
-        vertices, faces = surface2mesh(
-            surf,
-            self.mask,
-            anti_rot=self.anti_rot,
-            step1=self.steps[0],
-            step2=self.steps[1],
-        )
+            self.mask = np.logical_or(surf < 0, np.isnan(surf))
+            vertices, faces = surface2mesh(
+                surf,
+                self.mask,
+                anti_rot=self.anti_rot,
+                step1=self.steps[0],
+                step2=self.steps[1],
+            )
+        else:
+            self.surf = surf 
+            self.mask = np.zeros(self.shape).astype(bool)
+            vertices, faces = points2quad(surf)
         return vertices, faces
 
     @property

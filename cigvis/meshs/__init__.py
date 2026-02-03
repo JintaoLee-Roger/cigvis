@@ -5,5 +5,5 @@
 
 from .merge import merge_meshs
 from .points import *
-from .surfaces import surface2mesh, arbline2mesh
+from .surfaces import surface2mesh, arbline2mesh, points2quad
 from .indicator import north_pointer_mesh

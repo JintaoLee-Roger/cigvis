@@ -15,15 +15,24 @@ from vispy.visuals import MeshVisual, CompoundVisual
 
 class EventMixin:
 
+    def _get_xyz_from_event(self, event):
+        hover_on = self.visual_at(event.pos)
+        if hasattr(hover_on, 'get_click_pos3d'):
+            xyz = hover_on.get_click_pos3d(event)
+            return xyz, hover_on
+        return None, hover_on
+
     def on_mouse_press(self, event):
         # Hold <Alt> and click left to print position
-        if keys.ALT in event.modifiers:
-            ## 屏幕/画布坐标系 Canvas Coordinates
-            # print(event.pos)
-
+        if (event.button == 1) and (keys.ALT in event.modifiers) and (keys.CONTROL not in event.modifiers) and (not self.drag_mode):
             hover_on = self.visual_at(event.pos)
             if hasattr(hover_on, 'get_click_pos3d'):
-                print(hover_on.get_click_pos3d(event))
+                xyz = hover_on.get_click_pos3d(event)
+
+                if self._prompt_callback is None:
+                    print(hover_on.axis, xyz)
+                else:
+                    self._prompt_callback(xyz, hover_on, event)
 
         # Hold <Ctrl> to enter drag mode or press <d> to toggle.
         if keys.CONTROL in event.modifiers or self.drag_mode:

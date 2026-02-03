@@ -104,3 +104,30 @@ def arbline2mesh(p, n3, anti_rot=True, vstep=1):
         faces[:, [1, 2]] = faces[:, [2, 1]]
 
     return vertices, faces.astype(int)
+
+
+
+def points2quad(p, r=0.5):
+    """
+    convert points to seperate quad meshes
+    """
+    x, y, z = p[:, 0], p[:, 1], p[:, 2]
+    mask = np.logical_and(~np.isnan(z), z > 0)
+    x, y, z = x[mask], y[mask], z[mask]
+    n_points = len(x)
+
+    # vertices offset (N, 4, 3)
+    offsets = np.array([
+        [-r, -r, 0], [r, -r, 0], [r, r, 0], [-r, r, 0],
+    ])
+    
+    base_coords = np.stack([x, y, z], axis=1) # (N, 3)
+    vertices = base_coords[:, np.newaxis, :] + offsets # (N, 4, 3)
+    vertices = vertices.reshape(-1, 3) # (4N, 3)
+
+    # a point represents two tri faces
+    indices = np.array([0, 1, 2, 0, 2, 3])
+    start_indices = np.arange(0, 4 * n_points, 4)[:, np.newaxis]
+    faces = (start_indices + indices).reshape(-1, 3)
+
+    return vertices.astype(np.float32), faces.astype(np.uint32)

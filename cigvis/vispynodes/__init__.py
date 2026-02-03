@@ -14,4 +14,5 @@ from .well_log import WellLog
 from .vis_canvas import VisCanvas
 from .meshnode import SurfaceNode, ArbLineNode
 from .axis3d import Axis3D
+from .volume_image import VolumeImage
 
