@@ -75,11 +75,11 @@ class load_theme:
                 key, value = line.split(":", 1)
                 key = key.strip()
                 value = value.strip()
-                # 使用 ast.literal_eval 安全地解析 Python 表达式
+                # Safely parse Python expressions with ast.literal_eval.
                 try:
                     value = ast.literal_eval(value)
                 except (ValueError, SyntaxError):
-                    pass  # 保留原字符串值
+                    pass  # Keep the original string value.
                 style_dict[key] = value
         return style_dict
 
@@ -143,8 +143,8 @@ class load_theme:
 def set_mixed_fonts(font_zh='SimHei'):
     """
     Parameters:
-    - fig: matplotlib.figure.Figure 对象
-    - font_zh: FontProperties 对象，用于中文文本
+    - fig: matplotlib.figure.Figure object
+    - font_zh: FontProperties object for Chinese text
     """
     fig = plt.gcf()
     for text in fig.findobj(match=plt.Text):

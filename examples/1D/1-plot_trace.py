@@ -28,17 +28,17 @@ sx = np.fromfile(sxp, np.float32).reshape(ni, nx, nt)
 
 trace = sx[100, 100, :]
 
-# 垂直显示
+# Vertical display
 # cigvis.plot1d(trace, dt=0.02, axis_label='Time / s', c='skyblue')
 
 fig, axes = plt.subplots(3, 1, figsize=(10, 8))
 
-# 水平显示
+# Horizontal display
 cigvis.plot1d(trace, orient='h', dt=0.02, ax=axes[0])
 
-# 填充模式
+# Fill mode
 
-# 填充波峰
+# Fill positive peaks
 cigvis.plot1d(trace,
               orient='h',
               dt=0.02,
@@ -46,7 +46,7 @@ cigvis.plot1d(trace,
               value_label='Amplitude',
               ax=axes[1])
 
-# 填充波谷
+# Fill negative troughs
 cigvis.plot1d(trace,
               orient='h',
               dt=0.02,

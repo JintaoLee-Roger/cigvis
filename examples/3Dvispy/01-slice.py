@@ -21,9 +21,14 @@ root = Path(__file__).resolve().parent.parent.parent
 
 seisp = root / 'data/co2/sx.dat'
 ni, nx, nt = 192, 192, 240
-sx = np.fromfile(seisp, np.float32).reshape(ni, nx, nt)
+# sx = np.fromfile(seisp, np.float32).reshape(ni, nx, nt)
+sx = np.random.randn(ni, nx, nt)
 
 nodes = cigvis.create_slices(sx, cmap='Petrel')
 nodes += cigvis.create_colorbar_from_nodes(nodes, 'Amplitude', select='slices')
 
-cigvis.plot3D(nodes, size=(700, 600), savename='example.png', xyz_axis=False)
+cigvis.plot3D(
+    nodes,
+    view=cigvis.Plot3DView(size=(700, 600), xyz_axis=False),
+    save=cigvis.Plot3DSave(path='example.png'),
+)

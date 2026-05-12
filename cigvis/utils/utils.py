@@ -10,6 +10,9 @@ import warnings
 import numpy as np
 import functools
 
+DEPRECATION_VERSION = '0.2.1'
+DEPRECATION_REMOVAL_VERSION = '0.4.0'
+
 
 def check_mmap(d: np.ndarray) -> None:
     if isinstance(d, np.memmap):
@@ -21,19 +24,30 @@ def check_mmap(d: np.ndarray) -> None:
                 f"file in some cases", UserWarning)
 
 
-def deprecated(custom_message=None, replacement=None):
+def deprecated(
+    custom_message=None,
+    replacement=None,
+    deprecated_in=DEPRECATION_VERSION,
+    remove_in=DEPRECATION_REMOVAL_VERSION,
+):
     """Decorator to mark functions as deprecated with an optional custom message
     and replacement function name.
 
     :param custom_message: (str) Custom deprecation message
     :param replacement: (str) The name of the replacement function
+    :param deprecated_in: (str) Version where the API was deprecated
+    :param remove_in: (str) Version where the API is scheduled for removal
     """
 
     def decorator(func):
 
         @functools.wraps(func)
         def new_func(*args, **kwargs):
-            message = f"Call to deprecated function {func.__name__}."
+            message = (
+                f"Call to deprecated function {func.__name__}. "
+                f"Deprecated since {deprecated_in}; scheduled for removal "
+                f"in {remove_in}."
+            )
             if replacement:
                 message += f" Use {replacement} instead."
             if custom_message:

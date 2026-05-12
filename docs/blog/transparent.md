@@ -1,188 +1,114 @@
-如何获得背景透明的图像
+如何保存透明背景图像
 =====================
 
-当使用 cigvis 或类似的绘图库时，默认保存的图像背景颜色可能不是透明的。然而，通过以下几个步骤，我们可以将背景设置为透明：
+从当前接口开始，cigvis 可以在保存截图时直接生成透明背景 PNG，不再需要先设置一个特殊背景色，再用额外脚本把该颜色替换成透明。
 
+## 直接保存透明背景
 
-## 1：使用超出colormap范围的背景色
-
-为了确保背景颜色与绘制的数据区分开，选择一个不会出现在绘图所使用的颜色映射中的颜色。例如：
-
-- 如果你使用的是 `jet` 颜色映射，避免使用蓝色、绿色或红色等颜色，这些都包含在渐变中。
-- 一个好的选择可能是 `(0, 255, 0)`（纯绿色）或 `(255, 0, 255)`（品红色）。
-
-下面是一个设置独特背景色的 cigvis 示例：
+如果希望 `plot3D` 在创建画布后立刻保存一张透明背景图，使用 `Plot3DSave(transparent_bg=True)`：
 
 ```python
 import numpy as np
 import cigvis
 from cigvis import colormap
 
-d = np.fromfile(xxxx).reshape(xxxx)
-rgt = np.fromfile(xxxx).reshape(xxxx)
+d = np.fromfile("sx.dat", np.float32).reshape(ni, nx, nt)
+rgt = np.fromfile("rgt.dat", np.float32).reshape(ni, nx, nt)
 
-nodes = cigvis.create_slices(d, cmap='gray')
-cmap = colormap.set_alpha('jet', 0.8)
+nodes = cigvis.create_slices(d, cmap="gray")
+cmap = colormap.set_alpha("jet", 0.8)
 nodes = cigvis.add_mask(nodes, rgt, cmaps=cmap)
 
-cigvis.plot3D(nodes, bgcolor=(1, 0, 1, 1))  # 设置背景为品红色
+cigvis.plot3D(
+    nodes,
+    view=cigvis.Plot3DView(size=(900, 700), show=False),
+    save=cigvis.Plot3DSave(
+        path="transparent.png",
+        transparent_bg=True,
+    ),
+)
 ```
 
-## 2: 将背景颜色替换为透明
-
-保存的 PNG 图像现在有一个自己设置的背景色。为了将其转换为透明背景，我们可以使用一个简单的 Python 脚本来替换背景颜色。以下是实现的代码：
+如果需要保存更高分辨率的图片，可以单独设置保存尺寸：
 
 ```python
-import sys
-from PIL import Image
-import numpy as np
-
-def set_background_transparent(input_path, output_path, bg_color=(0, 255, 0)):
-    """
-    Replace the specified background color with transparency in a PNG image.
-
-    :param input_path: Path to the input PNG file.
-    :param output_path: Path to save the output PNG file with transparency.
-    :param bg_color: The RGB color to be made transparent (default is green).
-    """
-    # Load the image and ensure it has an alpha channel
-    img = Image.open(input_path).convert("RGBA")
-    data = np.array(img)
-
-    # Extract RGBA channels
-    r, g, b, a = data[:, :, 0], data[:, :, 1], data[:, :, 2], data[:, :, 3]
-
-    # Create a mask for the background color
-    mask = (r == bg_color[0]) & (g == bg_color[1]) & (b == bg_color[2])
-
-    # Set the alpha channel to 0 for the background pixels
-    data[mask, 3] = 0
-
-    # Save the modified image
-    result = Image.fromarray(data, "RGBA")
-    result.save(output_path)
-
-# Main entry point for command-line usage
-if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        print("Usage: python make_transparent.py <input_file> <output_file>")
-        sys.exit(1)
-
-    input_file = sys.argv[1]
-    output_file = sys.argv[2]
-    set_background_transparent(input_file, output_file)
+cigvis.plot3D(
+    nodes,
+    view=cigvis.Plot3DView(size=(900, 700), show=False),
+    save=cigvis.Plot3DSave(
+        path="transparent_3000.png",
+        size=(3000, 2000),
+        output_policy="fit",
+        transparent_bg=True,
+    ),
+)
 ```
 
-运行脚本，将保存的 PNG 图像中的背景颜色替换为透明：
-```bash
-python make_transparent.py raw.png transparent.png
-```
+`view.size` 控制交互窗口或基础画布大小；`save.size` 控制导出图片大小。`output_policy="fit"` 会保持内容比例，不强行拉伸画面。
 
-![ex](https://raw.githubusercontent.com/JintaoLee-Roger/images/main/cigvis/blogs/transparent.png)
+## 交互后按 s 保存
 
+交互窗口里按 `s` 保存的是调整视角后的当前画面。这个快捷键保存默认使用透明背景，不需要额外传入 `Plot3DSave(transparent_bg=True)`。`save=...` 只控制创建画布时是否自动保存一张图。
 
+## 旧方法
+
+旧版本常见做法是设置一个不会出现在 colormap 中的背景色，例如品红色或纯绿色，然后在保存后用 Pillow 把这个背景色替换为透明。这种方法容易误伤图像中真实存在的同色像素，因此新代码应优先使用 `transparent_bg=True`。
 
 
 # English
 
-When working with cigvis or similar plotting libraries, the default background color of a saved plot might not be transparent. However, we can make it transparent by leveraging a few steps:
+How to Save Images with a Transparent Background
+=================================================
 
-1. Set the background to a unique color during plotting.
-2.	Save the plot as a PNG file.
-3.	Post-process the saved PNG to replace the unique background color with transparency.
+cigvis can now save transparent-background PNG files directly. You no longer need to render with a special background color and replace that color in a post-processing step.
 
-This article walks you through these steps, with a Python script to automate the final step.
+## Save Transparent PNG Directly
 
-### Step 1: Use a Background Color Outside the Colormap Range
-
-To ensure the background is distinguishable from your plotted data, choose a color that does not appear in the colormap used for the plot. For example:
-
-- If you are using the jet colormap, avoid colors like blue, green, or red that are part of the gradient.
-- A good choice might be (0, 255, 0) (pure green) or (255, 0, 255) (magenta).
-
-Here is an example of setting a unique background color in cigvis:
+If you want `plot3D` to save a transparent-background image immediately after creating the canvas, use `Plot3DSave(transparent_bg=True)`:
 
 ```python
 import numpy as np
 import cigvis
 from cigvis import colormap
 
-d = np.fromfile(xxxx).reshape(xxxx)
-rgt = np.fromfile(xxxx).reshape(xxxx)
+d = np.fromfile("sx.dat", np.float32).reshape(ni, nx, nt)
+rgt = np.fromfile("rgt.dat", np.float32).reshape(ni, nx, nt)
 
-nodes = cigvis.create_slices(d, cmap='gray')
-cmap = colormap.set_alpha('jet', 0.8)
+nodes = cigvis.create_slices(d, cmap="gray")
+cmap = colormap.set_alpha("jet", 0.8)
 nodes = cigvis.add_mask(nodes, rgt, cmaps=cmap)
 
-cigvis.plot3D(nodes, bgcolor=(1, 0, 1, 1))
-
-# save
+cigvis.plot3D(
+    nodes,
+    view=cigvis.Plot3DView(size=(900, 700), show=False),
+    save=cigvis.Plot3DSave(
+        path="transparent.png",
+        transparent_bg=True,
+    ),
+)
 ```
 
-### Step 2: Replace the Background Color with Transparency
-
-The saved PNG now has a solid background color. To make it transparent, we can replace the background color (e.g., green) with transparency using a simple Python script. Below is the implementation:
-
-Python Script for Transparency
-
-Save this script as make_transparent.py:
+For a higher-resolution export, set `save.size`:
 
 ```python
-import sys
-from PIL import Image
-import numpy as np
-
-def set_background_transparent(input_path, output_path, bg_color=(0, 255, 0)):
-    """
-    Replace the specified background color with transparency in a PNG image.
-
-    :param input_path: Path to the input PNG file.
-    :param output_path: Path to save the output PNG file with transparency.
-    :param bg_color: The RGB color to be made transparent (default is green).
-    """
-    # Load the image and ensure it has an alpha channel
-    img = Image.open(input_path).convert("RGBA")
-    data = np.array(img)
-
-    # Extract RGBA channels
-    r, g, b, a = data[:, :, 0], data[:, :, 1], data[:, :, 2], data[:, :, 3]
-
-    # Create a mask for the background color
-    mask = (r == bg_color[0]) & (g == bg_color[1]) & (b == bg_color[2])
-
-    # Set the alpha channel to 0 for the background pixels
-    data[mask, 3] = 0
-
-    # Save the modified image
-    result = Image.fromarray(data, "RGBA")
-    result.save(output_path)
-
-# Main entry point for command-line usage
-if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        print("Usage: python make_transparent.py <input_file> <output_file>")
-        sys.exit(1)
-
-    input_file = sys.argv[1]
-    output_file = sys.argv[2]
-    set_background_transparent(input_file, output_file)
+cigvis.plot3D(
+    nodes,
+    view=cigvis.Plot3DView(size=(900, 700), show=False),
+    save=cigvis.Plot3DSave(
+        path="transparent_3000.png",
+        size=(3000, 2000),
+        output_policy="fit",
+        transparent_bg=True,
+    ),
+)
 ```
 
-### Step 3: Automating the Transparency Process
+`view.size` controls the interactive window or base canvas size; `save.size` controls the exported image size. `output_policy="fit"` preserves the content aspect ratio instead of stretching it.
 
-Run the script on your saved PNG image to replace the background color with transparency:
+## Press s After Interaction
 
-```bash
-python make_transparent.py plot_with_background.png plot_with_transparent_bg.png
-```
+Pressing `s` in the interactive window saves the current adjusted view. This shortcut uses a transparent background by default; you do not need to pass `Plot3DSave(transparent_bg=True)`. The `save=...` option only controls the initial automatic export when the canvas is created.
 
-- Input: plot_with_background.png (plot with a unique background color).
-- Output: plot_with_transparent_bg.png (plot with a transparent background).
+## Legacy Approach
 
-### Summary
-
-1. Set a unique background color during plotting: Choose a color not in the colormap.
-2.	Save the plot as a PNG file: Retain the unique background.
-3.	Post-process to make the background transparent: Use the provided Python script to replace the background color with transparency.
-
-With this approach, you can efficiently generate plots with transparent backgrounds, suitable for presentations, overlays, or further processing.
+Older workflows often used a unique background color, such as magenta or green, and then replaced that color with transparency using Pillow. This can accidentally remove real pixels with the same color, so new code should prefer `transparent_bg=True`.

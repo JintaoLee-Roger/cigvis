@@ -25,6 +25,7 @@ class VolumeSlice:
                  scale=-1,
                  nancolor=None):
         self._server = None  # viser.ViserServer
+        self._name = f'slice-{axis}-{pos}'
         self.volume = volume
         self.axis = axis
         self.pos = pos
@@ -79,6 +80,15 @@ class VolumeSlice:
         if not isinstance(server, viser.ViserServer):
             raise ValueError("server must be type: viser.ViserServer")
         self._server = server
+        self.update_node(self.pos)
+
+    @property
+    def name(self):
+        return self._name
+
+    @name.setter
+    def name(self, name):
+        self._name = str(name)
         self.update_node(self.pos)
 
     @property
@@ -182,7 +192,7 @@ class VolumeSlice:
 
     def _update(self, img):
         self.nodes = self.server.scene.add_image(
-            self.axis,
+            self.name,
             img,
             self.render_width,
             self.render_height,
@@ -293,20 +303,26 @@ class PosObserver:
             draw_line(img, self.yaxis, False)
             draw_line(img, self.zaxis, True)
             if update_others:
-                self._linked_images['y'].update_line()
-                self._linked_images['z'].update_line()
+                if 'y' in self._linked_images:
+                    self._linked_images['y'].update_line()
+                if 'z' in self._linked_images:
+                    self._linked_images['z'].update_line()
         elif axis == 'y':
             draw_line(img, self.xaxis, False)
             draw_line(img, self.zaxis, True)
             if update_others:
-                self._linked_images['x'].update_line()
-                self._linked_images['z'].update_line()
+                if 'x' in self._linked_images:
+                    self._linked_images['x'].update_line()
+                if 'z' in self._linked_images:
+                    self._linked_images['z'].update_line()
         else:
             draw_line(img, self.xaxis, False)
             draw_line(img, self.yaxis, True)
             if update_others:
-                self._linked_images['x'].update_line()
-                self._linked_images['y'].update_line()
+                if 'x' in self._linked_images:
+                    self._linked_images['x'].update_line()
+                if 'y' in self._linked_images:
+                    self._linked_images['y'].update_line()
 
         return img
 

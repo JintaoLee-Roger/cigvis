@@ -23,7 +23,8 @@ In plotly, for a seismic volume,
 """
 
 from itertools import product
-from typing import Callable, List, Tuple, Dict, Union
+from dataclasses import dataclass, fields, is_dataclass
+from typing import Any, Callable, List, Tuple, Dict, Union
 import warnings
 import os
 import numpy as np
@@ -40,19 +41,20 @@ from cigvis.vispynodes import (
     Axis3D,
     NorthPointer,
 )
+from cigvis.vispynodes.shading_filter import HeadlightShadingFilter
 
 from vispy.scene.visuals import Mesh, Line
 import vispy
-from vispy.gloo.util import _screenshot
 from scipy.ndimage import gaussian_filter
 from skimage.measure import marching_cubes
 
 import cigvis
 from cigvis import colormap
 from cigvis.utils import surfaceutils
-from cigvis.utils import vispyutils
 import cigvis.utils as utils
 from cigvis.meshs import surface2mesh
+from cigvis.vispynodes.screenshot import _normalize_render_size, _save_canvas_png
+from cigvis.vispynodes.volume_image import VolumeImage
 
 __all__ = [
     "create_slices",
@@ -62,16 +64,105 @@ __all__ = [
     "create_colorbar_from_nodes",
     "create_surfaces",
     "set_surface_color_by_slices_nodes",
+    "create_bodies",
     "create_bodys",
+    "create_line_logs",
     "create_Line_logs",
     "create_well_logs",
     "create_points",
     "create_fault_skin",
     "create_arbitrary_line",
     "create_axis",
+    "create_volume_image",
+    "Plot3DView",
+    "Plot3DSave",
+    "Plot3DColorbar",
+    "Plot3DGui",
     "plot3D",
     "run",
 ]
+
+
+@dataclass
+class Plot3DView:
+    """Options that control the 3D view/canvas created by ``plot3D``."""
+
+    size: Tuple[int, int] = (800, 600)
+    show: bool = True
+    grid: Tuple[int, int] = None
+    share: bool = False
+    xyz_axis: bool = False
+    cbar_region_ratio: float = 0.125
+    bgcolor: Any = None
+    scale_factor: float = None
+    center: Any = None
+    fov: float = None
+    azimuth: float = None
+    elevation: float = None
+    zoom_factor: float = None
+    axis_scales: Tuple[float, float, float] = None
+    title: str = None
+    keys: str = None
+
+
+@dataclass
+class Plot3DSave:
+    """Options that control screenshot/export behavior in ``plot3D``."""
+
+    path: Any = None
+    directory: Any = None
+    size: Union[Tuple[int, int], str] = None
+    mode: str = 'offscreen'
+    output_policy: str = 'fit'
+    transparent_bg: bool = False
+    pad_color: Any = 'white'
+    bgcolor: Any = None
+
+
+@dataclass
+class Plot3DColorbar:
+    """Options used when updating/saving colorbars in ``plot3D``."""
+
+    save: bool = False
+    name: str = 'cbar.png'
+    cmap: Any = None
+    clim: Any = None
+    discrete: bool = None
+    disc_ticks: Any = None
+    dpi_scale: float = None
+    label_str: str = None
+    label_color: Any = None
+    label_size: Any = None
+    tick_size: Any = None
+    border_width: Any = None
+    border_color: Any = None
+
+
+@dataclass
+class Plot3DGui:
+    """Options that control the optional PySide6 GUI shell in ``plot3D``."""
+
+    enabled: bool = True
+    theme: str = 'dark'
+
+
+def _set_visual_metadata(visual, **metadata) -> None:
+    did_unfreeze = False
+    if hasattr(visual, 'unfreeze'):
+        try:
+            visual.unfreeze()
+            did_unfreeze = True
+        except Exception:
+            did_unfreeze = False
+    try:
+        for key, value in metadata.items():
+            setattr(visual, key, value)
+    finally:
+        if did_unfreeze and hasattr(visual, 'freeze'):
+            try:
+                visual.freeze()
+            except Exception:
+                pass
 
 
 def create_slices(volume: np.ndarray,
@@ -139,6 +230,7 @@ def create_slices(volume: np.ndarray,
         pos = {'x': x, 'y': y, 'z': z}
     assert isinstance(pos, Dict)
 
+    cmap_name = cmap if isinstance(cmap, str) else getattr(cmap, 'name', None)
     if clim is None:
         clim = utils.auto_clim(volume)
     cmap = colormap.cmap_to_vispy(cmap)
@@ -156,6 +248,18 @@ def create_slices(volume: np.ndarray,
     image_nodes += image_dict['x']
     image_nodes += image_dict['y']
     image_nodes += image_dict['z']
+    for image_node in image_nodes:
+        _set_visual_metadata(
+            image_node,
+            _cigvis_cmap_name=cmap_name,
+            _cigvis_interpolation=interpolation,
+        )
+        for image in getattr(image_node, 'overlaid_images', [image_node]):
+            _set_visual_metadata(
+                image,
+                _cigvis_cmap_name=cmap_name,
+                _cigvis_interpolation=interpolation,
+            )
 
     lines_nodes = []
 
@@ -300,6 +404,10 @@ def add_mask(nodes: List,
         raise ValueError("'cmaps' cannot be 'None'")
     if not isinstance(cmaps, List):
         cmaps = [cmaps] * len(volumes)
+    cmap_names = [
+        cmap if isinstance(cmap, str) else getattr(cmap, 'name', None)
+        for cmap in cmaps
+    ]
     if not isinstance(alpha, List):
         alpha = [alpha] * len(volumes)
     if not isinstance(excpt, List):
@@ -327,13 +435,84 @@ def add_mask(nodes: List,
                 texture_format=texture_format,
                 preproc_f=preproc_funcs[i],
             )
+            image = node.overlaid_images[-1]
+            _set_visual_metadata(
+                image,
+                _cigvis_cmap_name=cmap_names[i],
+                _cigvis_interpolation=interpolation[i],
+            )
 
     return nodes
 
 
+def create_volume_image(
+    volume: np.ndarray,
+    pos: Union[List, Dict] = None,
+    clim: List = None,
+    cmap: str = 'Petrel',
+    interpolation: str = 'linear',
+    **kwargs,
+) -> VolumeImage:
+    """
+    Create a VolumeImage manager for one base volume.
+
+    VolumeImage is preferred over create_slices when the volume data may be
+    replaced dynamically (e.g., AI workflow: image -> model -> new image).
+    Use replace_overlay_volume() + refresh_overlay() to update overlays without
+    rebuilding the scene.
+
+    Parameters
+    ----------
+    volume : np.ndarray
+        3D array
+    pos : List or Dict, optional
+        Slice positions, same format as create_slices. Default: x=0, y=0, z=-1
+    clim : List, optional
+        [vmin, vmax]. Default: auto from data percentile
+    cmap : str
+        Colormap name
+    interpolation : str
+        Interpolation method
+
+    Returns
+    -------
+    vi : VolumeImage
+        Call vi.nodes() to get the list of nodes for plot3D
+    """
+    if clim is None:
+        clim = utils.auto_clim(volume)
+
+    vi = VolumeImage(
+        volume,
+        cmap=cmap,
+        clim=clim,
+        interpolation=interpolation,
+        **kwargs,
+    )
+
+    if pos is None:
+        shape, _ = utils.get_shape(volume, cigvis.is_line_first())
+        pos = dict(x=[0], y=[0], z=[shape[2] - 1])
+    if isinstance(pos, list):
+        assert len(pos) == 3
+        if isinstance(pos[0], list):
+            x, y, z = pos
+        else:
+            x, y, z = [pos[0]], [pos[1]], [pos[2]]
+        pos = {'x': x, 'y': y, 'z': z}
+
+    vi.create_slices(
+        x_pos=pos.get('x'),
+        y_pos=pos.get('y'),
+        z_pos=pos.get('z'),
+    )
+    return vi
+
+
 @utils.deprecated(
-    "The code is based on 'vispy' backbend, and this function will be removed in the feature version.\nExample:\nnodes=cigvis.create_overlay(bg, [fg1, fg2], fg_cmap=['jet', 'gray']\n==> change to ==>\nnodes=cigvis.create_slices(bg)\nnodes=cigvis.add_mask(nodes, [fg1, fg2], cmaps=['jet', 'gray'])\n",
-    "`cigvis.add_mask`")
+    "This compatibility wrapper keeps the old vispy overlay API working.",
+    "`cigvis.create_slices` plus `cigvis.add_mask`",
+)
 def create_overlay(bg_volume: np.ndarray,
                    fg_volume: np.ndarray,
                    pos: Union[List, Dict] = None,
@@ -347,49 +526,13 @@ def create_overlay(bg_volume: np.ndarray,
                    cbar_type: str = 'fg',
                    **kwargs) -> List:
     """
-    create a overlied slice node
+    Deprecated compatibility wrapper for the old overlay-slice API.
 
-    Parameters
-    ----------
-    bg_volume : array-like
-        3D array, background volume
-    fg_volume : array-like or List
-        3D array(s), foreground volume(s)
-    pos : List or Dict
-        init position of the slices, can be a List or Dict, such as:
-        ```
-        pos = [0, 0, 200] # x: 0, y: 0, z: 200
-        pos = [[0, 200], [9], []] # x: 0 and 200, y: 9, z: None
-        pos = {'x': [0, 200], 'y': [1], z: []}
-        ```
-    bg_clim : List
-        [vmin, vmax] for background slices plotting
-    fg_clim : List
-        [vmin, vmax] for foreground slices plotting
-    bg_cmap : str or Colormap
-        colormap for background slices, it can be str or matplotlib's Colormap or vispy's Colormap
-    fg_cmap : str or Colormap
-        colormap for foreground slices, it can be str or matplotlib's Colormap or vispy's Colormap
-    bg_interpolation : str
-        interpolation method for background slices. 
-    fg_interpolation : str
-        interpolation method. If the values of the slices is discrete, we recommand 
-        set as 'nearest'
-    return_cbar : bool
-        return a colorbar
-    cbar_type : str
-        'fg' for foreground colorbar, 'bg' for background colorbar
-    kwargs : Dict
-        other kwargs for `volume_slices`
-
-    Returns
-    -------
-    slices_nodes : List
-        list of slice nodes
+    Prefer ``create_slices(bg_volume)`` followed by ``add_mask(...)`` for new
+    code. This function intentionally preserves the old return shape.
     """
-    # check
     utils.check_mmap(bg_volume)
-    if not isinstance(fg_volume, List):
+    if not isinstance(fg_volume, list):
         fg_volume = [fg_volume]
     for volume in fg_volume:
         assert bg_volume.shape == volume.shape
@@ -401,30 +544,28 @@ def create_overlay(bg_volume: np.ndarray,
     else:
         nt = bg_volume.shape[0]
 
-    # set pos
     if pos is None:
         pos = dict(x=[0], y=[0], z=[nt - 1])
-    if isinstance(pos, List):
+    if isinstance(pos, list):
         assert len(pos) == 3
-        if isinstance(pos[0], List):
+        if isinstance(pos[0], list):
             x, y, z = pos
         else:
             x, y, z = [pos[0]], [pos[1]], [pos[2]]
         pos = {'x': x, 'y': y, 'z': z}
-    assert isinstance(pos, Dict)
+    assert isinstance(pos, dict)
 
     if bg_clim is None:
         bg_clim = utils.auto_clim(bg_volume)
     if fg_clim is None:
         fg_clim = [utils.auto_clim(v) for v in fg_volume]
-    if not isinstance(fg_clim[0], (List, Tuple)):
+    if not isinstance(fg_clim[0], (list, tuple)):
         fg_clim = [fg_clim]
 
     bg_cmap = colormap.cmap_to_vispy(bg_cmap)
-
     if fg_cmap is None:
         raise ValueError("'fg_cmap' cannot be 'None'")
-    if not isinstance(fg_cmap, List):
+    if not isinstance(fg_cmap, list):
         fg_cmap = [fg_cmap] * len(fg_volume)
     for i in range(len(fg_cmap)):
         fg_cmap[i] = colormap.cmap_to_vispy(fg_cmap[i])
@@ -439,7 +580,8 @@ def create_overlay(bg_volume: np.ndarray,
         pos['z'],
         cmaps=[bg_cmap, *fg_cmap],
         clims=[bg_clim, *fg_clim],
-        interpolation=[bg_interpolation, *fg_interpolation])
+        interpolation=[bg_interpolation, *fg_interpolation],
+    )
 
     nodes = []
     nodes += nodes_dict['x']
@@ -454,14 +596,8 @@ def create_overlay(bg_volume: np.ndarray,
             cmap = bg_cmap
             clim = bg_clim
 
-        kwargs = vispyutils.get_valid_kwargs('colorbar', **kwargs)
-
-        discrete = kwargs.get('discrete', False)
-        disc_ticks = kwargs.get('disc_ticks', None)
-
-        if discrete and disc_ticks is None:
-            v = np.unique(fg_volume)
-            kwargs['disc_ticks'] = [v]
+        if kwargs.get('discrete', False) and kwargs.get('disc_ticks', None) is None:
+            kwargs['disc_ticks'] = [np.unique(fg_volume[0])]
 
         cbar = create_colorbar(cmap, clim, **kwargs)
         return nodes, cbar
@@ -695,7 +831,16 @@ def create_surfaces(surfs: List[np.ndarray],
         surfs = [surfs]
 
     if any([sf.ndim > 2 for sf in surfs]):
-        warnings.warn("The usage of surfs with ndim > 2, i.e., combining the color matrix (or value) directly with the surf, has been deprecated since version v0.1.0 and will be completely removed in version v0.1.5. We recommend placing the value or color matrix inside value_type. Please refer to `examples/3Dvispy/12-surf-overlay.py` for guidance.", DeprecationWarning, stacklevel=2) # yapf: disable
+        warnings.warn(
+            "Passing surfs with ndim > 2, i.e. combining the color matrix "
+            "or value directly with the surf, is deprecated. Deprecated "
+            "since 0.1.0; scheduled for removal in "
+            f"{utils.DEPRECATION_REMOVAL_VERSION}. Put the value or color "
+            "matrix in value_type instead. See "
+            "`examples/3Dvispy/12-surf-overlay.py` for guidance.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         surfs = surfs[0] if len(surfs) == 1 else surfs
         return _create_surfaces_old(surfs, volume, value_type, clim, cmap, 1, shape, interp, step1=step1, step2=step2, **kwargs) # yapf: disable
 
@@ -794,9 +939,9 @@ def _create_surfaces_old(surfs: List[np.ndarray],
     utils.check_mmap(volume)
     utils.check_mmap(surfs)
     line_first = cigvis.is_line_first()
-    method = kwargs.get('method', 'cubic')
-    fill = kwargs.get('fill', -1)
-    anti_rot = kwargs.get('anti_rot', True)
+    method = kwargs.pop('method', 'cubic')
+    fill = kwargs.pop('fill', -1)
+    anti_rot = kwargs.pop('anti_rot', True)
 
     # add surface
     if not isinstance(surfs, List):
@@ -859,8 +1004,6 @@ def _create_surfaces_old(surfs: List[np.ndarray],
             c = c[::step1, ::step2, ...]
             c = c[~mask].flatten().reshape(-1, channel)
 
-        mesh_kwargs = vispyutils.get_valid_kwargs('mesh', **kwargs)
-
         if kwargs.get('color', None) is not None:
             v = None
             c = None
@@ -872,7 +1015,7 @@ def _create_surfaces_old(surfs: List[np.ndarray],
                     vertex_values=v,
                     vertex_colors=c,
                     shading='smooth',
-                    **mesh_kwargs)
+                    **kwargs)
 
         if v is not None and c is None and kwargs.get('color', None) is None:
             mesh.cmap = cmap
@@ -881,13 +1024,12 @@ def _create_surfaces_old(surfs: List[np.ndarray],
         mesh_nodes.append(mesh)
 
     if return_cbar:
-        kwargs = vispyutils.get_valid_kwargs('colorbar', **kwargs)
-        cbar = create_colorbar(cmap, clim, **kwargs)
+        cbar = create_colorbar(cmap, clim)
         return mesh_nodes, cbar
     return mesh_nodes
 
 
-def create_bodys(volume: np.ndarray,
+def create_bodies(volume: np.ndarray,
                  level: float,
                  margin: float = None,
                  color: str = 'yellow',
@@ -940,8 +1082,10 @@ def create_bodys(volume: np.ndarray,
     # marching_cubes in skimage is more faster
     # F3 demo, salt body, skimage: 3.04s, vispy: 21.44s
     verts, faces, normals, values = marching_cubes(volume, level)
-    kwargs = vispyutils.get_valid_kwargs('mesh', **kwargs)
-    body = Mesh(verts, faces, color=color, shading=shading, **kwargs)
+    _shading = None if (dyn_light and shading is not None) else shading
+    body = Mesh(verts, faces, color=color, shading=_shading, **kwargs)
+    if dyn_light and shading is not None:
+        body.attach(HeadlightShadingFilter(shading=shading))
     body.unfreeze()
     body.dyn_light = dyn_light
     body.freeze()
@@ -955,12 +1099,22 @@ def create_bodys(volume: np.ndarray,
     return [body]
 
 
-def create_Line_logs(logs: Union[List, np.ndarray],
+@utils.deprecated(
+    "The function was renamed for spelling consistency.",
+    "`cigvis.create_bodies`",
+)
+def create_bodys(*args, **kwargs) -> List:
+    """Deprecated alias for :func:`create_bodies`."""
+    return create_bodies(*args, **kwargs)
+
+
+def create_line_logs(logs: Union[List, np.ndarray],
                      value_type: str = 'depth',
                      cmap: str = 'jet',
                      clim: List = None,
                      width: float = 6.0,
                      return_cbar: bool = False,
+                     cbar_kw: Dict = None,
                      **kwargs):
     """
     create Line nodes to plot logs data
@@ -990,7 +1144,12 @@ def create_Line_logs(logs: Union[List, np.ndarray],
     kwargs : Dict
         parameters for vispy.scene.visuals.Line
     """
-    warnings.warn("We recommand use 'create_well_logs' instead", UserWarning)
+    warnings.warn(
+        "create_line_logs is discouraged but not scheduled for removal. "
+        "Prefer `cigvis.create_well_logs` for new code.",
+        UserWarning,
+        stacklevel=2,
+    )
     if isinstance(logs, np.ndarray):
         assert logs.shape[1] >= 3
         logs = [logs]
@@ -1019,17 +1178,24 @@ def create_Line_logs(logs: Union[List, np.ndarray],
         ]
 
     log_nodes = []
-    line_kwargs = vispyutils.get_valid_kwargs('line', **kwargs)
     for p, v in zip(pos, values):
         if v.ndim == 1:
             v = colormap.get_colors_from_cmap(cmap, clim, v)
-        log_nodes.append(Line(p, width=width, color=v, **line_kwargs))
+        log_nodes.append(Line(p, width=width, color=v, **kwargs))
 
     if return_cbar:
-        kwargs = vispyutils.get_valid_kwargs('colorbar', **kwargs)
-        cbar = create_colorbar(cmap, clim, **kwargs)
+        cbar = create_colorbar(cmap, clim, **(cbar_kw or {}))
         return log_nodes, cbar
     return log_nodes
+
+
+@utils.deprecated(
+    "The function was renamed to snake_case.",
+    "`cigvis.create_line_logs`",
+)
+def create_Line_logs(*args, **kwargs):
+    """Deprecated alias for :func:`create_line_logs`."""
+    return create_line_logs(*args, **kwargs)
 
 
 def create_well_logs(points: np.ndarray,
@@ -1200,12 +1366,14 @@ def create_points(points: np.ndarray,
             assert len(vertex_colors) == len(points)
             kwargs['vertex_colors'] = np.repeat(vertex_colors, 8, axis=0)
 
-    mesh_kwargs = vispyutils.get_valid_kwargs('mesh', **kwargs)
+    _shading = None if (dyn_light and shading is not None) else shading
     point_mesh = Mesh(vertices=vertices,
                       faces=faces,
                       color=color,
-                      shading=shading,
-                      **mesh_kwargs)
+                      shading=_shading,
+                      **kwargs)
+    if dyn_light and shading is not None:
+        point_mesh.attach(HeadlightShadingFilter(shading=shading))
     point_mesh.unfreeze()
     point_mesh.dyn_light = dyn_light
     point_mesh.freeze()
@@ -1238,11 +1406,14 @@ def create_fault_skin(skin_dir,
     if clim is None and values is not None:
         clim = [values.min(), values.max()]
 
+    _shading = None if (dyn_light and shading is not None) else shading
     node = Mesh(vertices,
                 faces,
                 vertex_values=values,
-                shading=shading,
+                shading=_shading,
                 **kwargs)
+    if dyn_light and shading is not None:
+        node.attach(HeadlightShadingFilter(shading=shading))
     node.unfreeze()
     node.dyn_light = dyn_light
     node.freeze()
@@ -1373,66 +1544,282 @@ def create_axis(
     return nodes
 
 
+def _dict_option(value, name: str) -> Dict:
+    if value is None:
+        return {}
+    if is_dataclass(value):
+        return {
+            field.name: getattr(value, field.name)
+            for field in fields(value)
+            if getattr(value, field.name) is not None
+        }
+    if not isinstance(value, dict):
+        raise TypeError(
+            f"plot3D({name}=...) must be a dict or a cigvis Plot3D* "
+            "configuration object."
+        )
+    return dict(value)
+
+
+def _save_option(value) -> Dict:
+    if value is None:
+        return {}
+    if isinstance(value, (str, os.PathLike)):
+        return {'path': value}
+    if is_dataclass(value):
+        out = _dict_option(value, 'save')
+    elif isinstance(value, dict):
+        out = dict(value)
+    else:
+        raise TypeError(
+            "plot3D(save=...) must be a path string, dict, or "
+            "cigvis.Plot3DSave."
+        )
+    if 'directory' in out:
+        out['dir'] = out.pop('directory')
+    if 'savename' in out:
+        out['path'] = out.pop('savename')
+    if 'savedir' in out:
+        out['dir'] = out.pop('savedir')
+    return out
+
+
+def _gui_option(value) -> Dict:
+    if isinstance(value, bool):
+        return {'enabled': value}
+    if value is None:
+        return {'enabled': False}
+    if is_dataclass(value):
+        out = _dict_option(value, 'gui')
+        out.setdefault('enabled', True)
+        return out
+    if isinstance(value, dict):
+        out = dict(value)
+        out.setdefault('enabled', True)
+        return out
+    raise TypeError("plot3D(gui=...) must be a bool, dict, or cigvis.Plot3DGui.")
+
+
+def _warn_plot3d_legacy(keys: List[str]) -> None:
+    if not keys:
+        return
+    joined = ', '.join(keys)
+    warnings.warn(
+        "plot3D top-level parameter(s) are deprecated: "
+        f"{joined}. Use view={{...}}, save={{...}}, cbar={{...}}, "
+        "and gui={...} so each option has a clear owner. Deprecated since "
+        f"{utils.DEPRECATION_VERSION}; scheduled for removal in "
+        f"{utils.DEPRECATION_REMOVAL_VERSION}.",
+        FutureWarning,
+        stacklevel=3,
+    )
+
+
+def _build_plot3d_options(view, save, cbar, gui, legacy_kwargs):
+    view_cfg = _dict_option(view, 'view')
+    save_cfg = _save_option(save)
+    cbar_cfg = _dict_option(cbar, 'cbar') if not isinstance(cbar, bool) else {'save': cbar}
+    gui_cfg = _gui_option(gui)
+    legacy_used = []
+    ignored = []
+
+    layout_keys = {'grid', 'share', 'xyz_axis'}
+    canvas_keys = {
+        'size', 'show', 'bgcolor', 'scale_factor', 'center', 'fov', 'azimuth',
+        'elevation', 'zoom_factor', 'axis_scales', 'title', 'keys',
+    }
+    view_keys = layout_keys | canvas_keys | {'cbar_region_ratio'}
+
+    for key in list(legacy_kwargs):
+        value = legacy_kwargs.pop(key)
+        if key == 'view':
+            view_cfg.update(_dict_option(value, 'view'))
+        elif key == 'layout':
+            view_cfg.update(_dict_option(value, 'layout'))
+            legacy_used.append(key)
+        elif key == 'canvas':
+            view_cfg.update(_dict_option(value, 'canvas'))
+            legacy_used.append(key)
+        elif key in view_keys:
+            view_cfg[key] = value
+            legacy_used.append(key)
+        elif key == 'savename':
+            save_cfg['path'] = value
+            legacy_used.append(key)
+        elif key == 'savedir':
+            save_cfg['dir'] = value
+            legacy_used.append(key)
+        elif key == 'save_cbar':
+            cbar_cfg['save'] = value
+            legacy_used.append(key)
+        elif key == 'cbar_name':
+            cbar_cfg['name'] = value
+            legacy_used.append(key)
+        elif key == 'gui_theme':
+            gui_cfg['theme'] = value
+            legacy_used.append(key)
+        elif key == 'canvas_kw':
+            view_cfg.update(_dict_option(value, 'canvas_kw'))
+            legacy_used.append(key)
+        elif key == 'save_kw':
+            save_cfg.update(_dict_option(value, 'save_kw'))
+            legacy_used.append(key)
+        elif key == 'cbar_kw':
+            cbar_cfg.update(_dict_option(value, 'cbar_kw'))
+            legacy_used.append(key)
+        elif key == 'dyn_light':
+            ignored.append(key)
+        else:
+            legacy_kwargs[key] = value
+
+    if legacy_kwargs:
+        unknown = ', '.join(sorted(legacy_kwargs))
+        raise TypeError(
+            "Ambiguous plot3D parameter(s): "
+            f"{unknown}. Put view/canvas settings in view={{...}}, save "
+            "settings in save={...}, and colorbar settings in cbar={...}."
+        )
+
+    _warn_plot3d_legacy(legacy_used)
+    if ignored:
+        warnings.warn(
+            "plot3D(dyn_light=...) no longer controls node lighting. Pass "
+            "dyn_light to create_surfaces/create_bodies/create_points/"
+            "create_fault_skin when creating the nodes. Deprecated since "
+            f"{utils.DEPRECATION_VERSION}; scheduled for removal in "
+            f"{utils.DEPRECATION_REMOVAL_VERSION}.",
+            FutureWarning,
+            stacklevel=3,
+        )
+
+    allowed_cbar = {field.name for field in fields(Plot3DColorbar)}
+    allowed_gui = {field.name for field in fields(Plot3DGui)}
+    view_extra = sorted(set(view_cfg) - view_keys)
+    if view_extra:
+        raise TypeError(
+            f"Unknown plot3D view option(s): {', '.join(view_extra)}. "
+            "Use cigvis.Plot3DView to see supported options."
+        )
+    cbar_extra = sorted(set(cbar_cfg) - allowed_cbar)
+    if cbar_extra:
+        raise TypeError(
+            f"Unknown plot3D cbar option(s): {', '.join(cbar_extra)}. "
+            "Use cigvis.Plot3DColorbar to see supported options."
+        )
+    gui_extra = sorted(set(gui_cfg) - allowed_gui)
+    if gui_extra:
+        raise TypeError(
+            f"Unknown plot3D gui option(s): {', '.join(gui_extra)}. "
+            "Use cigvis.Plot3DGui to see supported options."
+        )
+
+    grid = view_cfg.pop('grid', None)
+    share = bool(view_cfg.pop('share', False))
+    xyz_axis = bool(view_cfg.pop('xyz_axis', False))
+
+    size = _normalize_render_size(view_cfg.pop('size', (800, 600)),
+                                  "view['size']")
+    show_canvas = bool(view_cfg.pop('show', True))
+    cbar_region_ratio = float(view_cfg.pop('cbar_region_ratio', 0.125))
+    save_cbar = bool(cbar_cfg.pop('save', False))
+    cbar_name = cbar_cfg.pop('name', 'cbar.png')
+    if not save_cbar:
+        cbar_name = None
+
+    save_path = save_cfg.pop('path', None)
+    save_dir = str(save_cfg.pop('dir', './'))
+
+    gui_enabled = bool(gui_cfg.get('enabled', False))
+    gui_theme = gui_cfg.get('theme', 'dark')
+
+    return {
+        'grid': grid,
+        'share': share,
+        'xyz_axis': xyz_axis,
+        'size': size,
+        'show_canvas': show_canvas,
+        'cbar_region_ratio': cbar_region_ratio,
+        'cbar_name': cbar_name,
+        'cbar_kw': cbar_cfg,
+        'canvas_kw': view_cfg,
+        'save_path': save_path,
+        'save_dir': save_dir,
+        'save_kw': save_cfg,
+        'gui_enabled': gui_enabled,
+        'gui_theme': gui_theme,
+    }
+
+
 def plot3D(nodes: List,
-           grid: Tuple = None,
-           share: bool = False,
-           xyz_axis: bool = False,
-           cbar_region_ratio: float = 0.125,
-           savename: str = None,
-           savedir: str = './',
-           save_cbar: bool = False,
-           cbar_name: str = 'cbar.png',
-           size: Tuple = (800, 600),
+           *args,
+           view: Union[Dict, Plot3DView] = None,
+           save: Union[str, Dict, Plot3DSave] = None,
+           cbar: Union[bool, Dict, Plot3DColorbar] = None,
+           gui: Union[bool, Dict, Plot3DGui] = False,
            run_app: bool = True,
-           dyn_light: bool = True,
            **kwargs):
     """
-    plot nodes in a 3D canvas
+    Plot 3D vispy nodes.
 
-    Parameters
-    -----------
-    nodes : List of VisualNodes
-        VisualNodes
-    grid : Tuple
-        grid of the canvas
-    share : bool
-        link all cameras when grid is not None
-    xyz_axis : bool
-        add a xyz_axis to each canvas
-    cbar_region_ratio : float
-        colorbar region ration, i.e., (width*cbar_region_ratio, hight)
-    savename : str
-        if is not None, will save the figure when rendering
-    save_cbar : bool
-        save colorbar individual if there is any `Colorbar` in nodes
-    cbar_name : str
-        the save colorbar image name
-    size : Tuple
-        canvas size
-    run_app : bool
-        run the app or not
-    dyn_light : bool
-        dynamic light or not,
-    kwargs : Dict
-        other parameters pass to `Colorbar` and `VisCanvas`
-    
-    Examples
-    ----------
-    >>> node1, node2 = [mesh1, mesh2, image1], [mesh3, image2, image3]
-    >>> plot3D(node1) # one subcanvas in the canvas
-    >>> plot3D([node1, node2], grid=(1, 2)) # two subcanvas in the canvas
+    New code should group options by ownership:
+
+    >>> cigvis.plot3D(
+    ...     nodes,
+    ...     view=cigvis.Plot3DView(
+    ...         size=(900, 700),
+    ...         grid=(1, 2),
+    ...         share=True,
+    ...         xyz_axis=False,
+    ...         bgcolor='white',
+    ...     ),
+    ...     save=cigvis.Plot3DSave(
+    ...         path='example.png',
+    ...         size=(3000, 2000),
+    ...         output_policy='fit',
+    ...         transparent_bg=True,
+    ...     ),
+    ...     cbar=cigvis.Plot3DColorbar(save=False),
+    ...     gui=cigvis.Plot3DGui(enabled=True, theme='dark'),
+    ... )
+
+    Plain dicts are also accepted for ``view``/``save``/``cbar``/``gui``.
+    Use ``view={'show': False}`` with ``save={...}`` to save offscreen
+    without showing a window.
+
+    Legacy top-level parameters such as ``size=``, ``savename=``, ``grid=``,
+    ``layout={...}``, and ``canvas={...}`` are still recognized for now, but
+    they emit a migration warning. Unknown loose ``**kwargs`` now raise an
+    error because they are ambiguous.
     """
+    if args:
+        raise TypeError(
+            "plot3D accepts only `nodes` positionally. Use "
+            "view={'grid': ..., 'share': ..., 'xyz_axis': ...} for view "
+            "options."
+        )
+
+    opts = _build_plot3d_options(view, save, cbar, gui, kwargs)
+    grid = opts['grid']
+    share = opts['share']
+    xyz_axis = opts['xyz_axis']
+    size = opts['size']
+    show_canvas = opts['show_canvas']
+    cbar_region_ratio = opts['cbar_region_ratio']
+    cbar_name = opts['cbar_name']
+    cbar_kw = opts['cbar_kw']
+    canvas_kw = opts['canvas_kw']
+    save_path = opts['save_path']
+    save_dir = opts['save_dir']
+    save_kw = opts['save_kw']
+
     if grid is None:
         w, h = size
     else:
         h = size[1] / grid[0]
         w = size[0] / grid[1]
     cbar_size = (w * cbar_region_ratio, h)
-    if not save_cbar:
-        cbar_name = None
 
     # find cbars
-    cbar_kwargs = vispyutils.get_valid_kwargs('colorbar', **kwargs)
     cbar_list = []
     if isinstance(nodes, Dict):
         for k, v in nodes.items():
@@ -1479,30 +1866,53 @@ def plot3D(nodes: List,
             nodes.append(XYZAxis())
 
     # update cbars' size
-    for cbar in cbar_list:
-        cbar.update_params(cbar_size=cbar_size,
-                           savedir=savedir,
-                           cbar_name=cbar_name,
-                           **cbar_kwargs)
+    for cbar_node in cbar_list:
+        cbar_node.update_params(cbar_size=cbar_size,
+                                savedir=save_dir,
+                                cbar_name=cbar_name,
+                                **cbar_kw)
 
-    kwargs = vispyutils.get_valid_kwargs('viscanvas', **kwargs)
-    canvas = VisCanvas(visual_nodes=nodes,
-                       grid=grid,
-                       share=share,
-                       cbar_region_ratio=cbar_region_ratio,
-                       savedir=savedir,
-                       size=size,
-                       dyn_light=dyn_light,
-                       **kwargs)
+    if opts['gui_enabled']:
+        from cigvis.gui.gui3d import gui3d as _gui3d
 
-    canvas.show()
+        gui_canvas_kw = dict(canvas_kw)
+        gui_canvas_kw.update({
+            'size': size,
+            'cbar_region_ratio': cbar_region_ratio,
+            'savedir': save_dir,
+        })
+        win = _gui3d(
+            nodes=nodes,
+            grid=grid,
+            share=share,
+            theme=opts['gui_theme'],
+            canvas_kwargs=gui_canvas_kw,
+            run_app=False,
+        )
+        if save_path is not None:
+            _save_canvas_png(win.canvas.canvas, save_path, save_dir, save_kw)
+        if run_app:
+            vispy.app.run()
+        return win
 
-    if savename is not None:
-        screen_shot = _screenshot()
-        vispy.io.write_png(savedir + savename, screen_shot)
+    canvas_obj = VisCanvas(visual_nodes=nodes,
+                           grid=grid,
+                           share=share,
+                           cbar_region_ratio=cbar_region_ratio,
+                           savedir=save_dir,
+                           size=size,
+                           **canvas_kw)
 
-    if run_app:
+    if show_canvas:
+        canvas_obj.show()
+
+    if save_path is not None:
+        _save_canvas_png(canvas_obj, save_path, save_dir, save_kw)
+
+    if run_app and show_canvas:
         vispy.app.run()
+
+    return canvas_obj
 
 
 def run():

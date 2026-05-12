@@ -45,8 +45,10 @@ nodes4 += cigvis.create_axis(sx.shape, 'axis', axis_pos=[3, 3, 1], color='blue',
 
 
 cigvis.plot3D([nodes1, nodes2, nodes3, nodes4],
-              xyz_axis=False,
-              grid=(2, 2),
-              share=True,
-              size=(900, 800),
-              savename='example.png')
+              view=cigvis.Plot3DView(
+                  xyz_axis=False,
+                  grid=(2, 2),
+                  share=True,
+                  size=(900, 800),
+              ),
+              save=cigvis.Plot3DSave(path='example.png'))

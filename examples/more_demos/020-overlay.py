@@ -20,7 +20,7 @@ root = Path(__file__).resolve().parent.parent.parent
 
 def show(bg, fg):
     """
-    叠加地震和类别(地震相), alpha=0.5
+    Overlay seismic data and facies labels with alpha=0.5.
     """
     fg[fg == 1] = 100
     values = np.unique(fg)
@@ -38,7 +38,7 @@ def show(bg, fg):
         disc_ticks=[values.astype(int)],
     )
     """
-    mask 值最小的一类, 但是在colorbar中显示最小的一类(白色)
+    Mask the smallest class, but keep it visible in the colorbar (white).
     """
     values = np.unique(fg)
     colors = ['red', 'green', 'yellow', 'blue', (0, 0.5, 0.5)]
@@ -55,7 +55,7 @@ def show(bg, fg):
         disc_ticks=[values.astype(int)],
     )
     """
-    mask 最小的一类, 同时 colorbar 也去除 
+    Mask the smallest class and remove it from the colorbar.
     """
     values = np.unique(fg)
     colors = ['red', 'green', 'yellow', 'blue', (0, 0.5, 0.5)]
@@ -75,7 +75,7 @@ def show(bg, fg):
         disc_ticks=[values.astype(int)],
     )
     """
-    mask 最大的一类
+    Mask the largest class.
     """
     values = np.unique(fg)
     colors = ['red', 'green', 'yellow', 'blue', (0, 0.5, 0.5)]
@@ -94,7 +94,7 @@ def show(bg, fg):
         disc_ticks=[values.astype(int)],
     )
     """
-    mask 特定的值, 不是最小或最大, 可以是多个值
+    Mask selected values, not necessarily the minimum or maximum; multiple values are allowed.
     """
     values = np.unique(fg)
     colors = ['red', 'green', 'yellow', 'blue', (0, 0.5, 0.5)]
@@ -118,10 +118,12 @@ def show(bg, fg):
     )
 
     cigvis.plot3D([nodes1, nodes2, nodes3, nodes4, nodes5],
-                  grid=(2, 3),
-                  size=(1300, 800),
-                  cbar_region_ratio=0.24,
-                  savename='example.png')
+                  view=cigvis.Plot3DView(
+                      grid=(2, 3),
+                      size=(1300, 800),
+                      cbar_region_ratio=0.24,
+                  ),
+                  save=cigvis.Plot3DSave(path='example.png'))
 
 
 if __name__ == '__main__':

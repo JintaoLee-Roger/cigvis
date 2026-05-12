@@ -11,17 +11,16 @@
 # -----------------------------------------------------------------------------
 
 from typing import Dict, List, Tuple, Union
-import warnings
 from vispy import scene
 
 import cigvis
 from .indicator import XYZAxis, NorthPointer
 from .axis3d import Axis3D
 from .colorbar import Colorbar
-from .canvas_mixin import EventMixin, LightMixin, AxisMixin
+from .canvas_mixin import EventMixin, AxisMixin
 
 
-class VisCanvas(scene.SceneCanvas, EventMixin, LightMixin, AxisMixin):
+class VisCanvas(scene.SceneCanvas, EventMixin, AxisMixin):
     """
     A canvas that automatically draw all contents in a 3D seismic
     visualization scene, which may include 3D seismic volume slices, axis
@@ -59,9 +58,6 @@ class VisCanvas(scene.SceneCanvas, EventMixin, LightMixin, AxisMixin):
         camera zoom factor
     axis_scales : Tuple
         axis scale, default is (1, 1, 1)
-    auto_range : bool
-        default is True
-    
     savedir : str
         the dir to save sreenshot when press <s>
     title : str
@@ -85,29 +81,33 @@ class VisCanvas(scene.SceneCanvas, EventMixin, LightMixin, AxisMixin):
         elevation: float = 50,
         zoom_factor: float = 1.0,
         axis_scales: Tuple = (1.0, 1.0, 1.0),
-        auto_range: bool = True,
-
-        # for light
-        dyn_light: bool = True,
 
         # for save
         savedir: str = './',
         title: str = 'Seismic3D',
+        shortcut_save_kw: Dict = None,
+
+        # keyboard handling: 'interactive' enables vispy built-in shortcuts
+        # (e.g. Escape to close); pass None to disable them (e.g. inside a GUI)
+        keys: str = 'interactive',
     ):
 
         self.pngDir = savedir
+        self._shortcut_save_kw = (
+            {'mode': 'screen', 'transparent_bg': True}
+            if shortcut_save_kw is None
+            else dict(shortcut_save_kw)
+        )
 
         # Create a SceneCanvas obj and unfreeze it so we can add more
         # attributes inside.
         scene.SceneCanvas.__init__(self,
                                    title=title,
-                                   keys='interactive',
+                                   keys=keys,
                                    size=size,
                                    bgcolor=bgcolor)
 
         self.unfreeze()
-        if not auto_range:
-            warnings.warn("`auto_range` is deprecated and will be remove in the future version. Just ignore this parameter.", DeprecationWarning, stacklevel=2) # yapf: disable
 
         self.nodes = {}
 
@@ -121,7 +121,6 @@ class VisCanvas(scene.SceneCanvas, EventMixin, LightMixin, AxisMixin):
         self.zoom_factor = zoom_factor
         self.share = share
 
-        self.dyn_light = dyn_light
 
         axis_scales = list(axis_scales)
         for i, r in enumerate(cigvis.is_axis_reversed()):
@@ -183,11 +182,9 @@ class VisCanvas(scene.SceneCanvas, EventMixin, LightMixin, AxisMixin):
         if self.share:
             self.link_cameras()
 
-        if not self.share:
-            for view, nodes in zip(self.view, self.nodes.values()):
-                self._attach_light(view, nodes)
-        else:
-            self._attach_light_share(self.view[-1], self.nodes)
+        for view in self.view:
+            view.camera.azimuth = self.azimuth
+            view.camera.elevation = self.elevation
 
         self.freeze()
 
@@ -267,8 +264,6 @@ class VisCanvas(scene.SceneCanvas, EventMixin, LightMixin, AxisMixin):
         """
         add nodes to a viewbox
         """
-        # set azimuth=0 and elevation=0, for convenient lighting
-        # change them in self._attach_light() function
         view.camera = scene.cameras.TurntableCamera(
             # self.camera = scene.cameras.ArcballCamera(
             scale_factor=self.scale_factor,
@@ -361,8 +356,6 @@ class VisCanvas(scene.SceneCanvas, EventMixin, LightMixin, AxisMixin):
         node.name = '0-0'
         self.nodes['0,0'].append(node)
         self.view[0].add(node)
-        if hasattr(node, 'shading_filter'):
-            node.shading_filter.light_dir = self.view[0].camera.transform.map(self.initial_light_dir)[:3] # yapf: disable
         self.freeze()
 
     def remove_node(self, node, delete=True):

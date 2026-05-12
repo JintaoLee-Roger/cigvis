@@ -58,8 +58,8 @@ def volume_slices(volumes: Union[np.ndarray, List],
 
     Returns
     -------
-    visual_nodes : List[AxisAlignedImage]
-        return seismic_canvas's visual_nodes
+    visual_nodes : Dict[str, List[AxisAlignedImage]]
+        return a dict with keys 'x', 'y', 'z', each mapping to a list of AxisAlignedImage nodes
     """
     volumes, preproc_funcs, cmaps, clims, interpolation, n_vol, shape = _process_args(
         volumes, preproc_funcs, cmaps, clims, interpolation)
@@ -127,7 +127,7 @@ def _process_args(volumes: Union[np.ndarray, List],
           and len(cmaps) >= n_vol
         assert isinstance(clims, (tuple, list)) \
           and len(clims) >= n_vol \
-          and len(clims[0]) == 2 or clims[0] is None
+          and (len(clims[0]) == 2 or clims[0] is None)
         for vol in volumes:
             assert vol.shape == volumes[0].shape
     else:

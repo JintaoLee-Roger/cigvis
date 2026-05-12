@@ -27,7 +27,7 @@ sx = np.fromfile(sxp, np.float32).reshape(ni, nx, nt)
 
 trace = sx[100, 100, :]
 
-# 垂直显示
+# Vertical display
 cigvis.plot1d(trace,
               dt=0.02,
               axis_label='Time / s',

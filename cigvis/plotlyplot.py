@@ -2,7 +2,7 @@
 # Computational and Interpretation Group (CIG),
 # University of Science and Technology of China (USTC).
 # All rights reserved.
-"""
+r"""
 Functions for drawing 3D seismic figure using plotly
 ----------------------------------------------------
 
@@ -271,8 +271,8 @@ def create_overlay(bg_volume: np.ndarray,
             z=[None],
             mode='markers',
             marker=dict(
-                colorscale=fg_cmap,  # 与 vertexcolor 对应的 colorscale
-                cmin=fg_clim[0],  # 手动设置 colorscale 范围
+                colorscale=fg_cmap,  # Colorscale corresponding to vertexcolor
+                cmin=fg_clim[0],  # Explicit colorscale range
                 cmax=fg_clim[1],
                 colorbar=dict(title="Seismic Amplitude",
                               titleside="right",
@@ -336,20 +336,20 @@ def create_surfaces(
                 cmax=vmax,
                 showscale=show_cbar,
                 # flatshading=False,
-                # 光照效果
+                # Lighting effect
                 lighting=dict(ambient=0.1,
                               diffuse=0.9,
                               specular=0.5,
                               roughness=0.3,
                               fresnel=0.5),
 
-                # 光源位置
+                # Light position
                 lightposition=dict(x=100, y=200, z=300)))
 
     return traces
 
 
-def create_Line_logs(logs, cmap='jet', line_width=8):
+def create_line_logs(logs, cmap='jet', line_width=8):
     """
     logs can be a np.ndarray (one log), or List of np.ndarray (muti-logs).
     each element's shape is (N, 3) or (N, 4).
@@ -387,7 +387,7 @@ def create_well_logs(*args, **kwargs):
     use Mesh3D to create tube logs
     """
     raise NotImplementedError(
-        "`create_well_logs` currently not supported in the jupyter, please run it with a .py file. If you must run in jupyter, please consider use `create_Line_logs`"
+        "`create_well_logs` currently not supported in the jupyter, please run it with a .py file. If you must run in jupyter, please consider use `create_line_logs`"
     )  # noqa: E501
 
 
@@ -413,7 +413,7 @@ def create_points(points, color='red', size=3, sym='square'):
     return [trace]
 
 
-def create_bodys(volume, level, margin: float = None, color='yellow'):
+def create_bodies(volume, level, margin: float = None, color='yellow'):
     if margin is not None:
         if isinstance(volume, np.memmap):
             assert volume.mode != 'r', "margin will modify the volume, set `mode='c'` instead of `mode='r'` in np.memmap"
@@ -443,14 +443,14 @@ def create_bodys(volume, level, margin: float = None, color='yellow'):
         color=color,
         showscale=False,
         flatshading=False,
-        # 光照效果
+        # Lighting effect
         lighting=dict(ambient=0.1,
                       diffuse=0.9,
                       specular=0.5,
                       roughness=0.3,
                       fresnel=0.5),
 
-        # 光源位置
+        # Light position
         lightposition=dict(x=100, y=200, z=300))
 
     return [trace]

@@ -29,7 +29,7 @@ def show(bg, fg, fx):
                                                 label_str='RGT',
                                                 select='mask')
     """
-    mask RGT 的底部 (mask fg > 120)
+    Mask the bottom part of the RGT volume (mask fg > 120).
     """
     cmap2 = colormap.set_alpha_except_max('jet', 0.5)
     nodes2 = cigvis.create_slices(bg, pos=[[36], [28], [84]], cmap='gray')
@@ -80,11 +80,13 @@ def show(bg, fg, fx):
                                                 select='mask')
 
     cigvis.plot3D([nodes1, nodes2, nodes3, nodes4],
-                  grid=(2, 2),
-                  size=(1000, 700),
-                  cbar_region_ratio=0.18,
-                  share=True,
-                  savename='example.png')
+                  view=cigvis.Plot3DView(
+                      grid=(2, 2),
+                      size=(1000, 700),
+                      cbar_region_ratio=0.18,
+                      share=True,
+                  ),
+                  save=cigvis.Plot3DSave(path='example.png'))
 
 
 if __name__ == '__main__':

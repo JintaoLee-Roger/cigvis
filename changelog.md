@@ -1,6 +1,65 @@
 # Changelog
 
 
+### v0.3.0
+
+This release reorganizes the public plotting APIs, replaces the old desktop GUI,
+and separates backend-specific interfaces more explicitly.
+
+**Added**
+
+- Added structured `plot3D` option objects:
+  - `cigvis.Plot3DView` for canvas, layout, and camera settings.
+  - `cigvis.Plot3DSave` for screenshots and offscreen export.
+  - `cigvis.Plot3DColorbar` for colorbar export settings.
+  - `cigvis.Plot3DGui` for the optional PySide6 GUI shell.
+- Added high-resolution/offscreen screenshot export options, including `save.size`, `output_policy`, and `transparent_bg`.
+- Added `plot3D(..., gui=True)` integration with the modern 3D GUI shell, so existing `plot3D` nodes can be opened with a lightweight control panel.
+- Added `VolumeImage` and `create_volume_image` for managing a base volume plus mutable overlays without replacing slice callbacks; this is now the preferred internal path for GUI-style workflows that update masks or overlays repeatedly.
+- Added camera-relative `HeadlightShadingFilter` for mesh, surface, point, and well-log lighting. Lighting is now attached to the visual node itself rather than globally managed by `VisCanvas`.
+- Added Gaussian splat rendering (`Splat`) for dense point/voxel-style displays.
+- Added a Panel+Plotly `sliceviewer` backend for SSH/Jupyter-friendly 2D viewing of 2D/3D/4D arrays, including runtime dimension selection and automatic two-largest-dimension defaults for thin-volume workflows.
+- Added terminal entry points for the 3D GUI:
+  - `vis-gui3d`
+
+**Changed**
+
+- Replaced the old PyQt5 GUI package with the modern PySide6 GUI implementation. The old `gui` package has been removed and replaced by the new GUI implementation.
+- Simplified the 3D GUI sidebar and removed GUI-level Shading/Lighting controls. Mesh, surface, point, and well-log lighting should now be configured when creating nodes, for example through `create_surfaces(..., shading=..., dyn_light=...)`.
+- Fixed surface interpolation handling and added quad rendering support for point-style surfaces.
+- Removed the old `VisCanvas` light-management mixin; camera-relative lighting is now handled by `HeadlightShadingFilter` on each visual.
+- `plot3D` no longer uses `dyn_light` as a canvas-level option; node lighting is controlled at node creation time.
+- `cigvis` no longer switches its top-level `create_*` functions to Plotly implementations automatically inside Jupyter notebooks. The top-level `cigvis.create_*` functions are the VisPy API when VisPy is available.
+- Plotly functions are now backend-specific: use `cigvis.plotlyplot.create_*` explicitly for Plotly workflows. Do not rely on `cigvis.create_*` in notebooks to mean Plotly.
+- Renamed Plotly helpers to snake_case, including `plotlyplot.create_bodies` and `plotlyplot.create_line_logs`.
+- `vispy` is now a core dependency; desktop GUI dependencies moved from PyQt5 to PySide6 through the `gui` extra.
+- Added the `sliceviewer` optional dependency extra.
+- Added `sliceviewer.build_layout(...)` and `sliceviewer.show(..., launch=False)` for tests or embedding without starting a Panel server.
+- Improved `sliceviewer` defaults and layout: local serving now binds to `localhost` by default, and the control panel uses a compact high-contrast sidebar with display-axis, fixed-index, aspect, and comparison-grid controls.
+- Cleaned stale kwarg filtering helpers from `cigvis.utils.vispyutils`; new user-facing `plot3D` options are exposed through the `Plot3D*` dataclasses instead.
+- Cleaned colormap helpers by removing old deprecated helpers/parameters such as `blend_two_arrays`, `blend_multiple`, `includevispy`, and `forvispy`.
+- Renamed `AxisAlignedImage.set_visable` to `set_visible`.
+- Fixed several small Viser/volume-slice issues, including linked-line updates when some axes are absent and the "parameters" GUI label typo.
+- Updated examples, README, and docs to use the new `plot3D(view=..., save=..., cbar=..., gui=...)` API style.
+- Updated transparent-background documentation to use `Plot3DSave(transparent_bg=True)` instead of post-processing a special background color.
+- Updated user-facing comments and examples to use English comments consistently.
+
+**Breaking / Migration Notes**
+
+- In Jupyter notebooks, use `from cigvis import plotlyplot` and call `plotlyplot.create_*` / `plotlyplot.plot3D(...)` for Plotly output. Do not expect `cigvis.create_*` to dispatch to Plotly automatically.
+- Plotly notebook code should use the Plotly namespace and snake_case names, e.g. `plotlyplot.create_bodies` and `plotlyplot.create_line_logs`.
+- For VisPy rendering, keep using `cigvis.create_*` and `cigvis.plot3D(...)`.
+- For remote/browser 3D visualization, use `cigvis.viserplot`.
+- For lightweight remote/browser 2D slice viewing, use `cigvis.sliceviewer`.
+
+**Deprecated**
+
+- Deprecated legacy top-level `plot3D` parameters such as `size=`, `savename=`, `grid=`, `share=`, `xyz_axis=`, and `cbar_region_ratio=`. These are deprecated since `0.2.1` and scheduled for removal in `0.4.0`; use `view=...`, `save=...`, `cbar=...`, and `gui=...` instead.
+- Deprecated `plot3D(dyn_light=...)`. Pass `dyn_light` to node creation functions such as `create_surfaces`, `create_bodies`, `create_points`, or `create_fault_skin` instead. This compatibility path is scheduled for removal in `0.4.0`.
+- Deprecated spelling/legacy aliases remain available in the top-level VisPy API with warnings until `0.4.0`, including `create_bodys` and `create_Line_logs`; use `create_bodies` and `create_line_logs`.
+- Deprecated the old surface input style where value/color arrays are combined directly into `surfs` with `ndim > 2`. Put values or color matrices in `value_type` instead.
+
+
 ### v0.2.0
 
 - fixed `stratum` colormap.

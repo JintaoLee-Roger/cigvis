@@ -94,37 +94,6 @@ def arrs_to_image(arr, cmap, clim, as_uint8=False, nancolor=None):
     return out
 
 
-def blend_two_arrays(bg, fg, bg_cmap, fg_cmap, bg_clim, fg_clim):
-    """
-    blend two arrays using their cmap
-    """
-
-    warnings.warn(
-        "`blend_two_arrays` is deprecated and will be removed in a future version. Please use `arrs_to_image` instead."
-        " e.g., `arrs_to_image([bg, fg], [bg_cmap, fg_cmap], [bg_clim, fg_clim])`",
-        DeprecationWarning,
-        stacklevel=2)
-
-    out = arrs_to_image([bg, fg], [bg_cmap, fg_cmap], [bg_clim, fg_clim])
-
-    return out
-
-
-def blend_multiple(bg, fg, bg_cmap, fg_cmap, bg_clim, fg_clim):
-    """
-    """
-    warnings.warn(
-        "`blend_multiple` is deprecated and will be removed in a future version. Please use `arrs_to_image` instead."
-        " e.g., `arrs_to_image([bg, fg[0], ...], [bg_cmap, fg_cmap[0], ...], [bg_clim, fg_clim[0], ...])`",
-        DeprecationWarning,
-        stacklevel=2)
-
-    out = arrs_to_image([bg] + fg, [bg_cmap] + fg_cmap, [bg_clim] + fg_clim)
-
-    return out
-
-
-
 def fast_set_cmap(cmap, alpha, excpt):
     """
     fast set cmap by name, alpha and excpt,
@@ -142,20 +111,15 @@ def fast_set_cmap(cmap, alpha, excpt):
     return cmap
 
 
-def get_cmap_from_str(cmap: str, includevispy: bool = False):
+def get_cmap_from_str(cmap: str):
     """
     return a Colormap from a cmap string
-    
+
     Parameters
     ----------
     cmap : str
         colormap name string
-    includevispy : bool
-        deprecated, don't use it
     """
-    if includevispy:
-        warnings.warn("`includevispy` is deprecated and will be removed in a future version. Vispy's cmaps are automatically included.",DeprecationWarning,stacklevel=2)
-
     if not isinstance(cmap, str):
         return cmap
 
@@ -369,23 +333,20 @@ def reversed(cmap):
         raise ValueError("unkown cmap")
 
 
-def ramp(cmap, blow=0, up=1, alpha_min=0, alpha_max=1, forvispy=True):
+def ramp(cmap, blow=0, up=1, alpha_min=0, alpha_max=1):
     """
     Creates a modified colormap from an existing colormap, with adjustable transparency (alpha) levels.
-    
+
     Parameters:
     - cmap: The original colormap to be modified.
     - blow (float, optional): The lower bound of the colormap normalization range. Defaults to 0.
     - up (float, optional): The upper bound of the colormap normalization range. Defaults to 1.
     - alpha_min (float, optional): The minimum alpha (transparency) value to apply. Defaults to 0.
     - alpha_max (float, optional): The maximum alpha (transparency) value to apply. Defaults to 1.
-    
+
     Returns:
     - A new colormap with alpha adjusted from alpha_min to alpha_max within the specified range [blow, up].
     """
-    if not forvispy:
-        warnings.warn("The `forvispy` parameter is deprecated and will be removed in a future version.", DeprecationWarning, stacklevel=2)
-
     cmap = get_cmap_from_str(cmap)
     if _is_vispy_cmap(cmap):
         cmap = cmap_to_mpl(cmap)
@@ -402,10 +363,7 @@ def ramp(cmap, blow=0, up=1, alpha_min=0, alpha_max=1, forvispy=True):
     return cmap
 
 
-def set_up_as(cmap, color, forvispy=True):
-    if not forvispy:
-        warnings.warn("The `forvispy` parameter is deprecated and will be removed in a future version.", DeprecationWarning, stacklevel=2)
-
+def set_up_as(cmap, color):
     if isinstance(cmap, str):
         cmap = get_cmap_from_str(cmap)
 
@@ -422,10 +380,7 @@ def set_up_as(cmap, color, forvispy=True):
         raise ValueError("unkown cmap")
 
 
-def set_down_as(cmap, color, forvispy=True):
-    if not forvispy:
-        warnings.warn("The `forvispy` parameter is deprecated and will be removed in a future version.", DeprecationWarning, stacklevel=2)
-
+def set_down_as(cmap, color):
     if isinstance(cmap, str):
         cmap = get_cmap_from_str(cmap)
 
@@ -442,7 +397,7 @@ def set_down_as(cmap, color, forvispy=True):
         raise ValueError("unkown cmap")
 
 
-def set_alpha(cmap, alpha: float, forvispy: bool = True):
+def set_alpha(cmap, alpha: float):
     """
     Set the alpha blending value, between 0 (transparent) and 1 (opaque)
     for a cmap. This function is mainly used in vispy which
@@ -454,16 +409,11 @@ def set_alpha(cmap, alpha: float, forvispy: bool = True):
         the input cmap
     alpha : float
         opacity
-    forvispy : bool
-        deprecated, don't use it
 
     Returns
     -------
     cmap : str or vispyColormap or mplColormap
     """
-    if not forvispy:
-        warnings.warn("The `forvispy` parameter is deprecated and will be removed in a future version.", DeprecationWarning, stacklevel=2)
-
     if isinstance(cmap, str):
         cmap = get_cmap_from_str(cmap)
 
@@ -478,15 +428,12 @@ def set_alpha(cmap, alpha: float, forvispy: bool = True):
         raise ValueError("unkown cmap")
 
 
-def set_alpha_except_min(cmap, alpha: float, forvispy: bool = True):
+def set_alpha_except_min(cmap, alpha: float):
     """
     Set the alpha blending value, between 0 (transparent) and 1 (opaque)
     for a cmap and set the alpha of the min value as 0.
     This means mask the min value when used for a discrete show.
     """
-    if not forvispy:
-        warnings.warn("The `forvispy` parameter is deprecated and will be removed in a future version.", DeprecationWarning, stacklevel=2)
-
     if isinstance(cmap, str):
         cmap = get_cmap_from_str(cmap)
 
@@ -505,15 +452,12 @@ def set_alpha_except_min(cmap, alpha: float, forvispy: bool = True):
         raise ValueError("unkown cmap")
 
 
-def set_alpha_except_max(cmap, alpha: float, forvispy: bool = True):
+def set_alpha_except_max(cmap, alpha: float):
     """
     Set the alpha blending value, between 0 (transparent) and 1 (opaque)
     for a cmap and set the alpha of the **max** value as 0.
     This means mask the **max** value when used for a discrete show.
     """
-    if not forvispy:
-        warnings.warn("The `forvispy` parameter is deprecated and will be removed in a future version.", DeprecationWarning, stacklevel=2)
-
     if isinstance(cmap, str):
         cmap = get_cmap_from_str(cmap)
 
@@ -535,8 +479,7 @@ def set_alpha_except_max(cmap, alpha: float, forvispy: bool = True):
 def set_alpha_except_values(cmap,
                             alpha: float,
                             clim: List,
-                            values: List,
-                            forvispy: bool = True):
+                            values: List):
     """
     Set the alpha blending value, between 0 (transparent) and 1 (opaque)
     for a cmap. And set the alpha of the select values as 0 when clim is applied.
@@ -551,17 +494,12 @@ def set_alpha_except_values(cmap,
     clim : List
         [vmin, vmax] for mpl.colors.Normalize
     values : List
-        the select values to except (or mask) 
-    forvispy : bool
-        deprecated, don't use it
+        the select values to except (or mask)
 
     Returns
     -------
     cmap : str or vispyColormap or mplColormap
     """
-    if not forvispy:
-        warnings.warn("The `forvispy` parameter is deprecated and will be removed in a future version.", DeprecationWarning, stacklevel=2)
-
     if isinstance(cmap, str):
         cmap = get_cmap_from_str(cmap)
     if _is_vispy_cmap(cmap):
@@ -578,14 +516,11 @@ def set_alpha_except_values(cmap,
     return ListedColormap(colors, name=cmap.name)
 
 
-def set_alpha_except_top(cmap, alpha, clim, segm, forvispy=True):
+def set_alpha_except_top(cmap, alpha, clim, segm):
     """
     Set the alpha blending value, between 0 (transparent) and 1 (opaque)
     for a cmap. And set alphas in range `[segm, clim[1]]` to 0
     """
-    if not forvispy:
-        warnings.warn("The `forvispy` parameter is deprecated and will be removed in a future version.", DeprecationWarning, stacklevel=2)
-
     if isinstance(cmap, str):
         cmap = get_cmap_from_str(cmap)
     if _is_vispy_cmap(cmap):
@@ -599,14 +534,11 @@ def set_alpha_except_top(cmap, alpha, clim, segm, forvispy=True):
     return ListedColormap(colors, name=cmap.name)
 
 
-def set_alpha_except_bottom(cmap, alpha, clim, segm, forvispy=True):
+def set_alpha_except_bottom(cmap, alpha, clim, segm):
     """
     Set the alpha blending value, between 0 (transparent) and 1 (opaque)
     for a cmap. And set alphas in range `[clim[0], segm]` to 0
     """
-    if not forvispy:
-        warnings.warn("The `forvispy` parameter is deprecated and will be removed in a future version.", DeprecationWarning, stacklevel=2)
-
     if isinstance(cmap, str):
         cmap = get_cmap_from_str(cmap)
     if _is_vispy_cmap(cmap):
@@ -620,7 +552,7 @@ def set_alpha_except_bottom(cmap, alpha, clim, segm, forvispy=True):
     return ListedColormap(colors, name=cmap.name)
 
 
-def set_alpha_except_ranges(cmap, alpha, clim, r, forvispy=True):
+def set_alpha_except_ranges(cmap, alpha, clim, r):
     """
     Set the alpha blending value, between 0 (transparent) and 1 (opaque)
     for a cmap. And set the alpha of the range as 0 when clim is applied.
@@ -631,9 +563,6 @@ def set_alpha_except_ranges(cmap, alpha, clim, r, forvispy=True):
     r : List
         ranges, like [0, 2] or [[1, 2], [5, 8], ...]
     """
-    if not forvispy:
-        warnings.warn("The `forvispy` parameter is deprecated and will be removed in a future version.", DeprecationWarning, stacklevel=2)
-
     if not isinstance(r[0], List):
         r = [r]
     assert all([len(c) == 2 for c in r])

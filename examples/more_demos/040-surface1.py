@@ -5,7 +5,7 @@ Surfaces (n1, n2) are displayed
 .. Note::
 
     You may feel a lag when rotating, this is due to a bug in vispy. You have two ways to fix it.
-    - turn off the changing light: ```cigvis.plot3D(..., dyn_light=False)```.
+    - turn off dynamic lighting when creating surface nodes, e.g. ```cigvis.create_surfaces(..., dyn_light=False)```.
     - See this pull: https://github.com/vispy/vispy/pull/2532
  
 
@@ -26,7 +26,7 @@ root = Path(__file__).resolve().parent.parent.parent
 
 def show(sx, sfs):
     """
-    颜色为 depth, sf 里面的所有层位使用同一个 clim
+    Color by depth; all horizons in sfs share the same clim.
     """
     nodes1 = cigvis.create_slices(sx)
     nodes1 += cigvis.create_surfaces(sfs,
@@ -34,7 +34,7 @@ def show(sx, sfs):
                                      value_type='depth',
                                      clim=[0, 239])
     """
-    颜色为 depth, sf 里面的每个层位单独设置 clim
+    Color by depth; each horizon in sfs uses its own clim.
     """
     nodes2 = cigvis.create_slices(sx)
     for sf in sfs:
@@ -53,7 +53,7 @@ def show(sx, sfs):
                                      cmap='Petrel',
                                      clim=[sx.min(), sx.max()])
     """
-    一个mask的层位, 将二维矩阵中小于0的部分mask
+    Mask one horizon by masking values below 0 in the 2D matrix.
     """
     sfs[1][:120, 50:100] = -1
 
@@ -65,9 +65,8 @@ def show(sx, sfs):
                                      clim=[sx.min(), sx.max()])
 
     cigvis.plot3D([nodes1, nodes2, nodes3, nodes4],
-                  grid=(2, 2),
-                  share=True,
-                  savename='example.png')
+                  view=cigvis.Plot3DView(grid=(2, 2), share=True),
+                  save=cigvis.Plot3DSave(path='example.png'))
 
 
 if __name__ == '__main__':

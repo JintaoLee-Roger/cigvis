@@ -182,10 +182,10 @@ class AxisAlignedImage(Image):
         # self._update_location()
         self.freeze()
 
-    def set_visable(self, idx: int, visable=False):
+    def set_visible(self, idx: int, visible=False):
         if idx <= 0:
             return
-        self.overlaid_images[idx].visible = visable
+        self.overlaid_images[idx].visible = visible
 
     @property
     def axis(self):

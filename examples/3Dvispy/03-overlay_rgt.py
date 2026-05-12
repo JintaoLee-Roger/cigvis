@@ -10,7 +10,7 @@ Overlay RGT display on slice of 3D seismic data volume
 and the second parameters is (foreground)
 
 .. Note::
-    foreground 需要合理设置透明度和mask
+    Set foreground transparency and masking carefully.
 
 .. image:: ../../_static/cigvis/3Dvispy/03.png
     :alt: image
@@ -38,4 +38,8 @@ nodes = cigvis.create_slices(sx, pos=[[36], [28], [84]], cmap='gray')
 nodes = cigvis.add_mask(nodes, rgt, cmaps=fg_cmap)
 nodes += cigvis.create_colorbar_from_nodes(nodes, 'RGT', select='mask')
 
-cigvis.plot3D(nodes, size=(750, 600), savename='example.png')
+cigvis.plot3D(
+    nodes,
+    view=cigvis.Plot3DView(size=(750, 600)),
+    save=cigvis.Plot3DSave(path='example.png'),
+)

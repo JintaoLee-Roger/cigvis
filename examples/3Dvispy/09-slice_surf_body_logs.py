@@ -45,11 +45,11 @@ nodes += cigvis.create_well_logs(
     null_value=null_value,
     cmap=['jet', 'seismic', 'Petrel', 'od_seismic1'])
 nodes += cigvis.create_points(np.array([[70, 50, 158], [20, 100, 80]]), r=3)
-nodes += cigvis.create_bodys(lx, 0.5, 0)
+nodes += cigvis.create_bodies(lx, 0.5, 0)
 nodes += cigvis.create_surfaces([sf1, sf2],
                                 sx,
                                 'amp',
                                 cmap='Petrel',
                                 clim=[sx.min(), sx.max()])
 nodes += cigvis.create_colorbar_from_nodes(nodes, 'Amplitude', select='slices')
-cigvis.plot3D(nodes, savename='example.png')
+cigvis.plot3D(nodes, save=cigvis.Plot3DSave(path='example.png'))

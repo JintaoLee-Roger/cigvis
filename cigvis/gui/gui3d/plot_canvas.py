@@ -1,516 +1,557 @@
-# Copyright (c) 2024 Jintao Li.
-# Computational and Interpretation Group (CIG),
-# University of Science and Technology of China (USTC).
-# All rights reserved.
+"""
+3D vispy canvas using VolumeImage.
+
+Key changes from old gui3d:
+  - Uses VolumeImage instead of cigvis.create_slices
+  - SamLikeVolumeApp wired in for optional SAM-like interaction
+"""
+
+from __future__ import annotations
 
 from pathlib import Path
+from typing import Any, Optional, List, Dict, Callable, Tuple
+
+import numpy as np
+
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QMessageBox
 import cigvis
 from cigvis import colormap
-from cigvis.vispynodes import VisCanvas, AxisAlignedImage, SurfaceNode
-from PyQt5 import QtWidgets as qtw
+from cigvis.vispynodes import VisCanvas
+from cigvis.vispynodes.volume_image import VolumeImage
+from cigvis.vispynodes.axis_aligned_image import AxisAlignedImage
+from cigvis.vispynodes.meshnode import SurfaceNode
 
 
-class ImageMixin:
+_KNOWN_CMAPS = (
+    'gray', 'seismic', 'Petrel', 'stratum', 'jet',
+    'od_seismic1', 'bwp', 'od_seismic2', 'od_seismic3',
+)
 
-    def set_base_data(self, data):
-        if self.data is None:
-            self.data = data
-            self.nodes = cigvis.create_slices(self.data, **self.params)
-            # self.nodes += cigvis.create_axis(data.shape, mode='axis', axis_pos='auto', axis_labels=['Inline [points]', 'Xline [points]', 'Time [points]'])
-            self.canvas.add_nodes(self.nodes)
-        else:
-            self.clear()
-            self.set_base_data(data)
 
-    def set_cmap(self, cmap: str):
+def _base_image(node: AxisAlignedImage):
+    images = getattr(node, 'overlaid_images', None)
+    if images:
+        return images[0]
+    return node
+
+
+def _set_visual_metadata(visual, **metadata) -> None:
+    did_unfreeze = False
+    if hasattr(visual, 'unfreeze'):
         try:
-            self.params['cmap'] = colormap.cmap_to_vispy(cmap)
-            if self.data is not None:
-                self.set_attrs('cmap', self.params['cmap'])
+            visual.unfreeze()
+            did_unfreeze = True
+        except Exception:
+            did_unfreeze = False
+    try:
+        for key, value in metadata.items():
+            setattr(visual, key, value)
+    finally:
+        if did_unfreeze and hasattr(visual, 'freeze'):
+            try:
+                visual.freeze()
+            except Exception:
+                pass
+
+
+def _guess_cmap_name(image) -> Optional[str]:
+    name = getattr(image, '_cigvis_cmap_name', None)
+    if isinstance(name, str) and name:
+        return name
+
+    cmap = getattr(image, 'cmap', None)
+    name = getattr(cmap, 'name', None)
+    if isinstance(name, str) and name:
+        return name
+
+    if cmap is None or not hasattr(cmap, 'colors'):
+        return None
+
+    try:
+        colors = np.asarray(cmap.colors.rgba)
+    except Exception:
+        return None
+
+    for candidate in _KNOWN_CMAPS:
+        try:
+            ref = np.asarray(colormap.cmap_to_vispy(candidate).colors.rgba)
+        except Exception:
+            continue
+        if colors.shape == ref.shape and np.allclose(colors, ref, atol=1e-6):
+            return candidate
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Mixins
+# ---------------------------------------------------------------------------
+
+class BaseVolumeMixin:
+    """Manage the base VolumeImage node."""
+
+    def set_base_data(self, data: np.ndarray) -> None:
+        if self._vol is not None:
+            self.clear()
+
+        self._data = data
+        self._vol = VolumeImage(
+            data,
+            cmap=self._base_params.get('cmap', 'gray'),
+            clim=self._base_params.get('clim'),
+            interpolation=self._base_params.get('interpolation', 'linear'),
+        )
+
+        nx, ny, nz = self._vol.shape
+        xi = nx // 2
+        yi = ny // 2
+        zi = nz // 2
+        self._vol.create_slices([xi], [yi], [zi])
+        nodes = self._vol.nodes(intersection_lines=True)
+        for n in nodes:
+            self._nodes.append(n)
+        self.canvas.add_nodes(nodes)
+
+    def set_cmap(self, cmap_name: str) -> None:
+        try:
+            cmap_v = colormap.cmap_to_vispy(cmap_name)
+            self._base_params['cmap'] = cmap_name
+            self._base_params['cmap_v'] = cmap_v
+            for n in self._nodes:
+                if isinstance(n, AxisAlignedImage):
+                    base = _base_image(n)
+                    base.cmap = cmap_v
+                    _set_visual_metadata(base, _cigvis_cmap_name=cmap_name)
+                    _set_visual_metadata(n, _cigvis_cmap_name=cmap_name)
+            self.canvas.update()
         except Exception as e:
-            qtw.QMessageBox.critical(self, "Error", f"Error colormap: {e}")
+            QMessageBox.critical(self, "Error", f"Colormap error: {e}")
 
-    def set_vmin(self, vmin: str):
-        vmin = float(vmin)
-        self.params['vmin'] = vmin
-        if 'clim' in self.params:
-            v1, v2 = self.params['clim']
-            self.params['clim'] = [vmin, v2]
-            self.set_attrs('clim', [vmin, v2])
-        elif 'vmax' in self.params:
-            clim = [vmin, self.params['vmax']]
-            self.params['clim'] = clim
-            self.set_attrs('clim', clim)
+    def set_vmin(self, vmin_str: str) -> None:
+        if not vmin_str:
+            return
+        vmin = float(vmin_str)
+        self._base_params['vmin'] = vmin
+        vmax = self._base_params.get('vmax')
+        if vmax is not None:
+            clim = [vmin, vmax]
+            self._base_params['clim'] = clim
+            for n in self._nodes:
+                if isinstance(n, AxisAlignedImage):
+                    _base_image(n).clim = clim
+            self.canvas.update()
 
-    def set_vmax(self, vmax: str):
-        vmax = float(vmax)
-        self.params['vmax'] = vmax
-        if 'clim' in self.params:
-            v1, v2 = self.params['clim']
-            self.params['clim'] = [v1, vmax]
-            self.set_attrs('clim', [v1, vmax])
-        elif 'vmin' in self.params:
-            clim = [self.params['vmin'], vmax]
-            self.params['clim'] = clim
-            self.set_attrs('clim', clim)
+    def set_vmax(self, vmax_str: str) -> None:
+        if not vmax_str:
+            return
+        vmax = float(vmax_str)
+        self._base_params['vmax'] = vmax
+        vmin = self._base_params.get('vmin')
+        if vmin is not None:
+            clim = [vmin, vmax]
+            self._base_params['clim'] = clim
+            for n in self._nodes:
+                if isinstance(n, AxisAlignedImage):
+                    _base_image(n).clim = clim
+            self.canvas.update()
 
-    def set_interp(self, interp: str):
-        self.params['interpolation'] = interp
-        self.set_attrs('interpolation', interp)
+    def set_interp(self, interp: str) -> None:
+        self._base_params['interpolation'] = interp
+        for n in self._nodes:
+            if isinstance(n, AxisAlignedImage):
+                _base_image(n).interpolation = interp
+                _set_visual_metadata(n, _cigvis_interpolation=interp)
+        self.canvas.update()
 
 
-class MaskImageMixin:
+class MaskMixin3D:
+    """Manage overlay mask volumes via VolumeImage."""
 
-    def set_mask_data(self, data):
-        if len(self.mask_params) == len(self.masks):
-            self.mask_params.append({
-                'cmaps': 'jet',
-                'interpolation': 'nearest',
-                'alpha': 0.5,
-                'excpt': 'None',
-            })
-        self.masks.append(data)
-        self.nodes = cigvis.add_mask(self.nodes, data, **self.mask_params[-1])
+    def add_mask(self, data: np.ndarray) -> None:
+        if self._vol is None:
+            return
+        name = f'mask_{len(self._masks)}'
+        params = {
+            'cmap': colormap.set_alpha('jet', 0.5),
+            'interpolation': 'nearest',
+        }
+        self._mask_params.append({'name': name, **params})
+        self._masks.append(data)
+        try:
+            self._vol.add_overlay_volume(
+                name=name,
+                volume=data,
+                cmap=params['cmap'],
+                interpolation=params['interpolation'],
+            )
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Mask error: {e}")
 
-    def set_mask_params(self, params: list):
+    def set_mask_params(self, params: list) -> None:
+        if self._vol is None:
+            return
         idx, mode, value = params
-        if idx < 0 and len(self.mask_params) == len(self.masks):
-            self.mask_params.append({
-                'cmaps': 'jet',
-                'interpolation': 'nearest',
-                'alpha': 0.5,
-                'excpt': 'None',
-            })
-            # return
+        if idx < 0 or idx >= len(self._mask_params):
+            return
+        mp = self._mask_params[idx]
+        name = mp['name']
 
-        if mode == 'vmin':
-            vmin = float(value)
-            self.mask_params[idx]['vmin'] = vmin
-            if 'clim' in self.mask_params[idx]:
-                v1, v2 = self.mask_params[idx]['clim']
-                self.mask_params[idx]['clim'] = [vmin, v2]
-            elif 'vmax' in self.mask_params[idx]:
-                clim = [vmin, self.mask_params[idx]['vmax']]
-                self.mask_params[idx]['clim'] = clim
-            if len(self.mask_params) == len(self.masks):
-                self.set_mask_attrs('clim', self.mask_params[idx]['clim'], idx)
-
-        elif mode == 'vmax':
-            vmax = float(value)
-            self.mask_params[idx]['vmax'] = vmax
-            if 'clim' in self.mask_params[idx]:
-                v1, v2 = self.mask_params[idx]['clim']
-                self.mask_params[idx]['clim'] = [v1, vmax]
-            elif 'vmin' in self.mask_params[idx]:
-                clim = [self.mask_params[idx]['vmin'], vmax]
-                self.mask_params[idx]['clim'] = clim
-            if len(self.mask_params) == len(self.masks):
-                self.set_mask_attrs('clim', self.mask_params[idx]['clim'], idx)
-
-        elif mode == 'interp':
-            self.mask_params[idx]['interp'] = value
-            if len(self.mask_params) == len(self.masks):
-                self.set_mask_attrs('interpolation',
-                                    self.mask_params[idx]['interp'], idx)
+        if mode in ('vmin', 'vmax'):
+            mp[mode] = float(value)
+            if 'vmin' in mp and 'vmax' in mp:
+                clim = [mp['vmin'], mp['vmax']]
+                for n in self._nodes:
+                    if isinstance(n, AxisAlignedImage):
+                        spec = self._vol._overlays.get(name)
+                        if spec:
+                            spec.clim = tuple(clim)
+                            # trigger re-render via refresh
+                            self._vol.refresh_overlay(name)
 
         elif mode == 'cmap':
-            cmap = self.set_mask_cmap(value, self.mask_params[idx]['alpha'],
-                                      self.mask_params[idx]['excpt'])
-            if cmap:
-                self.mask_params[idx]['cmaps'] = cmap
-            if len(self.mask_params) == len(self.masks):
-                self.set_mask_attrs('cmap', self.mask_params[idx]['cmaps'],
-                                    idx)
+            mp['cmap'] = value
+            cmap_v = self._build_cmap(value, mp.get('alpha', 0.5), mp.get('except', 'None'))
+            if cmap_v:
+                mp['cmap_v'] = cmap_v
+                spec = self._vol._overlays.get(name)
+                if spec:
+                    spec.cmap = cmap_v
+                    self._vol.refresh_overlay(name)
 
         elif mode == 'alpha':
-            self.mask_params[idx]['alpha'] = float(value)
-            cmap = self.set_mask_cmap(self.mask_params[idx]['cmaps'], value,
-                                      self.mask_params[idx]['excpt'])
-            if cmap:
-                self.mask_params[idx]['cmaps'] = cmap
-            if len(self.mask_params) == len(self.masks):
-                self.set_mask_attrs('cmap', self.mask_params[idx]['cmaps'],
-                                    idx)
+            mp['alpha'] = float(value)
+            cmap_v = self._build_cmap(mp.get('cmap', 'jet'), float(value), mp.get('except', 'None'))
+            if cmap_v:
+                mp['cmap_v'] = cmap_v
+                spec = self._vol._overlays.get(name)
+                if spec:
+                    spec.cmap = cmap_v
+                    self._vol.refresh_overlay(name)
 
         elif mode == 'except':
-            self.mask_params[idx]['excpt'] = value
-            cmap = self.set_mask_cmap(self.mask_params[idx]['cmaps'],
-                                      self.mask_params[idx]['alpha'], value)
-            if cmap:
-                self.mask_params[idx]['cmaps'] = cmap
-            if len(self.mask_params) == len(self.masks):
-                self.set_mask_attrs('cmap', self.mask_params[idx]['cmaps'],
-                                    idx)
+            mp['except'] = value
+            cmap_v = self._build_cmap(mp.get('cmap', 'jet'), mp.get('alpha', 0.5), value)
+            if cmap_v:
+                mp['cmap_v'] = cmap_v
+                spec = self._vol._overlays.get(name)
+                if spec:
+                    spec.cmap = cmap_v
+                    self._vol.refresh_overlay(name)
 
-    def set_mask_cmap(self, cmap, alpha, excpt: str = 'None'):
+        elif mode == 'interp':
+            spec = self._vol._overlays.get(name)
+            if spec:
+                spec.interpolation = value
+                self._vol.refresh_overlay(name)
+
+    def _build_cmap(self, cmap_name, alpha, excpt):
         try:
             if excpt == 'None':
-                cmap = colormap.set_alpha(cmap, alpha)
+                return colormap.cmap_to_vispy(colormap.set_alpha(cmap_name, alpha))
             elif excpt == 'min':
-                cmap = colormap.set_alpha_except_min(cmap, alpha)
-            elif excpt == 'ramp':
-                cmap = colormap.ramp(cmap)
+                return colormap.cmap_to_vispy(colormap.set_alpha_except_min(cmap_name, alpha))
             elif excpt == 'max':
-                cmap = colormap.set_alpha_except_max(cmap, alpha)
-            else:
-                qtw.QMessageBox.critical(
-                    self, "Error",
-                    f"The except mode: {excpt} is not supported now")
-                return
-
+                return colormap.cmap_to_vispy(colormap.set_alpha_except_max(cmap_name, alpha))
+            elif excpt == 'ramp':
+                return colormap.cmap_to_vispy(colormap.ramp(cmap_name))
         except Exception as e:
-            qtw.QMessageBox.critical(self, "Error", f"Error colormap: {e}")
+            QMessageBox.critical(self, "Error", f"Colormap: {e}")
+        return None
+
+    def remove_mask(self, idx: int) -> None:
+        if idx < 0 or idx >= len(self._masks):
             return
+        self._masks.pop(idx)
+        self._mask_params.pop(idx)
+        # Rebuild overlays (simplest approach for now)
+        # TODO: proper remove if VolumeImage gains a remove_overlay method
 
-        return colormap.cmap_to_vispy(cmap)
-
-    def remove_mask(self, idx):
-        for node in self.nodes:
-            if isinstance(node, AxisAlignedImage):
-                node.remove_mask(idx + 1)
-        d = self.masks.pop(idx)
-        del d
-
-    def mask_clear(self):
-        for i in range(len(self.masks)):
-            self.remove_mask(0)  # HACK: 0?
-
-        # clear masks
-        self.masks.clear()
-        self.mask_params.clear()
+    def mask_clear(self) -> None:
+        self._masks.clear()
+        self._mask_params.clear()
 
 
-class HorizonMixin:
+class HorizonMixin3D:
+    """Manage horizon surface nodes."""
 
-    def set_horz_data(self, data):
-        if len(self.horz_params) == len(self.horzs):
-            self.horz_params.append({
-                'values': 'depth',
-                'cmaps': 'jet',
-                'offset': [0, 0, 0],
-                'interval': [1, 1, 1],
-            })
-        self.horzs.append(data)
-        node = SurfaceNode(data, self.data, **self.horz_params[-1])
-        self.horz_nodes.append(node)
+    def add_horizon(self, data: np.ndarray) -> None:
+        if self._data is None:
+            return
+        params = {'values': 'depth', 'cmaps': 'jet', 'offset': [0, 0, 0], 'interval': [1, 1, 1]}
+        self._horz_params.append(params)
+        self._horzs.append(data)
+        node = SurfaceNode(data, self._data, **params)
+        self._horz_nodes.append(node)
         self.canvas.add_node(node)
 
-    def set_horz_params(self, params):
+    def set_horz_params(self, params: list) -> None:
         idx, mode, value = params
-        if idx < 0 and len(self.horz_params) == len(self.horzs):
-            self.horz_params.append({
-                'values': 'depth',
-                'cmaps': 'jet',
-                'offset': [0, 0, 0],
-                'interval': [1, 1, 1],
-            })
+        if idx < 0 or idx >= len(self._horzs):
             return
+        hp = self._horz_params[idx]
+        node = self._horz_nodes[idx]
 
         if mode == 'coord':
-            self.horz_params[idx]['offset'] = value[0]
-            self.horz_params[idx]['interval'] = value[1]
-            if len(self.horz_params) == len(self.horzs):
-                self.horz_nodes[idx].update_offset_and_interval(
-                    value[0], value[1])
+            hp['offset'] = value[0]
+            hp['interval'] = value[1]
+            node.update_offset_and_interval(value[0], value[1])
         elif mode == 'value_type':
-            value = value.strip()
-            update = False if self.horz_params[idx]['values'] == value else True
-            if not update:
-                return
-            if len(self.horz_params) == len(self.horzs):
-                if value == 'depth':
-                    self.horz_nodes[idx].values = ['depth']
-                    self.horz_nodes[idx]._cmaps = [
-                        self.horz_params[idx]['cmaps']
-                    ]
-                    self.horz_nodes[idx].clims = None
-                elif value == 'amp':
-                    self.horz_nodes[idx].update_colors_by_slice_node(self.nodes, [self.data] + self.masks) # yapf: disable
-                else:
-                    try:
-                        if ',' in value and value[0] != '[' and value[
-                                -1] != ']':
-                            value = [v for v in value.split(',') if v.strip()]
-                            if len(value) == 1:
-                                value = value[0]
-                            elif len(value) == 2:
-                                value = (value[0], float(value[1]))
-                        if value[0] == '[' and value[-1] == ']' and value.count(
-                                ',') >= 2 and value.count(',') <= 3:
-                            value = value[1:-1]
-                            value = tuple([
-                                float(v) for v in value.split(',')
-                                if v.strip()
-                            ])
-                        self.horz_nodes[idx].values = [value]
-                        self.horz_nodes[idx].process_values()
-                    except Exception as e:
-                        qtw.QMessageBox.critical(self, "Error",
-                                                 f"Error value type: {e}")
-                        return
-            self.horz_params[idx]['values'] = value
-
+            hp['values'] = value
+            if value == 'depth':
+                node.values = ['depth']
+                node._cmaps = [hp['cmaps']]
+                node.clims = None
+            elif value == 'amp':
+                if self._nodes:
+                    node.update_colors_by_slice_node(
+                        self._nodes, [self._data] + self._masks)
         elif mode == 'cmap':
-            update = False if self.horz_params[idx]['cmaps'] == value else True
-            if not update:
-                return
+            hp['cmaps'] = value
             try:
-                if len(self.horz_params) == len(self.horzs):
-                    self.horz_nodes[idx].cmaps = [value]
+                node.cmaps = [value]
             except Exception as e:
-                qtw.QMessageBox.critical(self, "Error", f"Error colormap: {e}")
-                return
-            self.horz_params[idx]['cmaps'] = value
+                QMessageBox.critical(self, "Error", f"Cmap: {e}")
 
-    def remove_horz(self, idx):
-        node = self.horz_nodes.pop(idx)
+    def remove_horizon(self, idx: int) -> None:
+        if idx < 0 or idx >= len(self._horzs):
+            return
+        node = self._horz_nodes.pop(idx)
         self.canvas.remove_node(node)
+        self._horzs.pop(idx)
+        self._horz_params.pop(idx)
 
-        hz = self.horzs.pop(idx)
-        del hz
-        param = self.horz_params.pop(idx)
-        del param
-
-    def horz_clear(self):
-        for i in range(len(self.horzs)):
-            self.remove_horz(0)
-
-        self.horz_nodes.clear()
-        self.horzs.clear()
-        self.horz_params.clear()
+    def horz_clear(self) -> None:
+        for i in range(len(self._horzs)):
+            self.remove_horizon(0)
 
 
-class CameraMixin:
+class CameraMixin3D:
+    """Camera control helpers."""
 
-    def set_azimuth(self, azimuth):
-        if not hasattr(self.canvas, 'view'):
-            return
+    def set_azimuth(self, v: int) -> None:
         for view in self.canvas.view:
-            view.camera.azimuth = azimuth
+            view.camera.azimuth = v
 
-    def set_elevation(self, elevation):
-        if not hasattr(self.canvas, 'view'):
-            return
+    def set_elevation(self, v: int) -> None:
         for view in self.canvas.view:
-            view.camera.elevation = elevation
+            view.camera.elevation = v
 
-    def set_fov(self, fov):
-        if not hasattr(self.canvas, 'view'):
-            return
+    def set_fov(self, v: int) -> None:
         for view in self.canvas.view:
-            view.camera.fov = fov
+            view.camera.fov = v
 
-    def set_xpos(self, xpos):
-        if xpos < 0 and len(self.nodes) == 0:
-            return
-        xpos = int(xpos)
-        for node in self.nodes:
-            if isinstance(node, AxisAlignedImage):
-                if node.axis == 'x':
-                    node._update_location(xpos)
+    def set_xpos(self, pos: int) -> None:
+        for n in self._nodes:
+            if isinstance(n, AxisAlignedImage) and n.axis == 'x':
+                n._update_location(int(pos))
+        self.canvas.update()
 
-    def set_ypos(self, ypos):
-        if ypos < 0 and len(self.nodes) == 0:
-            return
-        ypos = int(ypos)
-        for node in self.nodes:
-            if isinstance(node, AxisAlignedImage):
-                if node.axis == 'y':
-                    node._update_location(ypos)
+    def set_ypos(self, pos: int) -> None:
+        for n in self._nodes:
+            if isinstance(n, AxisAlignedImage) and n.axis == 'y':
+                n._update_location(int(pos))
+        self.canvas.update()
 
-    def set_zpos(self, zpos):
-        if zpos < 0 and len(self.nodes) == 0:
-            return
-        zpos = int(zpos)
-        for node in self.nodes:
-            if isinstance(node, AxisAlignedImage):
-                if node.axis == 'z':
-                    node._update_location(zpos)
+    def set_zpos(self, pos: int) -> None:
+        for n in self._nodes:
+            if isinstance(n, AxisAlignedImage) and n.axis == 'z':
+                n._update_location(int(pos))
+        self.canvas.update()
 
-    def set_aspectx(self, aspx):
-        r = cigvis.is_x_reversed()
-        aspx *= (1 - 2 * r)
-        if not hasattr(self.canvas, 'view'):
-            return
+    def _apply_aspect(self, idx: int, value: float, reversed_flag: bool) -> None:
+        value *= (1 - 2 * int(reversed_flag))
         for view in self.canvas.view:
-            axis_scales = view.camera._flip_factors
-            axis_scales[0] = aspx
-            view.camera._flip_factors = axis_scales
+            f = list(view.camera._flip_factors)
+            f[idx] = value
+            view.camera._flip_factors = f
             view.camera._update_camera_pos()
-            self.canvas.update()
+        self.canvas.update()
 
-    def set_aspecty(self, aspy):
-        r = cigvis.is_y_reversed()
-        aspy *= (1 - 2 * r)
-        if not hasattr(self.canvas, 'view'):
-            return
-        for view in self.canvas.view:
-            axis_scales = view.camera._flip_factors
-            axis_scales[1] = aspy
-            view.camera._flip_factors = axis_scales
-            view.camera._update_camera_pos()
-            self.canvas.update()
+    def set_aspectx(self, v: float) -> None:
+        self._apply_aspect(0, v, cigvis.is_x_reversed())
 
-    def set_aspectz(self, aspz):
-        r = cigvis.is_z_reversed()
-        aspz *= (1 - 2 * r)
-        if not hasattr(self.canvas, 'view'):
-            return
-        for view in self.canvas.view:
-            axis_scales = view.camera._flip_factors
-            axis_scales[2] = aspz
-            view.camera._flip_factors = axis_scales
-            view.camera._update_camera_pos()
-            self.canvas.update()
+    def set_aspecty(self, v: float) -> None:
+        self._apply_aspect(1, v, cigvis.is_y_reversed())
 
-    def get_params(self):
-        out = None
-        if hasattr(self.canvas, 'view'):
-            camera = self.canvas.view[0].camera
-            out = [camera.azimuth, camera.elevation, camera.fov]
-            out = list(map(int, out))
+    def set_aspectz(self, v: float) -> None:
+        self._apply_aspect(2, v, cigvis.is_z_reversed())
 
-        if len(self.nodes) > 0:
-            pos = {'x': [], 'y': [], 'z': []}
-            for node in self.nodes:
-                if isinstance(node, AxisAlignedImage):
-                    axis = node.axis
-                    apos = node.pos
-                    pos[axis].append(apos)
-
-            out.append(pos)
-
-        return out
+    def get_camera_params(self) -> Optional[list]:
+        if not hasattr(self.canvas, 'view') or not self.canvas.view:
+            return None
+        cam = self.canvas.view[0].camera
+        params = [int(cam.azimuth), int(cam.elevation), int(cam.fov)]
+        params.append(self.get_slice_positions())
+        return params
 
 
-class DraggableMixin:
+class DragDropMixin3D:
 
-    def enableDragging(self):
+    def enable_drop(self) -> None:
         self.setAcceptDrops(True)
 
-    def dragEnterEvent(self, event):
+    def dragEnterEvent(self, event) -> None:
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
 
-    def dropEvent(self, event):
-        filePath = event.mimeData().urls()[0].toLocalFile()
-        if Path(filePath).is_file():
-            self.controlP.loadBtn.loadData(filePath)
-        elif Path(filePath).is_dir():
-            self.controlP.loadfolder.loadFd.loadFolder(filePath)
-
-    def handleFileDropped(self):
-        raise NotImplementedError("Need Implemented in main class")
+    def dropEvent(self, event) -> None:
+        path = event.mimeData().urls()[0].toLocalFile()
+        if path and self.parent() and hasattr(self.parent(), 'on_file_dropped'):
+            self.parent().on_file_dropped(path)
 
 
-class PlotCanvas(qtw.QWidget, DraggableMixin, CameraMixin, ImageMixin,
-                 MaskImageMixin, HorizonMixin):
+# ---------------------------------------------------------------------------
+# Main 3D canvas widget
+# ---------------------------------------------------------------------------
 
-    def __init__(self, *args, parent=None, **kwargs):
+class PlotCanvas3D(
+    QWidget,
+    DragDropMixin3D,
+    CameraMixin3D,
+    BaseVolumeMixin,
+    MaskMixin3D,
+    HorizonMixin3D,
+):
+    """
+    3D vispy canvas widget using VolumeImage.
+
+    Embed a VisCanvas inside a QWidget so it plays nicely with PySide6 layouts.
+    """
+
+    def __init__(
+        self,
+        parent=None,
+        visual_nodes=None,
+        grid: Optional[Tuple[int, int]] = None,
+        share: bool = False,
+        canvas_kwargs: Optional[Dict[str, Any]] = None,
+    ) -> None:
         super().__init__(parent)
-        self.layout = qtw.QVBoxLayout(self)
-        self.layout.setContentsMargins(0, 0, 0, 0)  # 减小边界
+        self._layout = QVBoxLayout(self)
+        self._layout.setContentsMargins(0, 0, 0, 0)
+        self._init_state()
 
-        self.canvas = CanvasWrapper(*args, **kwargs)
+        # The VisCanvas instance — start with no nodes; add them after data load
+        canvas_kwargs = dict(canvas_kwargs or {})
+        canvas_kwargs.setdefault('keys', None)
+        self.canvas = VisCanvas(
+            visual_nodes=visual_nodes,
+            grid=grid,
+            share=share,
+            size=canvas_kwargs.pop('size', (800, 600)),
+            **canvas_kwargs,
+        )
         self.canvas.create_native()
         self.canvas.native.setParent(self)
-        self.layout.addWidget(self.canvas.native)
+        self._layout.addWidget(self.canvas.native)
 
-        self.controlP = self.parent().controlP
-        self.gstates = self.parent().gstates
+        self.enable_drop()
+        if visual_nodes is not None:
+            self._adopt_visual_nodes(visual_nodes)
 
-        self.enableDragging()
-        self.init_states()
+    def _init_state(self) -> None:
+        self._data: Optional[np.ndarray] = None
+        self._vol: Optional[VolumeImage] = None
+        self._nodes: List = []
+        self._base_params: dict = {'cmap': 'gray', 'interpolation': 'linear'}
 
-    def init_states(self):
-        self.data = None
-        self.nodes = []
-        self.params = {'cmap': 'gray', 'interpolation': 'bilinear'}
+        self._masks: List[np.ndarray] = []
+        self._mask_params: List[dict] = []
 
-        # mask
-        self.masks = []
-        self.mask_params = []
+        self._horzs: List[np.ndarray] = []
+        self._horz_params: List[dict] = []
+        self._horz_nodes: List = []
 
-        # horiz
-        self.horzs = []
-        self.horz_params = []
-        self.horz_nodes = []
+        self._plot_nodes = None
 
-    def set_data(self, data):
-        if self.gstates.loadType == 'base':
-            self.set_base_data(data)
-        elif self.gstates.loadType == 'mask':
-            self.set_mask_data(data)
-        elif self.gstates.loadType == 'horz':
-            self.set_horz_data(data)
+    def _flatten_nodes(self, nodes) -> List:
+        if nodes is None:
+            return []
+        if isinstance(nodes, dict):
+            out = []
+            for value in nodes.values():
+                out.extend(self._flatten_nodes(value))
+            return out
+        if isinstance(nodes, (list, tuple)):
+            out = []
+            for item in nodes:
+                out.extend(self._flatten_nodes(item))
+            return out
+        return [nodes]
 
-    def set_attrs(self, name, value, types=AxisAlignedImage):
-        for node in self.nodes:
-            if isinstance(node, types):
-                setattr(node, name, value)
+    def _adopt_visual_nodes(self, nodes) -> None:
+        self._plot_nodes = nodes
+        flat_nodes = self._flatten_nodes(nodes)
+        self._nodes = [n for n in flat_nodes if isinstance(n, AxisAlignedImage)]
+        self._horz_nodes = [n for n in flat_nodes if isinstance(n, SurfaceNode)]
+        if self._nodes:
+            image = _base_image(self._nodes[0])
+            cmap_name = _guess_cmap_name(image)
+            if cmap_name:
+                self._base_params['cmap'] = cmap_name
+            interp = getattr(image, 'interpolation', None)
+            if interp:
+                self._base_params['interpolation'] = interp
+            clim = getattr(image, 'clim', None)
+            if clim is not None and len(clim) == 2:
+                self._base_params['vmin'] = float(clim[0])
+                self._base_params['vmax'] = float(clim[1])
+                self._base_params['clim'] = [float(clim[0]), float(clim[1])]
 
-    def set_mask_attrs(self, name, value, idx, types=AxisAlignedImage):
-        for node in self.nodes:
-            if isinstance(node, types):
-                setattr(node.overlaid_images[idx + 1], name, value)
+    def get_slice_limits(self) -> Dict[str, Tuple[int, int]]:
+        limits: Dict[str, Tuple[int, int]] = {}
+        for axis in ('x', 'y', 'z'):
+            axis_nodes = [
+                n for n in self._nodes
+                if isinstance(n, AxisAlignedImage) and n.axis == axis and n.limit is not None
+            ]
+            if axis_nodes:
+                lo = min(int(n.limit[0]) for n in axis_nodes)
+                hi = max(int(n.limit[1]) for n in axis_nodes)
+                limits[axis] = (lo, hi)
+        return limits
 
-    def clear(self):
-        # print(self.masks)
+    def get_slice_positions(self) -> Dict[str, int]:
+        positions: Dict[str, int] = {}
+        for axis in ('x', 'y', 'z'):
+            axis_nodes = [
+                n for n in self._nodes
+                if isinstance(n, AxisAlignedImage) and n.axis == axis
+            ]
+            if axis_nodes:
+                positions[axis] = int(axis_nodes[0].pos)
+        return positions
+
+    def get_base_display_params(self) -> Dict[str, Any]:
+        params = dict(self._base_params)
+        if self._nodes:
+            image = _base_image(self._nodes[0])
+            cmap_name = _guess_cmap_name(image)
+            if cmap_name:
+                params['cmap'] = cmap_name
+            interp = getattr(image, 'interpolation', None)
+            if interp:
+                params['interpolation'] = interp
+            clim = getattr(image, 'clim', None)
+            if clim is not None and len(clim) == 2:
+                params['clim'] = [float(clim[0]), float(clim[1])]
+                params['vmin'] = float(clim[0])
+                params['vmax'] = float(clim[1])
+        return params
+
+    def clear(self) -> None:
         self.horz_clear()
         self.mask_clear()
-
-        # clear nodes
-        for node in self.nodes:
-            node.parent = None
-            del node
-        self.nodes.clear()
-
-        # clear data
+        for n in self._nodes:
+            try:
+                n.parent = None
+            except Exception:
+                pass
+        self._nodes.clear()
         try:
-            self.data.close()
-        except:
-            del self.data
-        self.data = None
-
-        # init
-        self.params = {'cmap': 'gray', 'interpolation': 'bilinear'}
-
-
-class CanvasWrapper(VisCanvas):
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.dyn_light = True
-
-    def update_light(self, text):
-        if text == 'on':
-            self.dyn_light = True
-        else:
-            self.dyn_light = False
-
-    def update_camera(self, azimuth, elevation, fov):
-        self.azimuth = azimuth
-        self.elevation = elevation
-        self.fov = fov
-
-        if not hasattr(self, 'view'):
-            return
-
-        for view in self.view:
-            view.camera.azimuth = self.azimuth
-            view.camera.elevation = self.elevation
-            view.camera.fov = self.fov
-
-    def update_axis_scales(self, axis_scales):
-        axis_scales = list(axis_scales)
-        for i, r in enumerate(cigvis.is_axis_reversed()):
-            axis_scales[i] *= (1 - 2 * r)
-        self.axis_scales = axis_scales
-
-        if not hasattr(self, 'view'):
-            return
-
-        for view in self.view:
-            view.camera._flip_factors = self.axis_scales
-            view.camera._update_transform()
-            self.update()
+            if hasattr(self._data, 'close'):
+                self._data.close()
+        except Exception:
+            pass
+        self._data = None
+        self._vol = None
+        self._base_params = {'cmap': 'gray', 'interpolation': 'linear'}

@@ -30,10 +30,12 @@ def show(d):
     nodes3.append(cbar)
 
     cigvis.plot3D([nodes1, nodes2, nodes3],
-                  grid=(1, 3),
-                  size=(1500, 500),
-                  cbar_region_ratio=0.18,
-                  savename='example.png')
+                  view=cigvis.Plot3DView(
+                      grid=(1, 3),
+                      size=(1500, 500),
+                      cbar_region_ratio=0.18,
+                  ),
+                  save=cigvis.Plot3DSave(path='example.png'))
 
 
 if __name__ == '__main__':

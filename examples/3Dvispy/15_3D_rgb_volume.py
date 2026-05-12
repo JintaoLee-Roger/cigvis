@@ -42,4 +42,4 @@ sx = (sx * 255).astype(np.uint8)
 ### `cmap` will be ignored
 nodes = cigvis.create_slices(sx, pos=[[10, ni//2, ni-10], [10, nx//2, nx-10], [10, nt//2, nt-10]])
 
-cigvis.plot3D(nodes, size=(700, 600))
+cigvis.plot3D(nodes, view=cigvis.Plot3DView(size=(700, 600)))

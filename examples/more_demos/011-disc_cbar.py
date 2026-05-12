@@ -19,9 +19,9 @@ root = Path(__file__).resolve().parent.parent.parent
 
 def show_discrete_cbar(d):
     """
-    添加离散的colorbar
+    Add a discrete colorbar.
 
-    离散数据建议将interpolation设置为 'nearest'
+    For discrete data, set interpolation to 'nearest'.
     """
     nodes1 = cigvis.create_slices(d, cmap='jet', interpolation='nearest')
     cbar1 = cigvis.create_colorbar(
@@ -32,7 +32,7 @@ def show_discrete_cbar(d):
         label_str='Facies')
     nodes1.append(cbar1)
     """
-    离散的数据, 当数据中有outline时, 会导致其他值的颜色很接近
+    For discrete data, outlines can make neighboring colors look very similar.
     """
     d[d == 1] = 100
     nodes2 = cigvis.create_slices(d, cmap='jet', interpolation='nearest')
@@ -43,7 +43,7 @@ def show_discrete_cbar(d):
         disc_ticks=[np.unique(d).astype(int)],
         label_str='Facies')
     """
-    自定义 colormap 可以解决 cbar2 的问题
+    A custom colormap can fix the issue shown in cbar2.
     """
     values = np.unique(d)
     colors = ['gray', 'green', '#7f6589', 'blue', (0, 0.5, 0.5)]
@@ -56,13 +56,13 @@ def show_discrete_cbar(d):
         discrete=True,
         disc_ticks=[values.astype(int)])
     """
-    可以使用 get_colors_from_cmap 获取颜色
+    Use get_colors_from_cmap to sample colors.
 
-    然后自定义 colormap 解决 cbar2 的问题
+    Then build a custom colormap to fix the issue shown in cbar2.
     """
     values = np.unique(d)
 
-    # 获取均匀分布的颜色
+    # Sample evenly spaced colors.
     colors = colormap.get_colors_from_cmap('jet',
                                            clim=[0, len(values) - 1],
                                            values=np.arange(0, len(values)))
@@ -77,10 +77,12 @@ def show_discrete_cbar(d):
         disc_ticks=[values.astype(int)])
 
     cigvis.plot3D([nodes1, nodes2, nodes3, nodes4],
-                  grid=(2, 2),
-                  cbar_region_ratio=0.18,
-                  size=(1400, 1000),
-                  savename='example.png')
+                  view=cigvis.Plot3DView(
+                      grid=(2, 2),
+                      cbar_region_ratio=0.18,
+                      size=(1400, 1000),
+                  ),
+                  save=cigvis.Plot3DSave(path='example.png'))
 
 
 if __name__ == '__main__':

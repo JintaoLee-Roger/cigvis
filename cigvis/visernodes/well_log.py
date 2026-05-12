@@ -6,6 +6,12 @@
 from typing import List, Dict, Tuple, Union
 import numpy as np
 from cigvis import colormap, ExceptionWrapper
+from .base import (
+    ViserNodeMixin,
+    auto_scale_from_points,
+    color_to_uint8_rgb,
+    colors_to_uint8_rgb,
+)
 
 try:
     import viser
@@ -14,7 +20,7 @@ except BaseException as E:
     viser = ExceptionWrapper(E, message)
 
 
-class LogBase:
+class LogBase(ViserNodeMixin):
 
     def __init__(
         self,
@@ -25,28 +31,16 @@ class LogBase:
         clim: Tuple[float, float] = None,
         scale: int = -1,
     ):
-        self._server = None  # viser.ViserServer
         if scale < 0:
-            self._scale = [1 / points.max()] * 3
-        else:
-            self._scale = [scale] * 3
+            scale = auto_scale_from_points(points, target=1.0)
 
         self._cmap = cmap
         self._clim = clim
         self.base_name = ''
-        self._points = points.astype(np.float32)
-        self.points = points.astype(np.float32)
-
-    @property
-    def server(self):
-        return self._server
-
-    @server.setter
-    def server(self, server):
-        if not isinstance(server, viser.ViserServer):
-            raise ValueError("server must be type: viser.ViserServer")
-        self._server = server
-        self.update_node()
+        self._base_points = points.astype(np.float32)
+        self._points = self._base_points
+        self.points = self._base_points.copy()
+        self._init_node_state('logs', scale)
 
     @property
     def cmap(self):
@@ -66,15 +60,6 @@ class LogBase:
         self._clim = clim
         self.update_node()
 
-    @property
-    def name(self):
-        return self._name
-
-    @name.setter
-    def name(self, name):
-        self._name = name
-        self.update_node()
-
     def update_node(self):
         raise NotImplementedError("need to be implemented in subclass")
 
@@ -87,13 +72,8 @@ class LogBase:
         pass
 
     @property
-    def scale(self):
-        return self._scale
-
-    @scale.setter
-    def scale(self, scale):
-        self._scale = scale
-        self.update_node()
+    def data_extent(self):
+        return np.ptp(self._base_points[:, :3], axis=0)
 
 
 class LogPoints(LogBase):
@@ -107,22 +87,27 @@ class LogPoints(LogBase):
         clim: Tuple[float, float] = None,
         point_size: float = 1,
         point_shape: str = 'square',
+        color=None,
         scale: int = -1,
         **kwargs,
     ):
         super().__init__(points, values, colors, cmap, clim, scale)
-        self._points = points
+        self._points = self._base_points
         self._values = values
         self._colors = colors
+        self._color = color
         self.point_size = point_size
         self.point_shape = point_shape
         self.base_name = 'point'
 
     def process_points(self):
-        self.points[:, 0] = self._points[:, 0] * self.scale[0]
-        self.points[:, 1] = self._points[:, 1] * self.scale[1]
-        self.points[:, 2] = self._points[:, 2] * self.scale[2]
-        if self._colors is not None:
+        self.points = self._points[:, :3] * np.asarray(self.scale)
+        if self._color is not None:
+            self.colors = np.tile(
+                color_to_uint8_rgb(self._color),
+                (len(self.points), 1),
+            )
+        elif self._colors is not None:
             self.colors = self._colors
         elif self._values is not None:
             clim = self.clim
@@ -142,9 +127,7 @@ class LogPoints(LogBase):
                 clim,
                 self._points[:, 2],
             )
-        self.colors = self.colors[:, :3]
-        self.colors *= 255
-        self.colors = self.colors.astype(np.uint8)
+        self.colors = colors_to_uint8_rgb(self.colors)
 
     def update_node(self):
         if self.server is None:
@@ -154,7 +137,7 @@ class LogPoints(LogBase):
             self._name,
             self.points,
             self.colors,
-            point_size=self.point_size * self.scale[2],
+            point_size=self.point_size * max(self.scale),
             point_shape=self.point_shape,
         )
 
@@ -173,17 +156,15 @@ class LogLineSegments(LogBase):
         **kwargs,
     ):
         super().__init__(points, values, colors, cmap, clim, scale)
-        self._points = points
+        self._points = self._base_points
         self._values = values
         self._colors = colors
         self.line_width = line_width
         self.base_name = 'line'
 
     def process_points(self):
-        self.points = np.stack([self._points[:-1], self._points[1:]], axis=1)
-        self.points[:, :, 0] *= self.scale[0]
-        self.points[:, :, 1] *= self.scale[1]
-        self.points[:, :, 2] *= self.scale[2]
+        scaled = self._points[:, :3] * np.asarray(self.scale)
+        self.points = np.stack([scaled[:-1], scaled[1:]], axis=1)
         if self._colors is not None:
             self.colors = self._colors
         elif self._values is not None:
@@ -204,9 +185,7 @@ class LogLineSegments(LogBase):
                 clim,
                 self._points[:, 2],
             )
-        self.colors = self.colors[:, :3]
-        self.colors *= 255
-        self.colors = self.colors.astype(np.uint8)
+        self.colors = colors_to_uint8_rgb(self.colors)
         self.colors = np.stack([self.colors[:-1], self.colors[:-1]], axis=1)
 
     def update_node(self):

@@ -6,7 +6,7 @@
 Share camera parameters across multiple canvas
 ================================================
 
-这个可以很方便的实现比较两个数据结果
+This makes it easy to compare two data results.
 
 .. image:: ../../_static/cigvis/3Dvispy/11.gif
     :alt: image
@@ -30,7 +30,10 @@ nodes2 = cigvis.create_slices(sx, cmap='Petrel')
 
 cigvis.plot3D(
     [nodes1, nodes2],
-    grid=(1, 2),  # here, define a grid
-    share=True,  # here, link all cameras
-    size=(1000, 800),
-    savename='example.png')
+    view=cigvis.Plot3DView(
+        grid=(1, 2),  # here, define a grid
+        share=True,  # here, link all cameras
+        size=(1000, 800),
+    ),
+    save=cigvis.Plot3DSave(path='example.png'),
+)

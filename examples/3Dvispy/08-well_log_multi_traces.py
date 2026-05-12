@@ -43,8 +43,8 @@ points = np.c_[x, y, z]
 
 nodes = cigvis.create_slices(sx)
 
-# cyclinder=False: 半径和颜色都表示测井值的大小
-# cyclinder=True: 井柱半径不变
+# cyclinder=False: radius and color both encode log values
+# cyclinder=True: keep the well tube radius fixed
 nodes += cigvis.create_well_logs(
     points,
     v,
@@ -57,4 +57,12 @@ nodes += cigvis.create_well_logs(
 # nodes += cigvis.create_colorbar_from_nodes(nodes, 'Log Impedance', select='logs', idx=0, idx2=1)
 nodes += cigvis.create_axis(sx.shape, 'axis', 'auto', axis_labels=['Inline [km]', 'Xline [km]', 'Time [s]'], line_width=1, intervals=[0.025, 0.025, 0.002], rotation=(30, -30, -90), tick_nums=4)
 
-cigvis.plot3D(nodes, zoom_factor=8, size=(800, 600), savename='example.png', xyz_axis=False)
+cigvis.plot3D(
+    nodes,
+    view=cigvis.Plot3DView(
+        size=(800, 600),
+        zoom_factor=8,
+        xyz_axis=False,
+    ),
+    save=cigvis.Plot3DSave(path='example.png'),
+)

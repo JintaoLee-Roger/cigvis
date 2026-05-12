@@ -78,22 +78,40 @@ import importlib.util
 _has_viser = importlib.util.find_spec("viser") is not None
 _has_vispy = importlib.util.find_spec("vispy") is not None
 _has_plotly = importlib.util.find_spec("plotly") is not None
-_has_pyqt5 = importlib.util.find_spec("PyQt5") is not None
 
 
 from .config import *
 from . import io
 from . import colormap
 from . import meshs
-if _has_vispy and _has_pyqt5:
-    from . import gui
+_has_pyside6 = importlib.util.find_spec("PySide6") is not None
 
-injupyter = is_running_in_notebook()
+# GUI is loaded lazily to avoid importing Qt unless the user asks for it.
+# Access it as cigvis.gui, or import directly:
+#   from cigvis.gui import gui2d, gui3d
+_lazy_modules = {}
+if _has_vispy and _has_pyside6:
+    _lazy_modules['gui'] = 'cigvis.gui'
 
-if injupyter and _has_plotly:
-    from .plotlyplot import *
-elif not injupyter and _has_vispy:
+
+def __getattr__(name):
+    if name in _lazy_modules:
+        import importlib
+        mod = importlib.import_module(_lazy_modules[name])
+        globals()[name] = mod
+        return mod
+    raise AttributeError(f"module 'cigvis' has no attribute {name!r}")
+
+if _has_vispy:
     from .vispyplot import *
+
+try:
+    from . import plotlyplot
+except BaseException as E:
+    plotlyplot = ExceptionWrapper(
+        E,
+        "run `pip install \"cigvis[plotly]\"` or run `pip install \"cigvis[all]\"` to install the dependencies"
+    )
 
 try:
     from . import viserplot
@@ -101,6 +119,14 @@ except BaseException as E:
     viserplot = ExceptionWrapper(
         E,
         "run `pip install \"cigvis[viser]\"` or run `pip install \"cigvis[all]\"` to install the dependencies"
+    )
+
+try:
+    from . import sliceviewer
+except BaseException as E:
+    sliceviewer = ExceptionWrapper(
+        E,
+        "run `pip install \"cigvis[sliceviewer]\"` or `pip install panel plotly anywidget` to enable sliceviewer"
     )
 
 from .mpl2dplot import *

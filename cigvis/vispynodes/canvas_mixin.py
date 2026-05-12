@@ -3,14 +3,52 @@
 # University of Science and Technology of China (USTC).
 # All rights reserved.
 
-import vispy
+from numbers import Integral, Real
+
 from vispy.util import keys
-from vispy.gloo.util import _screenshot
 
 import cigvis
 from .indicator import XYZAxis, NorthPointer
 from .axis_aligned_image import AxisAlignedImage
-from vispy.visuals import MeshVisual, CompoundVisual
+from .screenshot import _save_canvas_png
+
+
+def _round_float(value, ndigits=6):
+    value = float(value)
+    if abs(value) < 10 ** (-(ndigits + 1)):
+        value = 0.0
+    return round(value, ndigits)
+
+
+def _python_value(value, ndigits=6):
+    if hasattr(value, 'tolist'):
+        value = value.tolist()
+    if isinstance(value, tuple):
+        return tuple(_python_value(v, ndigits) for v in value)
+    if isinstance(value, list):
+        return [_python_value(v, ndigits) for v in value]
+    if isinstance(value, dict):
+        return {k: _python_value(v, ndigits) for k, v in value.items()}
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, Integral):
+        return int(value)
+    if isinstance(value, Real):
+        return _round_float(value, ndigits)
+    return value
+
+
+def _literal(value):
+    return repr(_python_value(value))
+
+
+def _print_kw(name, value, indent='    '):
+    print(f'{indent}{name}={_literal(value)},')
+
+
+def _api_axis_scales(factors):
+    signs = [1 - 2 * reversed_ for reversed_ in cigvis.is_axis_reversed()]
+    return tuple(factor * sign for factor, sign in zip(factors, signs))
 
 
 class EventMixin:
@@ -130,15 +168,15 @@ class EventMixin:
 
         # Press <s> to save a screenshot.
         if event.text == 's':
-            # viewport = list(gl.glGetParameter(gl.GL_VIEWPORT))
-            # border = (viewport[3] - self.size[1]) // 2
-            # viewport[0] = viewport[2] - self.size[0] - border
-            # viewport[1] = viewport[3] - self.size[1] - border
-            # viewport[2] = self.size[0]
-            # viewport[3] = self.size[1]
-            screenshot = _screenshot()
-            # screenshot = self.render()
-            vispy.io.write_png(self.pngDir + self.title + '.png', screenshot)
+            _save_canvas_png(
+                self,
+                self.title + '.png',
+                self.pngDir,
+                getattr(self, '_shortcut_save_kw', {
+                    'mode': 'screen',
+                    'transparent_bg': True,
+                }),
+            )
 
         # Press <d> to toggle drag mode.
         if event.text == 'd':
@@ -156,36 +194,54 @@ class EventMixin:
 
         # Press <a> to get the parameters of all visual nodes.
         if event.text == 'a':
-            print("===== All useful parameters ====")
-            # Canvas size.
-            print("Canvas size = {}".format(self.size))
-            # Collect camera parameters.
-            print("Camera:")
+            print("===== Copyable cigvis state =====")
             camera_state = self.view[0].camera.get_state()
-            for key, value in camera_state.items():
-                print(" - {} = {}".format(key, value))
-            print(" - {} = {}".format('zoom factor', self.zoom_factor))
-
-            # axis scales
             factors = list(self.view[0].camera._flip_factors)
-            print(f'axes scale ratio (< 0 means axis reversed):')
-            print(f' - x: {factors[0]}')
-            print(f' - y: {factors[1]}')
-            print(f' - z: {factors[2]}')
+            view_kwargs = {
+                'size': tuple(self.size),
+                'scale_factor': camera_state.get('scale_factor'),
+                'center': camera_state.get('center'),
+                'fov': camera_state.get('fov'),
+                'azimuth': camera_state.get('azimuth'),
+                'elevation': camera_state.get('elevation'),
+                'axis_scales': _api_axis_scales(factors),
+            }
+            if getattr(self, 'nrows', 1) > 1 or getattr(self, 'ncols', 1) > 1:
+                view_kwargs['grid'] = (self.nrows, self.ncols)
+                view_kwargs['share'] = self.share
 
-            # Collect slice parameters.
-            print("Slices:")
+            print("# Paste into cigvis.plot3D(...):")
+            print("view=cigvis.Plot3DView(")
+            for key, value in view_kwargs.items():
+                if value is not None:
+                    _print_kw(key, value)
+            print("),")
+
             pos_dict = {'x': [], 'y': [], 'z': []}
             for node in self.view[0].scene.children:
-                if self._check_drag(node):
-                    pos = node.pos
-                    pos_dict[node.axis].append(pos)
-            for axis, pos in pos_dict.items():
-                print(" - {}: {}".format(axis, pos))
-            # Collect the axis legend parameters.
+                axis = getattr(node, 'axis', None)
+                if self._check_drag(node) and axis in pos_dict:
+                    pos_dict[axis].append(_python_value(node.pos))
+
+            print("")
+            print("# Paste into cigvis.create_slices(...):")
+            _print_kw('pos', pos_dict)
+
+            xyz_axis_locs = []
             for node in self.view[0].children:
                 if isinstance(node, XYZAxis):
-                    print("XYZAxis loc = {}".format(node.loc))
+                    xyz_axis_locs.append(_python_value(node.loc))
+            if xyz_axis_locs:
+                print("")
+                print("# Current axis legend location(s):")
+                _print_kw('xyz_axis_loc', xyz_axis_locs)
+
+            print("")
+            print("# Raw camera state:")
+            for key, value in camera_state.items():
+                _print_kw(key, value)
+            _print_kw('zoom_factor', self.zoom_factor)
+            _print_kw('camera_axis_scales', tuple(factors))
 
         # zoom in z axis, press <z>
         if event.text == 'z':
@@ -272,90 +328,6 @@ class EventMixin:
                     if self._check_drag(n) and n.ids == ids
                 ]
 
-
-class LightMixin:
-    # HACK: 直接绑定 ShadingFilter 会不会更方便
-    # 使用 mesh._vshare.filters 获取 attach 的 ShadingFilter
-    def _attach_light(self, view, nodes):
-        light_dir = (0, -1, 0, 0)
-
-        initial_light_dir = view.camera.transform.imap(light_dir)
-        if not hasattr(self, "initial_light_dir"):
-            self.initial_light_dir = initial_light_dir
-        view.camera.azimuth = self.azimuth
-        view.camera.elevation = self.elevation
-
-        for node in nodes:
-            if isinstance(node, MeshVisual):
-                if node.shading_filter is not None:
-                    node.shading_filter.light_dir = view.camera.transform.map(
-                        initial_light_dir)[:3]
-            if isinstance(node, CompoundVisual):
-                if hasattr(node, 'meshs'):
-                    for mesh in node.meshs:
-                        if mesh.shading_filter is not None:
-                            mesh.shading_filter.light_dir = view.camera.transform.map(
-                                initial_light_dir)[:3]
-
-        @view.scene.transform.changed.connect
-        def on_transform_change(event):
-            if not self.dyn_light:
-                return
-            transform = view.camera.transform
-            for node in nodes:
-                if hasattr(node, 'dyn_light') and not node.dyn_light:
-                    continue
-                if isinstance(node, MeshVisual):
-                    if node.shading_filter is not None:
-                        node.shading_filter.light_dir = transform.map(
-                            initial_light_dir)[:3]
-                if isinstance(node, CompoundVisual):
-                    if hasattr(node, 'meshs'):
-                        for mesh in node.meshs:
-                            if mesh.shading_filter is not None:
-                                mesh.shading_filter.light_dir = transform.map(
-                                    initial_light_dir)[:3]
-
-    def _attach_light_share(self, view, nodess):
-        light_dir = (0, -1, 0, 0)
-        initial_light_dir = view.camera.transform.imap(light_dir)
-        if not hasattr(self, "initial_light_dir"):
-            self.initial_light_dir = initial_light_dir
-        view.camera.azimuth = self.azimuth
-        view.camera.elevation = self.elevation
-
-        for nodes in nodess.values():
-            for node in nodes:
-                if isinstance(node, MeshVisual):
-                    if node.shading_filter is not None:
-                        node.shading_filter.light_dir = view.camera.transform.map(
-                            initial_light_dir)[:3]
-                if isinstance(node, CompoundVisual):
-                    if hasattr(node, 'meshs'):
-                        for mesh in node.meshs:
-                            if mesh.shading_filter is not None:
-                                mesh.shading_filter.light_dir = view.camera.transform.map(
-                                    initial_light_dir)[:3]
-
-        @view.scene.transform.changed.connect
-        def on_transform_change(event):
-            if not self.dyn_light:
-                return
-            transform = view.camera.transform
-            for nodes in nodess.values():
-                for node in nodes:
-                    if hasattr(node, 'dyn_light') and not node.dyn_light:
-                        continue
-                    if isinstance(node, MeshVisual):
-                        if node.shading_filter is not None:
-                            node.shading_filter.light_dir = transform.map(
-                                initial_light_dir)[:3]
-                    if isinstance(node, CompoundVisual):
-                        if hasattr(node, 'meshs'):
-                            for mesh in node.meshs:
-                                if mesh.shading_filter is not None:
-                                    mesh.shading_filter.light_dir = transform.map(
-                                        initial_light_dir)[:3]
 
 
 class AxisMixin:

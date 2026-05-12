@@ -6,7 +6,7 @@
 Based on the `Mesh` of vispy, we create a new class to maintenance the instance of surface, instead of the general `Mesh` class 
 """
 
-from typing import Callable, List, Tuple
+from typing import List, Tuple
 import warnings
 import numpy as np
 from vispy.scene import Mesh
@@ -16,6 +16,7 @@ from cigvis.meshs import surface2mesh, arbline2mesh, points2quad
 from cigvis.utils import surfaceutils
 from .axis_aligned_image import AxisAlignedImage
 import matplotlib.colors as mcolors
+from .shading_filter import HeadlightShadingFilter
 
 
 class SurfaceNode(Mesh):
@@ -73,10 +74,15 @@ class SurfaceNode(Mesh):
 
         vertices, faces = self.to_meshs()
 
-        super().__init__(vertices=vertices,
-                         faces=faces,
-                         shading=shading,
-                         **kwargs)
+        if dyn_light and shading is not None:
+            super().__init__(vertices=vertices, faces=faces, shading=None, **kwargs)
+            self.unfreeze()
+            self._headlight = HeadlightShadingFilter(shading=shading)
+            self.freeze()
+            self.attach(self._headlight)
+        else:
+            super().__init__(vertices=vertices, faces=faces, shading=shading, **kwargs)
+
         self.process_values()
 
         self.is_instance = True
@@ -199,7 +205,7 @@ class SurfaceNode(Mesh):
                 try:
                     c = mcolors.to_rgb(value)
                     self.values[i] = c
-                except:
+                except Exception:
                     raise ValueError(f"Invalid value {value}")
 
             # a single color with alpha, e.g., ('red', 0.5)
@@ -208,7 +214,7 @@ class SurfaceNode(Mesh):
                     assert value[1] <= 1 and value[1] >= 0, "alpha must between 0 and 1" # yapf: disable
                     c = mcolors.to_rgba(value[0], value[1])
                     self.values[i] = c
-                except:
+                except Exception:
                     raise ValueError(f"Invalid value {value}")
             
             # rgb/rgba color, e.g., (0.5, 0.5, 0.5) or (0.5, 0.5, 0.5, 0.6)
@@ -284,64 +290,6 @@ class SurfaceNode(Mesh):
         self.values = values
         self.process_values()
 
-    # TODO:
-    def apply_filter_ops(self, ops: Callable[[np.ndarray, np.ndarray],Tuple[np.ndarray, np.ndarray]]):
-        """
-        Apply custom operation function to process vertices and faces, and update mesh data.
-        
-        Parameters:
-            ops: A callable function that takes current vertices and faces arrays as input,
-                 returns updated vertices and faces arrays.
-                 Function signature should be: fn(vertices: np.ndarray, faces: np.ndarray) -> Tuple[np.ndarray, np.ndarray]
-        
-        Returns:
-            Tuple[np.ndarray, np.ndarray]: Updated vertices and faces
-            
-        Example:
-            # Example operation: Move all vertices 1 unit along Y axis
-            def move_vertices_y(vertices, faces):
-                new_vertices = vertices.copy()
-                new_vertices[:, 1] += 1.0  # Increase Y coordinate
-                return new_vertices, faces
-                
-            surface_node.apply_filter_ops(move_vertices_y)
-        """
-        raise NotImplementedError("This method is still in development")
-        if not callable(ops):
-            raise TypeError("ops must be a callable function")
-
-        # Get current vertices and faces data
-        vertices = self._meshdata.get_vertices()
-        faces = self._meshdata.get_faces()
-
-        # Apply custom operation
-        try:
-            new_vertices, new_faces = ops(vertices, faces)
-
-            # Check if returned data types and dimensions are valid
-            if not isinstance(new_vertices, np.ndarray) or not isinstance(
-                    new_faces, np.ndarray):
-                raise TypeError("ops function must return two numpy arrays")
-
-            if new_vertices.ndim != 2 or new_vertices.shape[1] < 3:
-                raise ValueError(
-                    f"Vertex array must be a 2D array with shape (N, 3+) but got {new_vertices.shape}"
-                )
-
-            if new_faces.ndim != 2 or new_faces.shape[1] != 3:
-                raise ValueError(
-                    f"Face array must be a 2D array with shape (M, 3) but got {new_faces.shape}"
-                )
-
-            # Update mesh data
-            self._meshdata.set_vertices(new_vertices)
-            self._meshdata.set_faces(new_faces)
-            self.mesh_data_changed()
-
-            return new_vertices, new_faces
-
-        except Exception as e:
-            raise RuntimeError(f"An error occurred while applying mesh operations: {str(e)}")
 
 
 class ArbLineNode(Mesh):

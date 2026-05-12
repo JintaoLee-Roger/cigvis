@@ -93,11 +93,13 @@ execute = False
 sphinx_gallery_conf = {
     'examples_dirs': [
         '../examples/3Dvispy', '../examples/2D', '../examples/1D',
-        '../examples/colormap', '../examples/gui', '../examples/more_demos', '../examples/viser'
+        '../examples/colormap', '../examples/gui', '../examples/more_demos',
+        '../examples/viser', '../examples/sliceviewer'
     ],
     'gallery_dirs': [
         'gallery/3Dvispy', 'gallery/2D', 'gallery/1D', 'gallery/colormap',
-        'gallery/gui', 'gallery/more_demos', 'gallery/viser'
+        'gallery/gui', 'gallery/more_demos', 'gallery/viser',
+        'gallery/sliceviewer'
     ],
     'filename_pattern':
     re.escape(os.sep),

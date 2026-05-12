@@ -33,4 +33,8 @@ points = np.c_[x, y, z]
 nodes = cigvis.create_slices(sx)
 nodes += cigvis.create_well_logs(points, cmap='red')
 
-cigvis.plot3D(nodes, size=(800, 800), savename='example.png')
+cigvis.plot3D(
+    nodes,
+    view=cigvis.Plot3DView(size=(800, 800)),
+    save=cigvis.Plot3DSave(path='example.png'),
+)

@@ -55,4 +55,4 @@ nodes += cigvis.create_surfaces(
 # idx2=1 means select the second cmap, and clim for the select Surface node, (`labl_cmap` in this case).
 nodes += cigvis.create_colorbar_from_nodes(nodes, 'surface', select='surface', idx=0, idx2=1)
 
-cigvis.plot3D(nodes, xyz_axis=False)
+cigvis.plot3D(nodes, view=cigvis.Plot3DView(xyz_axis=False))

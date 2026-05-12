@@ -29,6 +29,10 @@ lx = np.fromfile(lxp, np.float32).reshape(ni, nx, nt)
 
 nodes = cigvis.create_slices(sx)
 
-nodes += cigvis.create_bodys(lx, level=0.5, margin=0, filter_sigma=1)
+nodes += cigvis.create_bodies(lx, level=0.5, margin=0, filter_sigma=1)
 
-cigvis.plot3D(nodes, size=(800, 800), savename='example.png')
+cigvis.plot3D(
+    nodes,
+    view=cigvis.Plot3DView(size=(800, 800)),
+    save=cigvis.Plot3DSave(path='example.png'),
+)

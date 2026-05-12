@@ -8,6 +8,8 @@ import viser
 from PIL import Image, ImageDraw
 import imageio.v3 as iio
 from packaging import version
+from scipy.ndimage import gaussian_filter
+from skimage.measure import marching_cubes
 
 import cigvis
 from cigvis import colormap
@@ -283,7 +285,11 @@ def create_surfaces(surfs: List[np.ndarray],
             c = c[::step1, ::step2, ...]
             c = c[~mask].flatten().reshape(-1, channel)
 
-        mesh_kwargs = {}  # TODO:
+        mesh_kwargs = {
+            key: value
+            for key, value in kwargs.items()
+            if key not in ('method', 'fill', 'anti_rot')
+        }
 
         if kwargs.get('color', None) is not None:
             v = None
@@ -305,6 +311,106 @@ def create_surfaces(surfs: List[np.ndarray],
         mesh_nodes.append(mesh)
 
     return mesh_nodes
+
+
+def create_bodies(volume: np.ndarray,
+                  level: float,
+                  margin: float = None,
+                  color: str = 'yellow',
+                  filter_sigma: Union[float, List] = None,
+                  **kwargs) -> List:
+    """
+    Create isosurface body nodes for the viser backend.
+
+    Parameters
+    ----------
+    volume : array-like
+        3D volume used by marching cubes.
+    level : float
+        Isovalue extracted from ``volume``.
+    margin : float
+        If not None, set a boundary value before marching cubes.
+    color : str or RGB/RGBA
+        Uniform body color.
+    filter_sigma : float or list
+        Optional Gaussian smoothing before marching cubes.
+    """
+    utils.check_mmap(volume)
+    if (filter_sigma is not None) or (margin is not None):
+        if isinstance(volume, np.memmap) and volume.mode == 'r':
+            raise ValueError(
+                "margin/filter_sigma requires writable or copy-on-write data; "
+                "open memmap with mode='c' or pass a normal ndarray."
+            )
+        volume = np.asarray(volume).copy()
+
+    if filter_sigma is not None:
+        volume = gaussian_filter(volume, filter_sigma)
+
+    if margin is not None:
+        volume[0, :, :] = margin
+        volume[:, 0, :] = margin
+        volume[:, :, 0] = margin
+        volume[-1, :, :] = margin
+        volume[:, -1, :] = margin
+        volume[:, :, -1] = margin
+
+    vertices, faces, _, _ = marching_cubes(volume, level)
+    return [
+        MeshNode(
+            vertices=vertices,
+            faces=faces,
+            color=color,
+            **kwargs,
+        )
+    ]
+
+
+def create_points(points: np.ndarray,
+                  r: float = 2,
+                  color='green',
+                  cmap='jet',
+                  clim=None,
+                  point_shape='circle',
+                  values=None,
+                  colors=None,
+                  **kwargs) -> List:
+    """
+    Create sparse point-cloud nodes for horizons, fault points, or picks.
+
+    ``points`` can be ``(N, 3)``, ``(N, 4)`` with the 4th column as scalar
+    values, or ``(N, 6)/(N, 7)`` with RGB/RGBA colors. When ``color`` is not
+    None, it is used as a uniform color and scalar/color columns are ignored.
+    """
+    points = np.asarray(points)
+    if points.ndim != 2 or points.shape[1] not in (3, 4, 6, 7):
+        raise ValueError("points must have shape (N, 3), (N, 4), (N, 6), or (N, 7)")
+
+    if color is None:
+        if values is None and colors is None:
+            if points.shape[1] == 4:
+                values = points[:, 3]
+            elif points.shape[1] in (6, 7):
+                colors = points[:, 3:]
+            else:
+                values = points[:, 2]
+    else:
+        values = None
+        colors = None
+
+    return [
+        LogPoints(
+            points[:, :3],
+            values=values,
+            colors=colors,
+            cmap=cmap,
+            clim=clim,
+            point_size=r,
+            point_shape=point_shape,
+            color=color,
+            **kwargs,
+        )
+    ]
 
 
 def create_well_logs(

@@ -19,8 +19,7 @@ root = Path(__file__).resolve().parent.parent.parent
 
 def show(sx, points, values, null_value):
     """
-    显示将测井显示为一条等半径的tube,
-    颜色为一条测井曲线的值
+    Display the well log as a constant-radius tube colored by one log curve.
     """
 
     v = values[:, 0]
@@ -29,7 +28,7 @@ def show(sx, points, values, null_value):
     v2[v2 < -900] = v[v!=-999.25].min()
     logs1 = np.concatenate([points, v2[:, np.newaxis]], axis=1)
     nodes0 = cigvis.create_slices(sx)
-    nodes0 += cigvis.create_Line_logs(
+    nodes0 += cigvis.create_line_logs(
         logs1[:, :4],
         value_type='amp')
 
@@ -40,8 +39,8 @@ def show(sx, points, values, null_value):
                                       radius_tube=2,
                                       null_value=null_value)
     """
-    显示将测井显示为一条不同半径的tube,
-    颜色为一条测井曲线的值, 半径的大小也表示测井曲线值的大小
+    Display the well log as a variable-radius tube colored by one log curve.
+    The radius also encodes the log curve value.
     """
 
     nodes2 = cigvis.create_slices(sx)
@@ -52,12 +51,12 @@ def show(sx, points, values, null_value):
                                       radius_tube=[1, 2],
                                       null_value=null_value)
     """
-    显示多条测井曲线
+    Display multiple log curves.
 
-    显示将测井显示为一条不同半径的tube,
-    颜色为第一条测井曲线的值, 半径的大小也表示第一条测井曲线值的大小
+    Display the well log as a variable-radius tube colored by the first log
+    curve. The radius also encodes the first log curve value.
 
-    其他的测井曲线显示为附着在tube表面的面
+    Other log curves are displayed as faces attached to the tube surface.
     """
 
     cmaps = ['jet', 'seismic', 'Petrel', 'od_seismic1']
@@ -73,10 +72,12 @@ def show(sx, points, values, null_value):
 
     cigvis.plot3D(
         [nodes0, nodes1, nodes2, nodes3],
-        grid=(2, 2),
-        #   zoom_factor=16,
-        share=True,
-        savename='example.png')
+        view=cigvis.Plot3DView(
+            grid=(2, 2),
+            # zoom_factor=16,
+            share=True,
+        ),
+        save=cigvis.Plot3DSave(path='example.png'))
 
 
 if __name__ == '__main__':

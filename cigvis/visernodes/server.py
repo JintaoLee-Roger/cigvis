@@ -2,6 +2,7 @@
 # University of Science and Technology of China (USTC).
 # All rights reserved.
 
+from numbers import Integral, Real
 from typing import List
 import viser
 import numpy as np
@@ -13,6 +14,71 @@ from packaging import version
 import imageio.v3 as iio
 from PIL import Image, ImageDraw
 import re
+
+
+def _round_float(value, ndigits=6):
+    value = float(value)
+    if abs(value) < 10 ** (-(ndigits + 1)):
+        value = 0.0
+    return round(value, ndigits)
+
+
+def _python_value(value, ndigits=6):
+    if hasattr(value, 'tolist'):
+        value = value.tolist()
+    if isinstance(value, tuple):
+        return tuple(_python_value(v, ndigits) for v in value)
+    if isinstance(value, list):
+        return [_python_value(v, ndigits) for v in value]
+    if isinstance(value, dict):
+        return {k: _python_value(v, ndigits) for k, v in value.items()}
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, Integral):
+        return int(value)
+    if isinstance(value, Real):
+        return _round_float(value, ndigits)
+    return value
+
+
+def _literal(value):
+    return repr(_python_value(value))
+
+
+def _print_kw(name, value, indent='    '):
+    print(f'{indent}{name}={_literal(value)},')
+
+
+def _infer_init_scale(nodes):
+    for node in nodes:
+        if isinstance(node, VolumeSlice):
+            return list(node.init_scale)
+
+    extents = []
+    for node in nodes:
+        extent = getattr(node, 'data_extent', None)
+        if extent is None:
+            continue
+        extent = np.asarray(extent, dtype=float)
+        extent = extent[np.isfinite(extent)]
+        if extent.size:
+            extents.append(float(np.max(extent)))
+
+    max_extent = max(extents) if extents else 0
+    if max_extent <= 0:
+        return [1.0, 1.0, 1.0]
+    return [1.5 / max_extent] * 3
+
+
+def _node_scale(init_scale, axis_scales):
+    return [s * x for s, x in zip(init_scale, axis_scales)]
+
+
+def _apply_node_scale(node, init_scale, axis_scales):
+    if isinstance(node, VolumeSlice):
+        node.update_scale(axis_scales)
+    elif hasattr(node, 'scale'):
+        node.scale = _node_scale(init_scale, axis_scales)
 
 
 def update_clim(vmin, vmax, type, num, nodes):
@@ -90,6 +156,19 @@ class Server(viser.ViserServer):
         self._link_servers = []
         self.changed = False
 
+    def _clear_plot_state(self):
+        self.draw_slices = -1
+        self.mask_num = 0
+        for attr in (
+            '_guix', '_guiy', '_guiz', '_guiclim', '_guicmap',
+            '_maskclim1', '_maskcmap1', '_maskalpha1', '_maskexcpt1',
+            '_maskclim2', '_maskcmap2', '_maskalpha2', '_maskexcpt2',
+            '_maskclim3', '_maskcmap3', '_maskalpha3', '_maskexcpt3',
+            '_gui_scale', '_region_left', '_region_right',
+        ):
+            if hasattr(self, attr):
+                delattr(self, attr)
+
     def link(self, server):
         if self.nodes is not None:
             raise RuntimeError("Please link a server before adding nodes")
@@ -99,36 +178,37 @@ class Server(viser.ViserServer):
 
     def init_from_nodes(self, nodes, axis_scales, fov, look_at, wxyz, position):
         fov = fov * np.pi / 180
-        init_scale = -1
+        if not nodes:
+            raise ValueError("viserplot.plot3D requires at least one node")
+
+        self._clear_plot_state()
         self.nodes = nodes
+        self._axis_scales = tuple(
+            axis_scales if axis_scales is not None else (1, 1, 1)
+        )
+
+        init_scale = _infer_init_scale(nodes)
         for i, node in enumerate(nodes):
             if isinstance(node, VolumeSlice):
-                init_scale = node.init_scale
-                node.update_scale(axis_scales)
                 self.draw_slices = i
 
-        if init_scale == -1:  # no slices # TODO: for other types, Well logs?
-            init_scale = 100
-            for node in nodes:
-                if isinstance(node, MeshNode):
-                    init_scale = min(min(node.scale), init_scale)
-            init_scale = [init_scale] * 3
-
         self.init_scale = init_scale
-        # update scale of meshes
-        meshid, logsid = 0, 0
+        sliceid, meshid, logsid = 0, 0, 0
         for node in nodes:
-            if isinstance(node, MeshNode):
-                node.scale = [s * x for s, x in zip(init_scale, axis_scales)]
+            _apply_node_scale(node, init_scale, self._axis_scales)
+            if isinstance(node, VolumeSlice):
+                node.name = f'slice-{node.axis}-{sliceid}'
+                sliceid += 1
+            elif isinstance(node, MeshNode):
                 node.name = f'mesh{meshid}'
                 meshid += 1
             elif isinstance(node, LogBase):
-                node.scale = [s * x for s, x in zip(init_scale, axis_scales)]
                 node.name = f'logs{logsid}-{node.base_name}'
                 logsid += 1
             node.server = self
         
-        self.mask_num = len(nodes[self.draw_slices].masks)
+        if self.draw_slices >= 0:
+            self.mask_num = len(nodes[self.draw_slices].masks)
 
         self._add_slices_gui()
         self._add_params_gui()
@@ -199,7 +279,7 @@ class Server(viser.ViserServer):
                 self._guiz.on_update(lambda _: nodez.update_node(self._guiz.value))
 
     def _add_params_gui(self):
-        with self.gui.add_folder("paramters"):
+        with self.gui.add_folder("parameters"):
             if self.draw_slices >= 0:
                 step = (self.nodes[self.draw_slices].clim[1] - self.nodes[self.draw_slices].clim[0] + 1e-6) / 100
                 self._guiclim = self.gui.add_vector2('clim', initial_value=tuple(self.nodes[self.draw_slices].clim), step=step)
@@ -229,13 +309,13 @@ class Server(viser.ViserServer):
 
                 if self.mask_num > 1:
                     step2 = (self.nodes[self.draw_slices].fg_clims[1][1] - self.nodes[self.draw_slices].fg_clims[1][0] + 1e-6) / 100
-                    self._maskclim2 = self.gui.add_vector2('maskclim2', initial_value=tuple(self.nodes[self.draw_slices].fg_clims[1]), step=step2)
+                    self._maskclim2 = self.gui.add_vector2('mask_clim2', initial_value=tuple(self.nodes[self.draw_slices].fg_clims[1]), step=step2)
                     self._maskclim2.on_update(lambda _: update_clim(*self._maskclim2.value, 'fg', 1, nodes=self.nodes))
                     self._maskcmap2 = self.gui.add_dropdown('mask_cmap2', options=['pre-set', 'jet', 'stratum', 'Faults', 'gray'], initial_value='pre-set')
                     alpha2 = self.nodes[self.draw_slices].fg_cmaps[1](0.5)[-1]
                     self._maskalpha2 = self.gui.add_slider('mask_alpha2', min=0, max=1, step=0.05, initial_value=alpha2)
                     excpt2 = self.nodes[self.draw_slices].fg_cmaps[1].excpt if hasattr(self.nodes[self.draw_slices].fg_cmaps[1], 'excpt') else 'none'
-                    maskexcpt2 = self.gui.add_dropdown('mask_excpt2', options=['none', 'min', 'max', 'ramp'], initial_value=excpt2)
+                    self._maskexcpt2 = self.gui.add_dropdown('mask_excpt2', options=['none', 'min', 'max', 'ramp'], initial_value=excpt2)
                     self._maskcmap2.on_update(lambda _: update_mask_cmap(self._maskcmap2.value, self._maskalpha2.value, self._maskexcpt2.value, 1, self.draw_slices, nodes=self.nodes))
                     self._maskalpha2.on_update(lambda _: update_mask_cmap(self._maskcmap2.value, self._maskalpha2.value, self._maskexcpt2.value, 1, self.draw_slices, nodes=self.nodes))
                     self._maskexcpt2.on_update(lambda _: update_mask_cmap(self._maskcmap2.value, self._maskalpha2.value, self._maskexcpt2.value, 1, self.draw_slices, nodes=self.nodes))
@@ -243,7 +323,7 @@ class Server(viser.ViserServer):
 
                 if self.mask_num > 2:
                     step3 = (self.nodes[self.draw_slices].fg_clims[2][1] - self.nodes[self.draw_slices].fg_clims[2][0] + 1e-6) / 100
-                    self._maskclim3 = self.gui.add_vector2('maskclim3', initial_value=tuple(self.nodes[self.draw_slices].fg_clims[2]), step=step3)
+                    self._maskclim3 = self.gui.add_vector2('mask_clim3', initial_value=tuple(self.nodes[self.draw_slices].fg_clims[2]), step=step3)
                     self._maskclim3.on_update(lambda _: update_clim(*self._maskclim3.value, 'fg', 2, nodes=self.nodes))
                     self._maskcmap3 = self.gui.add_dropdown('mask_cmap3', options=['pre-set', 'jet', 'stratum', 'Faults', 'gray'], initial_value='pre-set')
                     alpha3 = self.nodes[self.draw_slices].fg_cmaps[2](0.5)[-1]
@@ -257,12 +337,9 @@ class Server(viser.ViserServer):
             # gui to control aspect
             def _update_scale(scale, nodes):
                 for node in nodes:
-                    if isinstance(node, VolumeSlice):
-                        node.update_scale(scale)
-                    elif isinstance(node, MeshNode):
-                        node.scale = [s * x for s, x in zip(self.init_scale, scale)]
+                    _apply_node_scale(node, self.init_scale, scale)
 
-            self._gui_scale = self.gui.add_vector3('scale', initial_value=(1, 1, 1), step=0.05, min=(0.1, 0.1, 0.1))
+            self._gui_scale = self.gui.add_vector3('scale', initial_value=self._axis_scales, step=0.05, min=(0.1, 0.1, 0.1))
             self._gui_scale.on_update(lambda _: _update_scale(self._gui_scale.value, nodes=self.nodes))
 
 
@@ -373,41 +450,82 @@ class Server(viser.ViserServer):
 
 
 def _print_states(server: Server):
-    client = list(server.get_clients().values())[0]
+    clients = list(server.get_clients().values())
+    if not clients:
+        print('')
+        print('No connected viser client. Open the viewer before printing states.')
+        print('')
+        return
+
+    client = clients[0]
 
     camera = client.camera
     print('')
-    print('----------- Current States ------------')
-    print(f'fov: {_round(camera.fov * 180 / np.pi)}')
-    print(f'look_at: {_round(camera.look_at)}')
-    print(f'wxyz: {_round(camera.wxyz)}')
-    print(f'position: {_round(camera.position)}')
-    print('----------- axis position -------------')
-    print(f'x: {server._guix.value}, y: {server._guiy.value}, z: {server._guiz.value}')
-    print('----------- parameters ----------------')
-    print(f'cmap: {server._guicmap.value}')
-    print(f'clim: {server._guiclim.value}')
-    if server.mask_num > 0:
-        print(f'mask_clim1: {server._maskclim1.value}')
-        print(f'mask_cmap1: {server._maskcmap1.value}')
-        print(f'mask_alpha1: {server._maskalpha1.value}')
-        print(f'mask_excpt1: {server._maskexcpt1.value}')
-    if server.mask_num > 1:
-        print(f'mask_clim2: {server._maskclim2.value}')
-        print(f'mask_cmap2: {server._maskcmap2.value}')
-        print(f'mask_alpha2: {server._maskalpha2.value}')
-        print(f'mask_excpt2: {server._maskexcpt2.value}')
-    if server.mask_num > 2:
-        print(f'mask_clim3: {server._maskclim3.value}')
-        print(f'mask_cmap3: {server._maskcmap3.value}')
-        print(f'mask_alpha3: {server._maskalpha3.value}')
-        print(f'mask_excpt3: {server._maskexcpt3.value}')
-    print('----------- Aspect Ratio --------------')
-    print(f'scale: {server._gui_scale.value}') # yapf: disable
-    if server._has_image_height:
-        print('----------- Screenshot Region --------------')
-        print(f'left_up: {server._region_left.value}')
-        print(f'right_down: {server._region_right.value}')
+    print('===== Copyable cigvis viser state =====')
+    print("# Paste into cigvis.viserplot.plot3D(...):")
+    scale_handle = getattr(server, '_gui_scale', None)
+    scale_value = (
+        scale_handle.value
+        if scale_handle is not None
+        else getattr(server, '_axis_scales', (1, 1, 1))
+    )
+    _print_kw('axis_scales', scale_value)
+    _print_kw('fov', camera.fov * 180 / np.pi)
+    _print_kw('look_at', camera.look_at)
+    _print_kw('wxyz', camera.wxyz)
+    _print_kw('position', camera.position)
+
+    pos = {}
+    for axis, attr in (('x', '_guix'), ('y', '_guiy'), ('z', '_guiz')):
+        handle = getattr(server, attr, None)
+        if handle is not None:
+            pos[axis] = [handle.value]
+    if pos:
+        print('')
+        print("# Paste into cigvis.viserplot.create_slices(...):")
+        _print_kw('pos', pos)
+        if hasattr(server, '_guiclim'):
+            _print_kw('clim', server._guiclim.value)
+        cmap = getattr(getattr(server, '_guicmap', None), 'value', None)
+        if cmap is not None and cmap != 'pre-set':
+            _print_kw('cmap', cmap)
+        elif cmap == 'pre-set':
+            print("    # cmap is unchanged from the node preset.")
+
+    mask_clims = []
+    mask_cmaps = []
+    mask_alpha = []
+    mask_excpt = []
+    for index in range(1, getattr(server, 'mask_num', 0) + 1):
+        clim = getattr(server, f'_maskclim{index}', None)
+        cmap = getattr(server, f'_maskcmap{index}', None)
+        alpha = getattr(server, f'_maskalpha{index}', None)
+        excpt = getattr(server, f'_maskexcpt{index}', None)
+        if clim is not None:
+            mask_clims.append(clim.value)
+        if cmap is not None:
+            mask_cmaps.append(cmap.value)
+        if alpha is not None:
+            mask_alpha.append(alpha.value)
+        if excpt is not None:
+            mask_excpt.append(None if excpt.value == 'none' else excpt.value)
+    if mask_clims or mask_cmaps or mask_alpha or mask_excpt:
+        print('')
+        print("# Current mask GUI values:")
+        if mask_clims:
+            _print_kw('mask_clims', mask_clims)
+        if mask_cmaps:
+            _print_kw('mask_cmaps', mask_cmaps)
+        if mask_alpha:
+            _print_kw('mask_alpha', mask_alpha)
+        if mask_excpt:
+            _print_kw('mask_excpt', mask_excpt)
+
+    if getattr(server, '_has_image_height', False):
+        print('')
+        print("# Current screenshot region:")
+        _print_kw('left_up', server._region_left.value)
+        _print_kw('right_down', server._region_right.value)
 
     print('')
 

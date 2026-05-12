@@ -6,11 +6,11 @@
 Overlay multiple 3D data bodies (RGT, fault) on slices of 3D seismic data bodies
 ====================================================================================
 
-``create_overlay`` 的第一个参数是背景(background), 
-第二个参数是叠加的前景(foreground), 其可以包含多个3D数据体
+The first parameter of ``create_overlay`` is the background, and the second
+parameter is the foreground overlay, which may contain multiple 3D volumes.
 
 .. Note::
-    foreground 需要合理设置透明度和mask
+    Set foreground transparency and masking carefully.
 
 .. image:: ../../_static/cigvis/3Dvispy/04.png
     :alt: image
@@ -47,4 +47,8 @@ nodes = cigvis.add_mask(nodes, [rgt, fx],
                         interpolation=['cubic', 'nearest'])
 nodes += cigvis.create_colorbar_from_nodes(nodes, 'RGT', select='mask', idx=0) # idx = 0 means the first mask
 
-cigvis.plot3D(nodes, size=(750, 600), savename='example.png')
+cigvis.plot3D(
+    nodes,
+    view=cigvis.Plot3DView(size=(750, 600)),
+    save=cigvis.Plot3DSave(path='example.png'),
+)
