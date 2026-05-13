@@ -33,7 +33,7 @@ sf2 = np.fromfile(sfp2, np.float32).reshape(ni, nx)
 nodes = cigvis.create_slices(sx)
 
 # show amplitude
-nodes += cigvis.create_surfaces([sf1],
+nodes += cigvis.create_surfaces([sf1, sf2],
                                 volume=sx,
                                 value_type='amp',
                                 cmap='Petrel',

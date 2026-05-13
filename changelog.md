@@ -10,10 +10,10 @@ and separates backend-specific interfaces more explicitly.
 
 - Added structured `plot3D` option objects:
   - `cigvis.Plot3DView` for canvas, layout, and camera settings.
-  - `cigvis.Plot3DSave` for screenshots and offscreen export.
+  - `cigvis.Plot3DSave` for automatic screenshots.
   - `cigvis.Plot3DColorbar` for colorbar export settings.
   - `cigvis.Plot3DGui` for the optional PySide6 GUI shell.
-- Added high-resolution/offscreen screenshot export options, including `save.size`, `output_policy`, and `transparent_bg`.
+- Added automatic screenshot export through `Plot3DSave`; PNG export uses the current canvas framebuffer and supports transparent backgrounds.
 - Added `plot3D(..., gui=True)` integration with the modern 3D GUI shell, so existing `plot3D` nodes can be opened with a lightweight control panel.
 - Added `VolumeImage` and `create_volume_image` for managing a base volume plus mutable overlays without replacing slice callbacks; this is now the preferred internal path for GUI-style workflows that update masks or overlays repeatedly.
 - Added camera-relative `HeadlightShadingFilter` for mesh, surface, point, and well-log lighting. Lighting is now attached to the visual node itself rather than globally managed by `VisCanvas`.
@@ -42,6 +42,10 @@ and separates backend-specific interfaces more explicitly.
 - Fixed several small Viser/volume-slice issues, including linked-line updates when some axes are absent and the "parameters" GUI label typo.
 - Updated examples, README, and docs to use the new `plot3D(view=..., save=..., cbar=..., gui=...)` API style.
 - Updated transparent-background documentation to use `Plot3DSave(transparent_bg=True)` instead of post-processing a special background color.
+- PNG screenshot/export now uses transparent backgrounds by default; pass `Plot3DSave(transparent_bg=False)` for a solid background.
+- Removed the independent `Plot3DSave.size`/`output_policy` export-size controls. Use `Plot3DView(size=...)` to control the canvas size; automatic saves and the `s` shortcut now share the same framebuffer capture path.
+- Surface/point splats now write depth by default to avoid dense translucent layers smearing over each other during camera or slice movement; volume splats keep the translucent-cloud behavior.
+- `auto_clim` now samples non in-memory array-like inputs instead of forcing a full array read.
 - Updated user-facing comments and examples to use English comments consistently.
 
 **Breaking / Migration Notes**

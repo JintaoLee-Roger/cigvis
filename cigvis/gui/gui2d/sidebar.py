@@ -186,7 +186,6 @@ class LoadPanel(QWidget):
         else:
             item = QListWidgetItem(Path(file_path).name)
             pw = MaskParamsWidget(mode='2d')
-            pw.set_callback = lambda cb: cb  # placeholder
             from cigvis.utils import utils
             v1, v2 = utils.auto_clim(data)
             pw.vmin_edit.set_value(_format_float(v1))

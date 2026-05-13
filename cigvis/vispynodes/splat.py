@@ -24,42 +24,61 @@ attribute float a_size;
 
 varying vec4 v_color;
 varying float v_total_size;
-
-float big_float = 1e10; // prevents numerical imprecision
+varying float v_visible;
 
 void main(void) {
     v_color = a_color;
+    v_visible = 1.0;
 
     vec4 pos = vec4(a_position, 1.0);
     vec4 fb_pos = $visual_to_framebuffer(pos);
 
-    vec4 x;
     vec4 size_vec;
     float v_size;
 
     if (u_scaling) {
         // "scene"/"visual" scaling: interpret a_size in scene/visual units
         pos = $framebuffer_to_scene_or_visual(fb_pos);
-        x = $framebuffer_to_scene_or_visual(fb_pos + vec4(big_float, 0, 0, 0));
-        x = (x - pos);
-        size_vec = $scene_or_visual_to_framebuffer(pos + normalize(x) * a_size);
-        v_size = size_vec.x / size_vec.w - fb_pos.x / fb_pos.w;
+        float pos_w = pos.w == 0.0 ? 1.0 : pos.w;
+        pos = vec4(pos.xyz / pos_w, 1.0);
+
+        float fb_w = fb_pos.w == 0.0 ? 1.0 : fb_pos.w;
+        vec2 fb_xy = fb_pos.xy / fb_w;
+
+        size_vec = $scene_or_visual_to_framebuffer(pos + vec4(a_size, 0.0, 0.0, 0.0));
+        float size_x_w = size_vec.w == 0.0 ? 1.0 : size_vec.w;
+        float size_x = length(size_vec.xy / size_x_w - fb_xy);
+
+        size_vec = $scene_or_visual_to_framebuffer(pos + vec4(0.0, a_size, 0.0, 0.0));
+        float size_y_w = size_vec.w == 0.0 ? 1.0 : size_vec.w;
+        float size_y = length(size_vec.xy / size_y_w - fb_xy);
+
+        size_vec = $scene_or_visual_to_framebuffer(pos + vec4(0.0, 0.0, a_size, 0.0));
+        float size_z_w = size_vec.w == 0.0 ? 1.0 : size_vec.w;
+        float size_z = length(size_vec.xy / size_z_w - fb_xy);
+
+        v_size = max(max(size_x, size_y), size_z);
     } else {
         // "fixed" scaling: a_size in pixels
         v_size = a_size * u_px_scale;
     }
 
+    if (!(v_size > 0.0)) {
+        v_visible = 0.0;
+        v_size = 0.0;
+    }
+    v_size = min(v_size, 4096.0);
+
     // Optional canvas size clamping (in pixels)
-    float original_size = v_size;
     if (u_canvas_size_min >= 0.0) v_size = max(v_size, u_canvas_size_min);
     if (u_canvas_size_max >= 0.0) v_size = min(v_size, u_canvas_size_max);
 
     // Total size includes antialias ring (like Markers)
-    float total_size = v_size + 4.0 * (1.5 * u_antialias);
+    float total_size = v_visible > 0.5 ? v_size + 4.0 * (1.5 * u_antialias) : 0.0;
     v_total_size = total_size;
 
     gl_Position = $framebuffer_to_render(fb_pos);
-    gl_PointSize = total_size;
+    gl_PointSize = max(total_size, 1.0);
 }
 """
 
@@ -73,9 +92,12 @@ uniform bool  u_premultiply; // premultiply alpha for nicer blending
 
 varying vec4 v_color;
 varying float v_total_size;
+varying float v_visible;
 
 // A simple, stable gaussian splat in point sprite coordinates.
 void main(void) {
+    if (v_visible < 0.5) discard;
+
     // point coord in [0,1]
     vec2 pc = gl_PointCoord.xy;
 
@@ -127,13 +149,26 @@ class SplatVisual(Visual):
         Typical: 1e-3 ~ 1e-2.
     premultiply : bool
         Use premultiplied alpha output. Often looks nicer for dense splats.
+    canvas_size_limits : tuple or None
+        Optional point-size clamp in canvas pixels, ``(min, max)``.
+    depth_test : bool
+        Whether splats should be depth-tested against existing geometry.
+    depth_mask : bool
+        Whether splats write depth. Keep this enabled for dense surface-like
+        splats so back layers do not keep blending over front layers. Disable
+        it only for intentionally translucent volume clouds.
     """
 
     def __init__(self, scaling="fixed", alpha=1.0, antialias=1.0,
-                 sigma_rel=0.55, cutoff=1e-2, premultiply=True, **kwargs):
+                 sigma_rel=0.55, cutoff=1e-2, premultiply=True,
+                 canvas_size_limits=None, depth_test=True, depth_mask=True,
+                 **kwargs):
         self._vbo = VertexBuffer()
         self._data = None
         self._scaling = "fixed"
+        self._canvas_size_limits = None
+        self._depth_test = bool(depth_test)
+        self._depth_mask = bool(depth_mask)
 
         Visual.__init__(self, vcode=_SPLAT_VERTEX_SHADER, fcode=_SPLAT_FRAGMENT_SHADER)
         self._draw_mode = 'points'
@@ -148,10 +183,7 @@ class SplatVisual(Visual):
         self.sigma_rel = sigma_rel
         self.cutoff = cutoff
         self.premultiply = premultiply
-
-        # GL state: depth + blending
-        blend_func = ('one', 'one_minus_src_alpha') if premultiply else ('src_alpha', 'one_minus_src_alpha')
-        self.set_gl_state(depth_test=True, blend=True, blend_func=blend_func)
+        self.canvas_size_limits = canvas_size_limits
 
         self.events.add(data_updated=Event)
 
@@ -176,6 +208,7 @@ class SplatVisual(Visual):
         """
         if pos is None or len(pos) == 0:
             self._data = None
+            self.events.data_updated()
             self.update()
             return
 
@@ -220,6 +253,17 @@ class SplatVisual(Visual):
 
         self.events.data_updated()
         self.update()
+
+    def _apply_gl_state(self):
+        blend_func = (
+            ('one', 'one_minus_src_alpha')
+            if self._premultiply
+            else ('src_alpha', 'one_minus_src_alpha')
+        )
+        self.set_gl_state(depth_test=self._depth_test,
+                          depth_mask=self._depth_mask,
+                          blend=True,
+                          blend_func=blend_func)
 
     # -------------------
     # Properties
@@ -291,13 +335,27 @@ class SplatVisual(Visual):
     def premultiply(self, v):
         self._premultiply = bool(v)
         self.shared_program['u_premultiply'] = self._premultiply
-        # update blend func to match mode
-        if self._premultiply:
-            self.set_gl_state(depth_test=True, blend=True,
-                              blend_func=('one', 'one_minus_src_alpha'))
-        else:
-            self.set_gl_state(depth_test=True, blend=True,
-                              blend_func=('src_alpha', 'one_minus_src_alpha'))
+        self._apply_gl_state()
+        self.update()
+
+    @property
+    def depth_test(self):
+        return self._depth_test
+
+    @depth_test.setter
+    def depth_test(self, value):
+        self._depth_test = bool(value)
+        self._apply_gl_state()
+        self.update()
+
+    @property
+    def depth_mask(self):
+        return self._depth_mask
+
+    @depth_mask.setter
+    def depth_mask(self, value):
+        self._depth_mask = bool(value)
+        self._apply_gl_state()
         self.update()
 
     @property
@@ -343,4 +401,4 @@ class SplatVisual(Visual):
         return (pos[:, axis].min(), pos[:, axis].max())
 
 
-Splat =  create_visual_node(SplatVisual)
+Splat = create_visual_node(SplatVisual)

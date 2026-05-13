@@ -8,7 +8,11 @@ GUI 3d demo
 
 Load a file and add some masks.
 
-You can run the follow commands:
+After installation, you can launch the 3D GUI directly from a terminal:
+
+``vis-gui3d``
+
+You can also run the Python API:
 
 1. open a 3d gui panel
 ``python -c "import cigvis; cigvis.gui.gui3d()"``
@@ -29,4 +33,4 @@ You can run the follow commands:
 
 import cigvis
 
-cigvis.gui.gui2d(128, 128, 128, False)
+cigvis.gui.gui3d(128, 128, 128, False)

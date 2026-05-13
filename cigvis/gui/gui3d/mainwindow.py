@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import sys
 import platform
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
 import numpy as np
 
@@ -59,6 +59,17 @@ def _drawer_page(*widgets: QWidget) -> QWidget:
         layout.addWidget(widget)
     layout.addStretch(1)
     return page
+
+
+def _has_mask_overlays(nodes) -> bool:
+    if nodes is None:
+        return False
+    if isinstance(nodes, dict):
+        return any(_has_mask_overlays(value) for value in nodes.values())
+    if isinstance(nodes, (list, tuple)):
+        return any(_has_mask_overlays(item) for item in nodes)
+    images = getattr(nodes, 'overlaid_images', None)
+    return bool(images and len(images) > 1)
 
 
 # ---------------------------------------------------------------------------
@@ -144,13 +155,14 @@ class Gui3dWindow(QMainWindow):
         nodes: Optional[list] = None,
         grid: Optional[tuple] = None,
         share: bool = False,
-        canvas_kwargs: Optional[dict[str, Any]] = None,
+        canvas_kwargs: Optional[Dict[str, Any]] = None,
         parent=None,
     ) -> None:
         super().__init__(parent)
         self._clear_dim = clear_dim
         self._decode_fn = decode_fn
         self._plot_mode = nodes is not None
+        self._plot_has_overlays = self._plot_mode and _has_mask_overlays(nodes)
         self._sam_ctrl: Optional[SamController] = None
         self._last_open_tab_idx: int = 0
         self._sync_timer: Optional[QTimer] = None
@@ -170,6 +182,8 @@ class Gui3dWindow(QMainWindow):
                 ("Visuals", "🎨"),
                 ("View", "📷"),
             ]
+            if self._plot_has_overlays:
+                nav_items.append(("Layers", "🗂"))
         else:
             nav_items = [
                 ("Load", "📂"),
@@ -209,10 +223,14 @@ class Gui3dWindow(QMainWindow):
         self._sam_panel = None
 
         if self._plot_mode:
+            self._overlays_panel = OverlaysPanel3D() if self._plot_has_overlays else None
             pages = [
                 _drawer_page(self._display_panel),
                 _drawer_page(self._camera_panel, self._slices_panel),
             ]
+            if self._overlays_panel is not None:
+                self._overlays_panel.set_mask_items(self.canvas.get_mask_display_params())
+                pages.append(_drawer_page(self._overlays_panel))
             limits = self.canvas.get_slice_limits()
             if limits:
                 self._slices_panel.set_axis_limits(limits)
@@ -482,7 +500,7 @@ def gui3d(
     nodes: Optional[list] = None,
     grid: Optional[tuple] = None,
     share: bool = False,
-    canvas_kwargs: Optional[dict[str, Any]] = None,
+    canvas_kwargs: Optional[Dict[str, Any]] = None,
     run_app: bool = True,
 ) -> Gui3dWindow:
     """

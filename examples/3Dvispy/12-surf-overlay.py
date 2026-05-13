@@ -40,7 +40,7 @@ labl_sf = gaussian(labl_sf, sigma=10)
 labl_sf = labl_sf / labl_sf.max()
 
 # set a colormap for foreground, i.e., label
-labl_cmap = colormap.set_alpha_except_min('jet', 0.6, False)
+labl_cmap = colormap.set_alpha_except_min('jet', 0.6)
 
 nodes = cigvis.create_slices(seis, cmap='Petrel')
 nodes += cigvis.create_surfaces(

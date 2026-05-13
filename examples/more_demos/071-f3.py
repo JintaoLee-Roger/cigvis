@@ -69,8 +69,8 @@ if __name__ == '__main__':
                                  clim=[-2.0, 1.5])
     nodes = cigvis.add_mask(nodes,
                             inter,
-                            clims=fg_clim,
-                            cmaps=fg_cmap,
+                            clim=fg_clim,
+                            cmap=fg_cmap,
                             interpolation='nearest')
 
     salt = np.memmap(saltp, np.float32, 'c', shape=shape)

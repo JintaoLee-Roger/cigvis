@@ -21,7 +21,7 @@ nodes = cigvis.add_mask(nodes, rgt, cmaps=cmap)
 
 cigvis.plot3D(
     nodes,
-    view=cigvis.Plot3DView(size=(900, 700), show=False),
+    view=cigvis.Plot3DView(size=(900, 700)),
     save=cigvis.Plot3DSave(
         path="transparent.png",
         transparent_bg=True,
@@ -29,22 +29,9 @@ cigvis.plot3D(
 )
 ```
 
-如果需要保存更高分辨率的图片，可以单独设置保存尺寸：
-
-```python
-cigvis.plot3D(
-    nodes,
-    view=cigvis.Plot3DView(size=(900, 700), show=False),
-    save=cigvis.Plot3DSave(
-        path="transparent_3000.png",
-        size=(3000, 2000),
-        output_policy="fit",
-        transparent_bg=True,
-    ),
-)
-```
-
-`view.size` 控制交互窗口或基础画布大小；`save.size` 控制导出图片大小。`output_policy="fit"` 会保持内容比例，不强行拉伸画面。
+导出图片尺寸来自当前可见 VisPy canvas 的实际 framebuffer。`Plot3DSave`
+不再提供独立的 `size` 参数；如需改变基础画布尺寸，请调整
+`Plot3DView(size=...)`。
 
 ## 交互后按 s 保存
 
@@ -80,7 +67,7 @@ nodes = cigvis.add_mask(nodes, rgt, cmaps=cmap)
 
 cigvis.plot3D(
     nodes,
-    view=cigvis.Plot3DView(size=(900, 700), show=False),
+    view=cigvis.Plot3DView(size=(900, 700)),
     save=cigvis.Plot3DSave(
         path="transparent.png",
         transparent_bg=True,
@@ -88,22 +75,9 @@ cigvis.plot3D(
 )
 ```
 
-For a higher-resolution export, set `save.size`:
-
-```python
-cigvis.plot3D(
-    nodes,
-    view=cigvis.Plot3DView(size=(900, 700), show=False),
-    save=cigvis.Plot3DSave(
-        path="transparent_3000.png",
-        size=(3000, 2000),
-        output_policy="fit",
-        transparent_bg=True,
-    ),
-)
-```
-
-`view.size` controls the interactive window or base canvas size; `save.size` controls the exported image size. `output_policy="fit"` preserves the content aspect ratio instead of stretching it.
+The exported image size comes from the current visible VisPy canvas framebuffer.
+`Plot3DSave` no longer provides a separate `size` option; adjust
+`Plot3DView(size=...)` if you need a different base canvas size.
 
 ## Press s After Interaction
 

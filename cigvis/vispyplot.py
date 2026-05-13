@@ -22,7 +22,6 @@ In plotly, for a seismic volume,
 
 """
 
-from itertools import product
 from dataclasses import dataclass, fields, is_dataclass
 from typing import Any, Callable, List, Tuple, Dict, Union
 import warnings
@@ -30,9 +29,7 @@ import os
 import numpy as np
 from cigvis.vispynodes import (
     VisCanvas,
-    volume_slices,
     AxisAlignedImage,
-    InteractiveLine,
     Colorbar,
     WellLog,
     XYZAxis,
@@ -40,6 +37,7 @@ from cigvis.vispynodes import (
     ArbLineNode,
     Axis3D,
     NorthPointer,
+    Splat,
 )
 from cigvis.vispynodes.shading_filter import HeadlightShadingFilter
 
@@ -70,10 +68,10 @@ __all__ = [
     "create_Line_logs",
     "create_well_logs",
     "create_points",
+    "create_splats",
     "create_fault_skin",
     "create_arbitrary_line",
     "create_axis",
-    "create_volume_image",
     "Plot3DView",
     "Plot3DSave",
     "Plot3DColorbar",
@@ -107,15 +105,11 @@ class Plot3DView:
 
 @dataclass
 class Plot3DSave:
-    """Options that control screenshot/export behavior in ``plot3D``."""
+    """Options that control automatic screenshots in ``plot3D``."""
 
     path: Any = None
     directory: Any = None
-    size: Union[Tuple[int, int], str] = None
-    mode: str = 'offscreen'
-    output_policy: str = 'fit'
-    transparent_bg: bool = False
-    pad_color: Any = 'white'
+    transparent_bg: bool = True
     bgcolor: Any = None
 
 
@@ -165,12 +159,292 @@ def _set_visual_metadata(visual, **metadata) -> None:
                 pass
 
 
+def _flatten_nodes(nodes):
+    if nodes is None:
+        return []
+    if isinstance(nodes, dict):
+        out = []
+        for value in nodes.values():
+            out.extend(_flatten_nodes(value))
+        return out
+    if isinstance(nodes, (list, tuple)):
+        out = []
+        for item in nodes:
+            out.extend(_flatten_nodes(item))
+        return out
+    return [nodes]
+
+
+def _find_volume_images(nodes):
+    managers = []
+    for node in _flatten_nodes(nodes):
+        vi = getattr(node, "_cigvis_volume_image", None)
+        if vi is None:
+            continue
+        if not any(vi is manager for manager in managers):
+            managers.append(vi)
+    return managers
+
+
+def _next_overlay_name(vi: VolumeImage) -> str:
+    idx = len(getattr(vi, '_overlays', {}))
+    while f'mask_{idx}' in vi._overlays:
+        idx += 1
+    return f'mask_{idx}'
+
+
+def _is_volume_sequence(value) -> bool:
+    if not isinstance(value, (list, tuple)):
+        return False
+    if len(value) == 0:
+        return False
+    return all(hasattr(item, 'ndim') or type(item).__module__ == 'torch' for item in value)
+
+
+def _normalize_single_value(value, name):
+    if isinstance(value, (list, tuple)) and len(value) == 1:
+        return value[0]
+    if isinstance(value, (list, tuple)) and len(value) > 1:
+        raise ValueError(f"add_mask only accepts one {name}; call add_mask repeatedly for multiple masks")
+    return value
+
+
+def _normalize_cmap_value(value):
+    if isinstance(value, dict):
+        return value
+    return _normalize_single_value(value, "cmap")
+
+
+def _normalize_clim_value(value):
+    if value is None:
+        return None
+    if isinstance(value, (list, tuple)) and len(value) == 1 and isinstance(value[0], (list, tuple)):
+        return value[0]
+    return value
+
+
+def _cmap_name(cmap):
+    return cmap if isinstance(cmap, str) else getattr(cmap, 'name', None)
+
+
+_SPLAT_MODE_PRESETS = {
+    'point': {
+        'scaling': 'fixed',
+        'size': 10.0,
+        'alpha': 0.95,
+        'sigma_rel': 0.42,
+        'cutoff': 5e-3,
+        'canvas_size_limits': None,
+        'depth_mask': True,
+    },
+    'surface': {
+        'scaling': 'visual',
+        'size': 4.0,
+        'alpha': 0.8,
+        'sigma_rel': 0.50,
+        'cutoff': 2e-3,
+        'canvas_size_limits': (1.5, 14),
+        'depth_mask': True,
+    },
+    'volume': {
+        'scaling': 'visual',
+        'size': 3.0,
+        'alpha': 0.45,
+        'sigma_rel': 0.58,
+        'cutoff': 1e-3,
+        'canvas_size_limits': (1.0, 18),
+        'depth_mask': False,
+    },
+}
+
+
+def _splat_mode(mode: str) -> str:
+    aliases = {
+        'point': 'point',
+        'points': 'point',
+        'pick': 'point',
+        'picks': 'point',
+        'surface': 'surface',
+        'surf': 'surface',
+        'volume': 'volume',
+        'voxel': 'volume',
+        'voxels': 'volume',
+    }
+    key = aliases.get(str(mode).lower())
+    if key is None:
+        raise ValueError("mode must be 'point', 'surface', or 'volume'")
+    return key
+
+
+def _normalize_splat_values(values, clim=None):
+    values = np.asarray(values, dtype=np.float32)
+    if values.ndim != 1:
+        raise ValueError("values must be a 1D array")
+
+    finite = np.isfinite(values)
+    if clim is None:
+        if np.any(finite):
+            vmin = float(np.nanmin(values[finite]))
+            vmax = float(np.nanmax(values[finite]))
+        else:
+            vmin, vmax = 0.0, 1.0
+    else:
+        if len(clim) != 2:
+            raise ValueError("clim must contain two values")
+        vmin, vmax = float(clim[0]), float(clim[1])
+
+    if not np.isfinite(vmin) or not np.isfinite(vmax) or vmax <= vmin:
+        vmax = vmin + 1.0
+
+    norm = np.zeros(values.shape, dtype=np.float32)
+    norm[finite] = np.clip((values[finite] - vmin) / (vmax - vmin), 0.0, 1.0)
+    return norm, (vmin, vmax)
+
+
+def _splat_color_from_values(values, cmap, clim):
+    norm, _ = _normalize_splat_values(values, clim)
+    cmap = colormap.cmap_to_vispy(cmap)
+    rgba = cmap.map(norm).astype(np.float32)
+    rgba[:, 3] = 1.0
+    return rgba
+
+
+def _sample_splat_inputs(pos, values, color, size, max_points, seed):
+    if max_points is None or len(pos) <= max_points:
+        return pos, values, color, size
+
+    n = len(pos)
+    max_points = int(max_points)
+    if max_points <= 0:
+        raise ValueError("max_points must be positive")
+
+    rng = np.random.default_rng(seed)
+    idx = rng.choice(len(pos), max_points, replace=False)
+    pos = pos[idx]
+
+    if values is not None:
+        values = np.asarray(values)[idx]
+
+    size_arr = np.asarray(size)
+    if size_arr.ndim == 1 and size_arr.shape == (n, ):
+        size = size_arr[idx]
+
+    color_arr = np.asarray(color) if color is not None else None
+    if color_arr is not None and color_arr.ndim == 2 and color_arr.shape[0] == n:
+        color = color_arr[idx]
+
+    return pos, values, color, size
+
+
+def create_splats(pos: np.ndarray,
+                  values: np.ndarray = None,
+                  cmap: str = 'viridis',
+                  clim: List = None,
+                  color=None,
+                  size=None,
+                  mode: str = 'surface',
+                  scaling: str = None,
+                  alpha: float = None,
+                  sigma_rel: float = None,
+                  cutoff: float = None,
+                  antialias: float = 1.0,
+                  canvas_size_limits: Tuple[float, float] = None,
+                  max_points: int = None,
+                  seed: int = 0,
+                  premultiply: bool = True,
+                  depth_test: bool = True,
+                  depth_mask: bool = None,
+                  **kwargs) -> List:
+    """
+    Create a Gaussian splat node from point positions.
+
+    This is a user-facing wrapper around :class:`cigvis.vispynodes.Splat`.
+    ``mode`` chooses practical defaults so callers usually only need
+    positions plus either ``values``/``cmap`` or a fixed ``color``.
+
+    Parameters
+    ----------
+    pos : array-like
+        Point positions, shape ``(N, 2)`` or ``(N, 3)``.
+    values : array-like, optional
+        Per-point scalar values mapped through ``cmap``.
+    cmap, clim
+        Colormap and limits used when ``values`` is provided.
+    color : color or array-like, optional
+        Fixed or per-point RGBA colors. If supplied, it overrides
+        ``values``/``cmap`` coloring.
+    size : float or array-like, optional
+        Splat diameter. Defaults depend on ``mode``.
+    mode : {'point', 'surface', 'volume'}
+        Preset for common use cases.
+    max_points : int, optional
+        Randomly subsample points before upload.
+
+    Returns
+    -------
+    nodes : List
+        A one-item list containing the Splat node, or an empty list when no
+        points are provided.
+    """
+    pos = np.asarray(pos, dtype=np.float32)
+    if pos.ndim != 2 or pos.shape[1] not in (2, 3):
+        raise ValueError("pos must have shape (N,2) or (N,3)")
+    if len(pos) == 0:
+        return []
+
+    preset = dict(_SPLAT_MODE_PRESETS[_splat_mode(mode)])
+    if scaling is not None:
+        preset['scaling'] = scaling
+    if size is not None:
+        preset['size'] = size
+    if alpha is not None:
+        preset['alpha'] = alpha
+    if sigma_rel is not None:
+        preset['sigma_rel'] = sigma_rel
+    if cutoff is not None:
+        preset['cutoff'] = cutoff
+    if canvas_size_limits is not None:
+        preset['canvas_size_limits'] = canvas_size_limits
+    if depth_mask is not None:
+        preset['depth_mask'] = depth_mask
+
+    if values is not None:
+        values = np.asarray(values, dtype=np.float32)
+        if values.shape != (len(pos), ):
+            raise ValueError("values must have shape (N,)")
+
+    pos, values, color, size_data = _sample_splat_inputs(
+        pos, values, color, preset['size'], max_points, seed)
+
+    if color is None:
+        if values is None:
+            color = (1.0, 0.72, 0.18, 1.0)
+        else:
+            color = _splat_color_from_values(values, cmap, clim)
+
+    splat = Splat(
+        scaling=preset['scaling'],
+        alpha=preset['alpha'],
+        antialias=antialias,
+        sigma_rel=preset['sigma_rel'],
+        cutoff=preset['cutoff'],
+        premultiply=premultiply,
+        canvas_size_limits=preset['canvas_size_limits'],
+        depth_test=depth_test,
+        depth_mask=preset['depth_mask'],
+        **kwargs,
+    )
+    splat.set_data(pos=pos, size=size_data, color=color)
+    return [splat]
+
+
 def create_slices(volume: np.ndarray,
                   pos: Union[List, Dict] = None,
                   clim: List = None,
                   cmap: str = 'Petrel',
                   interpolation: str = 'cubic',
                   texture_format=None,
+                  display_range: Dict = None,
                   intersection_lines: bool = True,
                   line_color=(1, 1, 1),
                   line_width=2.0,
@@ -199,6 +473,9 @@ def create_slices(volume: np.ndarray,
     texture_format : None or 'auto',
         if use None, the NaNs will be clip to clim[1],
         and if use 'auto', the NaNs will be discarded, i.e., transparent
+    display_range : Dict
+        optional display ranges in original data coordinates, such as
+        ``{'z': (0, 900)}``. Values are Python half-open ranges ``[start, stop)``.
     
     line_color : Tuple
         color for intersection lines and border lines, default is white
@@ -206,159 +483,43 @@ def create_slices(volume: np.ndarray,
         width for intersection lines and border lines, default is 2.0
 
     kwargs : Dict
-        other kwargs for `volume_slices`
+        other kwargs for `VolumeImage`
 
     Returns
     -------
     slices_nodes : List
         list of slice nodes
     """
-    utils.check_mmap(volume)
-    line_first = cigvis.is_line_first()
-    shape, _ = utils.get_shape(volume, line_first)
-    nt = shape[2]
-
-    # set pos
-    if pos is None:
-        pos = dict(x=[0], y=[0], z=[nt - 1])
-    if isinstance(pos, List):
-        assert len(pos) == 3
-        if isinstance(pos[0], List):
-            x, y, z = pos
-        else:
-            x, y, z = [pos[0]], [pos[1]], [pos[2]]
-        pos = {'x': x, 'y': y, 'z': z}
-    assert isinstance(pos, Dict)
-
-    cmap_name = cmap if isinstance(cmap, str) else getattr(cmap, 'name', None)
-    if clim is None:
-        clim = utils.auto_clim(volume)
-    cmap = colormap.cmap_to_vispy(cmap)
-
-    image_dict = volume_slices(volume,
-                               pos['x'],
-                               pos['y'],
-                               pos['z'],
-                               cmaps=cmap,
-                               clims=clim,
-                               interpolation=interpolation,
-                               texture_format=texture_format)
-
-    image_nodes = []
-    image_nodes += image_dict['x']
-    image_nodes += image_dict['y']
-    image_nodes += image_dict['z']
-    for image_node in image_nodes:
-        _set_visual_metadata(
-            image_node,
-            _cigvis_cmap_name=cmap_name,
-            _cigvis_interpolation=interpolation,
-        )
-        for image in getattr(image_node, 'overlaid_images', [image_node]):
-            _set_visual_metadata(
-                image,
-                _cigvis_cmap_name=cmap_name,
-                _cigvis_interpolation=interpolation,
-            )
-
-    lines_nodes = []
-
-    if not intersection_lines:
-        return image_nodes
-
-    # X-Y intersection lines
-    for x_img, y_img in product(image_dict['x'], image_dict['y']):
-        line = InteractiveLine(
-            ('x', 'y'),
-            shape,
-            color=line_color,
-            width=line_width,
-            antialias=True,
-        )
-        line.link_image(x_img)
-        line.link_image(y_img)
-        line.refresh()
-        lines_nodes.append(line)
-
-    # X-Z intersection lines
-    for x_img, z_img in product(image_dict['x'], image_dict['z']):
-        line = InteractiveLine(
-            ('x', 'z'),
-            shape,
-            color=line_color,
-            width=line_width,
-            antialias=True,
-        )
-        line.link_image(x_img)
-        line.link_image(z_img)
-        line.refresh()
-        lines_nodes.append(line)
-
-    # Y-Z intersection lines
-    for y_img, z_img in product(image_dict['y'], image_dict['z']):
-        line = InteractiveLine(
-            ('y', 'z'),
-            shape,
-            color=line_color,
-            width=line_width,
-            antialias=True,
-        )
-        line.link_image(y_img)
-        line.link_image(z_img)
-        line.refresh()
-        lines_nodes.append(line)
-
-    # contour lines for X Images
-    for x_img in image_dict['x']:
-        line = InteractiveLine(
-            ('x', ),
-            shape,
-            color=line_color,
-            width=line_width,
-            antialias=True,
-        )
-        line.link_image(x_img)
-        line.refresh()
-        lines_nodes.append(line)
-
-    # contour lines for Y Images
-    for y_img in image_dict['y']:
-        line = InteractiveLine(
-            ('y', ),
-            shape,
-            color=line_color,
-            width=line_width,
-            antialias=True,
-        )
-        line.link_image(y_img)
-        line.refresh()
-        lines_nodes.append(line)
-
-    # contour lines for Z Images
-    for z_img in image_dict['z']:
-        line = InteractiveLine(
-            ('z', ),
-            shape,
-            color=line_color,
-            width=line_width,
-            antialias=True,
-        )
-        line.link_image(z_img)
-        line.refresh()
-        lines_nodes.append(line)
-
-    return image_nodes + lines_nodes
+    vi = VolumeImage(
+        volume,
+        cmap=cmap,
+        clim=clim,
+        interpolation=interpolation,
+        texture_format=texture_format,
+        display_range=display_range,
+        **kwargs,
+    )
+    vi.create_slices(pos=pos)
+    return vi.nodes(
+        intersection_lines=intersection_lines,
+        line_color=line_color,
+        line_width=line_width,
+    )
 
 
 def add_mask(nodes: List,
-             volumes: Union[List, np.ndarray],
-             clims: Union[List, Tuple] = None,
-             cmaps: Union[str, List] = None,
+             volume: Union[List, np.ndarray],
+             clim: Union[List, Tuple] = None,
+             cmap: Union[str, Dict] = None,
              interpolation: str = 'linear',
-             alpha = None,
-             excpt = None,
+             alpha=None,
+             excpt=None,
              method: str = 'auto',
              texture_format: str = 'auto',
+             preproc_func: Callable = None,
+             *,
+             clims: Union[List, Tuple] = None,
+             cmaps: Union[str, Dict] = None,
              preproc_funcs: Callable = None,
              **kwargs) -> List:
     """
@@ -368,12 +529,14 @@ def add_mask(nodes: List,
     -----------
     nodes: List[Node]
         A List that contains `AxisAlignedImage` (may be created by `create_slices`)
-    volumes : array-like or List
-        3D array(s), foreground volume(s)/mask(s)
-    clims : List
+    volume : array-like
+        3D foreground volume/mask. Add multiple masks by calling add_mask
+        repeatedly.
+    clim : List
         [vmin, vmax] for foreground slices plotting
-    cmaps : str or Colormap
-        colormap for foreground slices, it can be str or matplotlib's Colormap or vispy's Colormap
+    cmap : str, Dict, or Colormap
+        colormap for foreground slices. A dict such as ``{'x': 'Reds',
+        'z': 'Blues'}`` applies the mask only to those axes.
     interpolation : str
         interpolation method. If the values of the slices is discrete, we recommand 
         set as 'nearest'
@@ -388,59 +551,119 @@ def add_mask(nodes: List,
         list of slice nodes
     """
 
-    if not isinstance(volumes, List):
-        volumes = [volumes]
+    if cmaps is not None:
+        if cmap is not None:
+            raise ValueError("Specify only one of 'cmap' or deprecated 'cmaps'")
+        warnings.warn(
+            "'cmaps' is deprecated; use 'cmap' instead.",
+            FutureWarning,
+            stacklevel=2,
+        )
+        cmap = cmaps
+    if clims is not None:
+        if clim is not None:
+            raise ValueError("Specify only one of 'clim' or 'clims'")
+        clim = clims
+    if preproc_funcs is not None:
+        if preproc_func is not None:
+            raise ValueError("Specify only one of 'preproc_func' or 'preproc_funcs'")
+        preproc_func = preproc_funcs
 
-    for volume in volumes:
-        # TODO: check shape as same as base image
-        utils.check_mmap(volume)
+    if _is_volume_sequence(volume):
+        if len(volume) != 1:
+            raise ValueError(
+                "add_mask no longer accepts multiple volumes. "
+                "Call add_mask repeatedly, for example: "
+                "nodes = cigvis.add_mask(nodes, rgt, cmap='stratum'); "
+                "nodes = cigvis.add_mask(nodes, fault, cmap='jet')"
+            )
+        volume = volume[0]
 
-    if clims is None:
-        clims = [utils.auto_clim(v) for v in volumes]
-    if not isinstance(clims[0], (List, Tuple)):
-        clims = [clims]
+    interpolation = _normalize_single_value(interpolation, "interpolation")
+    alpha = _normalize_single_value(alpha, "alpha")
+    excpt = _normalize_single_value(excpt, "excpt")
+    preproc_func = _normalize_single_value(preproc_func, "preproc_func")
+    cmap = _normalize_cmap_value(cmap)
+    clim = _normalize_clim_value(clim)
 
-    if cmaps is None:
-        raise ValueError("'cmaps' cannot be 'None'")
-    if not isinstance(cmaps, List):
-        cmaps = [cmaps] * len(volumes)
-    cmap_names = [
-        cmap if isinstance(cmap, str) else getattr(cmap, 'name', None)
-        for cmap in cmaps
-    ]
-    if not isinstance(alpha, List):
-        alpha = [alpha] * len(volumes)
-    if not isinstance(excpt, List):
-        excpt = [excpt] * len(volume)
-    for i in range(len(cmaps)):
-        if alpha[i] is not None:
-            cmaps[i] = colormap.fast_set_cmap(cmaps[i], alpha[i], excpt[i])
-        cmaps[i] = colormap.cmap_to_vispy(cmaps[i])
+    utils.check_mmap(volume)
+    if cmap is None:
+        raise ValueError("'cmap' cannot be None")
 
-    if isinstance(interpolation, str):
-        interpolation = [interpolation] * len(volumes)
-    if not isinstance(preproc_funcs, List):
-        preproc_funcs = [preproc_funcs] * len(volumes)
+    def _prepare_cmap(cmap_value):
+        name = _cmap_name(cmap_value)
+        if alpha is not None:
+            cmap_value = colormap.fast_set_cmap(cmap_value, alpha, excpt)
+        return cmap_value, name
 
-    for node in nodes:
+    if isinstance(cmap, dict):
+        cmap_for_manager = {}
+        cmap_names = {}
+        for axis, cmap_value in cmap.items():
+            axis = str(axis).lower()
+            if axis not in ('x', 'y', 'z'):
+                raise ValueError("cmap dict keys must be one of 'x', 'y', or 'z'")
+            cmap_value, name = _prepare_cmap(cmap_value)
+            cmap_for_manager[axis] = cmap_value
+            cmap_names[axis] = name
+        axes = tuple(cmap_for_manager.keys())
+    else:
+        cmap_for_manager, cmap_names = _prepare_cmap(cmap)
+        axes = None
+
+    managers = _find_volume_images(nodes)
+    if len(managers) > 1:
+        raise ValueError(
+            "add_mask found slices from multiple VolumeImage managers. "
+            "Call add_mask separately for each create_slices result."
+        )
+
+    if len(managers) == 1:
+        vi = managers[0]
+        vi.add_overlay_volume(
+            name=_next_overlay_name(vi),
+            volume=volume,
+            cmap=cmap_for_manager,
+            cmap_names=cmap_names,
+            clim=clim,
+            interpolation=interpolation,
+            preproc=preproc_func,
+            method=method,
+            texture_format=texture_format,
+            axes=axes,
+        )
+        return nodes
+
+    if clim is None:
+        clim = utils.auto_clim(volume)
+
+    flat_nodes = _flatten_nodes(nodes)
+    for node in flat_nodes:
         if not isinstance(node, AxisAlignedImage):
             continue
-        for i in range(len(volumes)):
-            node.add_mask(
-                volumes[i],
-                cmaps[i],
-                clims[i],
-                interpolation[i],
-                method=method,
-                texture_format=texture_format,
-                preproc_f=preproc_funcs[i],
-            )
-            image = node.overlaid_images[-1]
-            _set_visual_metadata(
-                image,
-                _cigvis_cmap_name=cmap_names[i],
-                _cigvis_interpolation=interpolation[i],
-            )
+        if isinstance(cmap_for_manager, dict):
+            if node.axis not in cmap_for_manager:
+                continue
+            node_cmap = colormap.cmap_to_vispy(cmap_for_manager[node.axis])
+            node_cmap_name = cmap_names[node.axis]
+        else:
+            node_cmap = colormap.cmap_to_vispy(cmap_for_manager)
+            node_cmap_name = cmap_names
+        node.add_mask(
+            volume,
+            node_cmap,
+            clim,
+            interpolation,
+            method=method,
+            texture_format=texture_format,
+            preproc_f=preproc_func,
+        )
+        image = node.overlaid_images[-1]
+        _set_visual_metadata(
+            image,
+            _cigvis_cmap_name=node_cmap_name,
+            _cigvis_interpolation=interpolation,
+        )
 
     return nodes
 
@@ -451,6 +674,7 @@ def create_volume_image(
     clim: List = None,
     cmap: str = 'Petrel',
     interpolation: str = 'linear',
+    display_range: Dict = None,
     **kwargs,
 ) -> VolumeImage:
     """
@@ -487,32 +711,14 @@ def create_volume_image(
         cmap=cmap,
         clim=clim,
         interpolation=interpolation,
+        display_range=display_range,
         **kwargs,
     )
 
-    if pos is None:
-        shape, _ = utils.get_shape(volume, cigvis.is_line_first())
-        pos = dict(x=[0], y=[0], z=[shape[2] - 1])
-    if isinstance(pos, list):
-        assert len(pos) == 3
-        if isinstance(pos[0], list):
-            x, y, z = pos
-        else:
-            x, y, z = [pos[0]], [pos[1]], [pos[2]]
-        pos = {'x': x, 'y': y, 'z': z}
-
-    vi.create_slices(
-        x_pos=pos.get('x'),
-        y_pos=pos.get('y'),
-        z_pos=pos.get('z'),
-    )
+    vi.create_slices(pos=pos)
     return vi
 
 
-@utils.deprecated(
-    "This compatibility wrapper keeps the old vispy overlay API working.",
-    "`cigvis.create_slices` plus `cigvis.add_mask`",
-)
 def create_overlay(bg_volume: np.ndarray,
                    fg_volume: np.ndarray,
                    pos: Union[List, Dict] = None,
@@ -526,83 +732,15 @@ def create_overlay(bg_volume: np.ndarray,
                    cbar_type: str = 'fg',
                    **kwargs) -> List:
     """
-    Deprecated compatibility wrapper for the old overlay-slice API.
+    Deprecated overlay API.
 
-    Prefer ``create_slices(bg_volume)`` followed by ``add_mask(...)`` for new
-    code. This function intentionally preserves the old return shape.
+    Use ``create_slices(bg_volume)`` followed by ``add_mask(...)``.
     """
-    utils.check_mmap(bg_volume)
-    if not isinstance(fg_volume, list):
-        fg_volume = [fg_volume]
-    for volume in fg_volume:
-        assert bg_volume.shape == volume.shape
-        utils.check_mmap(volume)
-
-    line_first = cigvis.is_line_first()
-    if line_first:
-        nt = bg_volume.shape[2]
-    else:
-        nt = bg_volume.shape[0]
-
-    if pos is None:
-        pos = dict(x=[0], y=[0], z=[nt - 1])
-    if isinstance(pos, list):
-        assert len(pos) == 3
-        if isinstance(pos[0], list):
-            x, y, z = pos
-        else:
-            x, y, z = [pos[0]], [pos[1]], [pos[2]]
-        pos = {'x': x, 'y': y, 'z': z}
-    assert isinstance(pos, dict)
-
-    if bg_clim is None:
-        bg_clim = utils.auto_clim(bg_volume)
-    if fg_clim is None:
-        fg_clim = [utils.auto_clim(v) for v in fg_volume]
-    if not isinstance(fg_clim[0], (list, tuple)):
-        fg_clim = [fg_clim]
-
-    bg_cmap = colormap.cmap_to_vispy(bg_cmap)
-    if fg_cmap is None:
-        raise ValueError("'fg_cmap' cannot be 'None'")
-    if not isinstance(fg_cmap, list):
-        fg_cmap = [fg_cmap] * len(fg_volume)
-    for i in range(len(fg_cmap)):
-        fg_cmap[i] = colormap.cmap_to_vispy(fg_cmap[i])
-
-    if isinstance(fg_interpolation, str):
-        fg_interpolation = [fg_interpolation] * len(fg_volume)
-
-    nodes_dict = volume_slices(
-        [bg_volume, *fg_volume],
-        pos['x'],
-        pos['y'],
-        pos['z'],
-        cmaps=[bg_cmap, *fg_cmap],
-        clims=[bg_clim, *fg_clim],
-        interpolation=[bg_interpolation, *fg_interpolation],
+    raise RuntimeError(
+        "cigvis.create_overlay is no longer supported for the VisPy backend. "
+        "Use `nodes = cigvis.create_slices(bg_volume)` and then "
+        "`nodes = cigvis.add_mask(nodes, fg_volume, cmap='jet')`."
     )
-
-    nodes = []
-    nodes += nodes_dict['x']
-    nodes += nodes_dict['y']
-    nodes += nodes_dict['z']
-
-    if return_cbar:
-        if cbar_type == 'fg':
-            cmap = fg_cmap
-            clim = fg_clim
-        else:
-            cmap = bg_cmap
-            clim = bg_clim
-
-        if kwargs.get('discrete', False) and kwargs.get('disc_ticks', None) is None:
-            kwargs['disc_ticks'] = [np.unique(fg_volume[0])]
-
-        cbar = create_colorbar(cmap, clim, **kwargs)
-        return nodes, cbar
-
-    return nodes
 
 
 def create_colorbar(cmap,
@@ -692,9 +830,13 @@ def create_colorbar_from_nodes(nodes,
     clim = None
     if select == 'mask' or (select == 'last' and isinstance(nodes[-1], AxisAlignedImage) and len(nodes[-1].overlaid_images) > 1):
         if select != 'last':
-            node = [node for node in nodes if isinstance(node, AxisAlignedImage)]
-            if len(node) == 0 or len(node[0].overlaid_images) == 1:
-                raise ValueError(f"No valid nodes, {len(node)} AxisAlignedImage or no mask")
+            node = [
+                node for node in nodes
+                if isinstance(node, AxisAlignedImage)
+                and len(node.overlaid_images) > 1
+            ]
+            if len(node) == 0:
+                raise ValueError("No valid nodes, no AxisAlignedImage with mask")
             if len(node[0].overlaid_images) == 2:
                 idx = 0
             elif len(node[0].overlaid_images) <= idx + 1:
@@ -1774,8 +1916,6 @@ def plot3D(nodes: List,
     ...     ),
     ...     save=cigvis.Plot3DSave(
     ...         path='example.png',
-    ...         size=(3000, 2000),
-    ...         output_policy='fit',
     ...         transparent_bg=True,
     ...     ),
     ...     cbar=cigvis.Plot3DColorbar(save=False),
@@ -1783,8 +1923,8 @@ def plot3D(nodes: List,
     ... )
 
     Plain dicts are also accepted for ``view``/``save``/``cbar``/``gui``.
-    Use ``view={'show': False}`` with ``save={...}`` to save offscreen
-    without showing a window.
+    Automatic PNG saves capture the visible canvas framebuffer, the same path
+    used by the ``s`` keyboard shortcut.
 
     Legacy top-level parameters such as ``size=``, ``savename=``, ``grid=``,
     ``layout={...}``, and ``canvas={...}`` are still recognized for now, but

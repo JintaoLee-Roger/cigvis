@@ -6,8 +6,8 @@
 Overlay RGT display on slice of 3D seismic data volume
 ==========================================================
 
-``create_overlay``: the first parameters is (background), 
-and the second parameters is (foreground)
+Use ``create_slices`` for the background and ``add_mask`` for the RGT
+overlay.
 
 .. Note::
     Set foreground transparency and masking carefully.
@@ -33,9 +33,14 @@ ni, nx, nt = 128, 128, 128
 sx = np.fromfile(sxp, np.float32).reshape(ni, nx, nt)
 rgt = np.fromfile(uxp, np.float32).reshape(ni, nx, nt)
 
-fg_cmap = colormap.set_alpha('jet', alpha=0.4)
 nodes = cigvis.create_slices(sx, pos=[[36], [28], [84]], cmap='gray')
-nodes = cigvis.add_mask(nodes, rgt, cmaps=fg_cmap)
+
+nodes = cigvis.add_mask(nodes, rgt, cmap='jet', alpha=0.4)
+# this is equivalent to
+# fg_cmap = colormap.set_alpha('jet', alpha=0.4)
+# nodes = cigvis.add_mask(nodes, rgt, cmaps=fg_cmap)
+
+
 nodes += cigvis.create_colorbar_from_nodes(nodes, 'RGT', select='mask')
 
 cigvis.plot3D(

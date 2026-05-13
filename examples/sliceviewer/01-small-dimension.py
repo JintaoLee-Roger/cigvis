@@ -21,7 +21,7 @@ mask = np.zeros_like(volume)
 mask[:, 22:42, 34:70] = 1
 
 nodes = sv.create_slice(volume, display_axes=(1, 2), indices={0: 2}, cmap="gray")
-nodes = sv.add_mask(nodes, mask, cmaps="jet", alpha=0.45, excpt="min")
+nodes = sv.add_mask(nodes, mask, cmap="jet", alpha=0.45, excpt="min")
 
 x = np.arange(volume.shape[2])
 y = 34 + 8 * np.sin(x / 12)

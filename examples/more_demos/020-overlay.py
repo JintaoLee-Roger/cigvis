@@ -29,7 +29,7 @@ def show(bg, fg):
     cmap = colormap.set_alpha(cmap, 0.5)  # Note:
 
     nodes1 = cigvis.create_slices(bg)
-    nodes1 = cigvis.add_mask(nodes1, fg, cmaps=cmap, interpolation='nearest')
+    nodes1 = cigvis.add_mask(nodes1, fg, cmap=cmap, interpolation='nearest')
     nodes1 += cigvis.create_colorbar_from_nodes(
         nodes1,
         label_str='Facies',
@@ -46,7 +46,7 @@ def show(bg, fg):
     cmap = colormap.set_alpha_except_min(cmap, 0.5)  # Note:
 
     nodes2 = cigvis.create_slices(bg)
-    nodes2 = cigvis.add_mask(nodes2, fg, cmaps=cmap, interpolation='nearest')
+    nodes2 = cigvis.add_mask(nodes2, fg, cmap=cmap, interpolation='nearest')
     nodes2 += cigvis.create_colorbar_from_nodes(
         nodes2,
         label_str='Facies',
@@ -63,7 +63,7 @@ def show(bg, fg):
     cmap = colormap.set_alpha_except_min(cmap, 0.5)  # Note:
 
     nodes3 = cigvis.create_slices(bg)
-    nodes3 = cigvis.add_mask(nodes3, fg, cmaps=cmap, interpolation='nearest')
+    nodes3 = cigvis.add_mask(nodes3, fg, cmap=cmap, interpolation='nearest')
 
     values = values[1:]
 
@@ -83,7 +83,7 @@ def show(bg, fg):
     cmap = colormap.set_alpha_except_max(cmap, 0.5)  # Note:
 
     nodes4 = cigvis.create_slices(bg)
-    nodes4 = cigvis.add_mask(nodes4, fg, cmaps=cmap, interpolation='nearest')
+    nodes4 = cigvis.add_mask(nodes4, fg, cmap=cmap, interpolation='nearest')
 
     values = values[:-1]
     nodes4 += cigvis.create_colorbar_from_nodes(
@@ -105,7 +105,7 @@ def show(bg, fg):
                                             values=[0, 100])
 
     nodes5 = cigvis.create_slices(bg)
-    nodes5 = cigvis.add_mask(nodes5, fg, cmaps=cmap, interpolation='nearest')
+    nodes5 = cigvis.add_mask(nodes5, fg, cmap=cmap, interpolation='nearest')
 
     values = values[values != 0]
     values = values[values != 100]

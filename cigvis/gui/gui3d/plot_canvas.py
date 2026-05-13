@@ -60,6 +60,10 @@ def _guess_cmap_name(image) -> Optional[str]:
         return name
 
     cmap = getattr(image, 'cmap', None)
+    return _guess_cmap_name_from_cmap(cmap)
+
+
+def _guess_cmap_name_from_cmap(cmap) -> Optional[str]:
     name = getattr(cmap, 'name', None)
     if isinstance(name, str) and name:
         return name
@@ -80,6 +84,19 @@ def _guess_cmap_name(image) -> Optional[str]:
         if colors.shape == ref.shape and np.allclose(colors, ref, atol=1e-6):
             return candidate
     return None
+
+
+def _guess_cmap_alpha(cmap, default: float = 0.5) -> float:
+    try:
+        colors = np.asarray(cmap.colors.rgba)
+        alphas = colors[:, 3]
+        alphas = alphas[np.isfinite(alphas)]
+        alphas = alphas[alphas > 1e-6]
+        if alphas.size:
+            return float(np.round(np.median(alphas), 3))
+    except Exception:
+        pass
+    return default
 
 
 # ---------------------------------------------------------------------------
@@ -170,8 +187,14 @@ class MaskMixin3D:
         if self._vol is None:
             return
         name = f'mask_{len(self._masks)}'
+        cmap_name = 'jet'
+        alpha = 0.5
+        cmap_v = colormap.set_alpha(cmap_name, alpha)
         params = {
-            'cmap': colormap.set_alpha('jet', 0.5),
+            'cmap': cmap_name,
+            'cmap_v': cmap_v,
+            'alpha': alpha,
+            'except': 'None',
             'interpolation': 'nearest',
         }
         self._mask_params.append({'name': name, **params})
@@ -180,7 +203,8 @@ class MaskMixin3D:
             self._vol.add_overlay_volume(
                 name=name,
                 volume=data,
-                cmap=params['cmap'],
+                cmap=cmap_v,
+                cmap_names=cmap_name,
                 interpolation=params['interpolation'],
             )
         except Exception as e:
@@ -196,16 +220,17 @@ class MaskMixin3D:
         name = mp['name']
 
         if mode in ('vmin', 'vmax'):
+            if value in (None, ''):
+                return
             mp[mode] = float(value)
             if 'vmin' in mp and 'vmax' in mp:
                 clim = [mp['vmin'], mp['vmax']]
-                for n in self._nodes:
-                    if isinstance(n, AxisAlignedImage):
-                        spec = self._vol._overlays.get(name)
-                        if spec:
-                            spec.clim = tuple(clim)
-                            # trigger re-render via refresh
-                            self._vol.refresh_overlay(name)
+                mp['clim'] = clim
+                spec = self._vol._overlays.get(name)
+                if spec:
+                    spec.clim = tuple(clim)
+                    self._vol.refresh_overlay(name)
+                    self.canvas.update()
 
         elif mode == 'cmap':
             mp['cmap'] = value
@@ -215,7 +240,11 @@ class MaskMixin3D:
                 spec = self._vol._overlays.get(name)
                 if spec:
                     spec.cmap = cmap_v
+                    spec.cmap_name = value
+                    spec.axis_cmaps = None
+                    spec.axis_cmap_names = None
                     self._vol.refresh_overlay(name)
+                    self.canvas.update()
 
         elif mode == 'alpha':
             mp['alpha'] = float(value)
@@ -225,7 +254,11 @@ class MaskMixin3D:
                 spec = self._vol._overlays.get(name)
                 if spec:
                     spec.cmap = cmap_v
+                    spec.cmap_name = mp.get('cmap', 'jet')
+                    spec.axis_cmaps = None
+                    spec.axis_cmap_names = None
                     self._vol.refresh_overlay(name)
+                    self.canvas.update()
 
         elif mode == 'except':
             mp['except'] = value
@@ -235,13 +268,19 @@ class MaskMixin3D:
                 spec = self._vol._overlays.get(name)
                 if spec:
                     spec.cmap = cmap_v
+                    spec.cmap_name = mp.get('cmap', 'jet')
+                    spec.axis_cmaps = None
+                    spec.axis_cmap_names = None
                     self._vol.refresh_overlay(name)
+                    self.canvas.update()
 
         elif mode == 'interp':
             spec = self._vol._overlays.get(name)
             if spec:
+                mp['interpolation'] = value
                 spec.interpolation = value
                 self._vol.refresh_overlay(name)
+                self.canvas.update()
 
     def _build_cmap(self, cmap_name, alpha, excpt):
         try:
@@ -478,11 +517,69 @@ class PlotCanvas3D(
             return out
         return [nodes]
 
+    def _volume_image_managers(self, nodes) -> List[VolumeImage]:
+        managers = []
+        for node in self._flatten_nodes(nodes):
+            vi = getattr(node, '_cigvis_volume_image', None)
+            if vi is None:
+                continue
+            if not any(vi is manager for manager in managers):
+                managers.append(vi)
+        return managers
+
+    def _overlay_image_for_name(self, name: str):
+        if self._vol is None:
+            return None
+        for axis in ('x', 'y', 'z'):
+            for i, node in enumerate(getattr(self._vol, '_slices', {}).get(axis, [])):
+                overlay_idx = getattr(self._vol, '_overlay_indices', {}).get((axis, i), {}).get(name)
+                images = getattr(node, 'overlaid_images', [])
+                if overlay_idx is not None and overlay_idx < len(images):
+                    return images[overlay_idx]
+        return None
+
+    def _sync_mask_params_from_volume_image(self) -> None:
+        self._masks.clear()
+        self._mask_params.clear()
+        if self._vol is None:
+            return
+        for idx, (name, spec) in enumerate(getattr(self._vol, '_overlays', {}).items()):
+            if spec.volume is None:
+                continue
+            image = self._overlay_image_for_name(name)
+            axis = spec.axes[0] if spec.axes else 'x'
+            cmap_name = spec.cmap_name_for_axis(axis)
+            if not isinstance(cmap_name, str) or not cmap_name:
+                cmap_name = _guess_cmap_name(image) if image is not None else None
+            if not isinstance(cmap_name, str) or not cmap_name:
+                cmap_name = _guess_cmap_name_from_cmap(spec.cmap_for_axis(axis))
+            clim = spec.clim
+            if clim is None and image is not None:
+                clim = getattr(image, 'clim', None)
+            params = {
+                'name': name or f'mask_{idx}',
+                'cmap': cmap_name or 'jet',
+                'alpha': _guess_cmap_alpha(spec.cmap_for_axis(axis)),
+                'except': 'None',
+                'interpolation': spec.interpolation,
+            }
+            if clim is not None and len(clim) == 2:
+                params['clim'] = [float(clim[0]), float(clim[1])]
+                params['vmin'] = float(clim[0])
+                params['vmax'] = float(clim[1])
+            self._masks.append(spec.volume)
+            self._mask_params.append(params)
+
     def _adopt_visual_nodes(self, nodes) -> None:
         self._plot_nodes = nodes
         flat_nodes = self._flatten_nodes(nodes)
         self._nodes = [n for n in flat_nodes if isinstance(n, AxisAlignedImage)]
         self._horz_nodes = [n for n in flat_nodes if isinstance(n, SurfaceNode)]
+        managers = self._volume_image_managers(nodes)
+        if len(managers) == 1:
+            self._vol = managers[0]
+            self._data = self._vol.volume
+            self._sync_mask_params_from_volume_image()
         if self._nodes:
             image = _base_image(self._nodes[0])
             cmap_name = _guess_cmap_name(image)
@@ -496,6 +593,9 @@ class PlotCanvas3D(
                 self._base_params['vmin'] = float(clim[0])
                 self._base_params['vmax'] = float(clim[1])
                 self._base_params['clim'] = [float(clim[0]), float(clim[1])]
+
+    def get_mask_display_params(self) -> List[Dict[str, Any]]:
+        return [dict(params) for params in self._mask_params]
 
     def get_slice_limits(self) -> Dict[str, Tuple[int, int]]:
         limits: Dict[str, Tuple[int, int]] = {}

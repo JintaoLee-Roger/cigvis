@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import List, Optional
+
 from PySide6.QtWidgets import QLabel, QHBoxLayout, QStackedWidget, QToolButton, QVBoxLayout, QWidget
 from PySide6.QtCore import QPropertyAnimation, QEasingCurve, QPoint, Signal, Qt
 
@@ -14,7 +16,7 @@ class SlidingDrawer(QWidget):
     def __init__(self, parent=None, width=300, animation_ms=250):
         super().__init__(parent)
         self.target_width = width
-        self._titles: list[str] = []
+        self._titles: List[str] = []
 
         self.setObjectName("SlidingDrawer")
         self.setAttribute(Qt.WA_StyledBackground, True)
@@ -62,7 +64,7 @@ class SlidingDrawer(QWidget):
 
         self.hide()
 
-    def add_module(self, widget: QWidget, title: str | None = None):
+    def add_module(self, widget: QWidget, title: Optional[str] = None):
         idx = self.stack.addWidget(widget)
         if title is not None:
             if idx < len(self._titles):
@@ -74,7 +76,7 @@ class SlidingDrawer(QWidget):
         if self.stack.count() == 1:
             self._update_title(0)
 
-    def set_titles(self, titles: list[str]) -> None:
+    def set_titles(self, titles: List[str]) -> None:
         self._titles = list(titles)
         self._update_title(self.stack.currentIndex())
 

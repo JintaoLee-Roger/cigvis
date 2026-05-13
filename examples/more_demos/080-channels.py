@@ -56,7 +56,7 @@ vis2 += cigvis.create_axis(
 
 fg_cmap = colormap.set_alpha_except_min('jet', 1)
 vis3 = cigvis.create_slices(seis, pos=pos, cmap='gray')
-vis3 = cigvis.add_mask(vis3, labl, cmaps=fg_cmap, interpolation='nearest')
+vis3 = cigvis.add_mask(vis3, labl, cmap=fg_cmap, interpolation='nearest')
 vis3 += cigvis.create_axis(
     seis.shape,
     'axis',
@@ -69,7 +69,7 @@ vis3 += cigvis.create_axis(
 )
 
 vis4 = cigvis.create_slices(seis, pos=pos, cmap='Petrel')
-vis4 = cigvis.add_mask(vis4, labl, cmaps=fg_cmap, interpolation='nearest')
+vis4 = cigvis.add_mask(vis4, labl, cmap=fg_cmap, interpolation='nearest')
 vis4 += cigvis.create_bodies(labl, 0.5, 0)
 vis4 += cigvis.create_axis(
     seis.shape,

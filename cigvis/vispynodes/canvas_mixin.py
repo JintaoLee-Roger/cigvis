@@ -173,7 +173,6 @@ class EventMixin:
                 self.title + '.png',
                 self.pngDir,
                 getattr(self, '_shortcut_save_kw', {
-                    'mode': 'screen',
                     'transparent_bg': True,
                 }),
             )

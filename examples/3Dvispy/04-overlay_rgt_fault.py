@@ -6,8 +6,8 @@
 Overlay multiple 3D data bodies (RGT, fault) on slices of 3D seismic data bodies
 ====================================================================================
 
-The first parameter of ``create_overlay`` is the background, and the second
-parameter is the foreground overlay, which may contain multiple 3D volumes.
+Use ``create_slices`` for the background and call ``add_mask`` once per
+foreground overlay volume.
 
 .. Note::
     Set foreground transparency and masking carefully.
@@ -35,16 +35,13 @@ sx = np.fromfile(sxp, np.float32).reshape(ni, nx, nt)
 rgt = np.fromfile(uxp, np.float32).reshape(ni, nx, nt)
 fx = np.fromfile(fxp, np.float32).reshape(ni, nx, nt)
 
-rgt_cmap = colormap.set_alpha('jet', 0.4)
-# mask min value (0), 0 means no fault
-fx_cmap = colormap.set_alpha_except_min('jet', alpha=1)
-fg_cmap = [rgt_cmap, fx_cmap]
+nodes = cigvis.create_slices(sx, pos=[[36], [28], [84]], cmap='gray')
+
+nodes = cigvis.add_mask(nodes, rgt, cmap='jet', interpolation='cubic', alpha=0.4)
 
 # fx is discrete data, set interpolation as 'nearest'
-nodes = cigvis.create_slices(sx, pos=[[36], [28], [84]], cmap='gray')
-nodes = cigvis.add_mask(nodes, [rgt, fx],
-                        cmaps=[rgt_cmap, fx_cmap],
-                        interpolation=['cubic', 'nearest'])
+nodes = cigvis.add_mask(nodes, fx, cmap='jet', interpolation='nearest', alpha=1, excpt='min')
+
 nodes += cigvis.create_colorbar_from_nodes(nodes, 'RGT', select='mask', idx=0) # idx = 0 means the first mask
 
 cigvis.plot3D(

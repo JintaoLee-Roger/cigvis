@@ -96,43 +96,31 @@ def create_slice(
 
 def add_mask(
     nodes: List,
-    volumes: Union[np.ndarray, List[np.ndarray]],
-    cmaps=None,
-    clims=None,
-    alpha: Union[float, List[float]] = 0.7,
-    excpt: Union[str, List[Optional[str]]] = "min",
+    volume: np.ndarray,
+    cmap=None,
+    clim=None,
+    alpha: Optional[float] = 0.7,
+    excpt: Optional[str] = "min",
 ) -> List:
-    """Add one or more overlay volumes on top of the slice."""
-    if cmaps is None:
-        raise ValueError("'cmaps' cannot be None")
-
-    if isinstance(volumes, tuple):
-        volumes = list(volumes)
-    elif not isinstance(volumes, list):
-        volumes = [volumes]
-    if not volumes:
-        raise ValueError("volumes cannot be empty")
-
-    n = len(volumes)
-    cmaps = _broadcast(cmaps, n, "cmaps")
-    clims = _broadcast_clims(clims, n)
-    alpha = _broadcast(alpha, n, "alpha")
-    excpt = _broadcast(excpt, n, "excpt")
+    """Add one overlay volume on top of the slice."""
+    if cmap is None:
+        raise ValueError("'cmap' cannot be None")
 
     slice_nodes = [nd for nd in nodes if isinstance(nd, SliceNode)]
     if not slice_nodes:
         raise ValueError("nodes must contain a SliceNode (from create_slice)")
     sn = slice_nodes[0]
 
-    for vol, cmap_str, clim, a, ex in zip(volumes, cmaps, clims, alpha, excpt):
-        vol = np.asarray(vol)
-        if vol.shape != sn.volume.shape:
-            raise ValueError(
-                f"Mask shape {vol.shape} must match volume shape {sn.volume.shape}"
-            )
-        clim = _finite_range(vol) if clim is None else _normalize_clim(clim)
-        cmap_obj = _cmap_mod.fast_set_cmap(cmap_str, a, ex)
-        sn.masks.append(MaskSpec(volume=vol, cmap=cmap_obj, clim=tuple(clim)))
+    volume = np.asarray(volume)
+    if volume.shape != sn.volume.shape:
+        raise ValueError(
+            f"Mask shape {volume.shape} must match volume shape {sn.volume.shape}"
+        )
+
+    clim = _finite_range(volume) if clim is None else _normalize_clim(clim)
+    cmap_obj = _cmap_mod.get_cmap_from_str(cmap) if alpha is None \
+        else _cmap_mod.fast_set_cmap(cmap, alpha, excpt)
+    sn.masks.append(MaskSpec(volume=volume, cmap=cmap_obj, clim=tuple(clim)))
 
     return nodes
 
@@ -344,37 +332,3 @@ def _normalize_clim(clim: Sequence) -> Tuple[float, float]:
         vmin -= pad
         vmax += pad
     return (vmin, vmax)
-
-
-def _broadcast(value, n: int, name: str) -> List:
-    if _is_sequence(value):
-        values = list(value)
-        if len(values) != n:
-            raise ValueError(f"{name} length {len(values)} does not match {n} volumes")
-        return values
-    return [value] * n
-
-
-def _broadcast_clims(clims, n: int) -> List:
-    if clims is None:
-        return [None] * n
-    if _looks_like_clim(clims):
-        return [clims] * n
-    if _is_sequence(clims):
-        values = list(clims)
-        if len(values) != n:
-            raise ValueError(f"clims length {len(values)} does not match {n} volumes")
-        return values
-    raise ValueError("clims must be [vmin, vmax] or one [vmin, vmax] per volume")
-
-
-def _is_sequence(value) -> bool:
-    return isinstance(value, (list, tuple)) and not isinstance(value, str)
-
-
-def _looks_like_clim(value) -> bool:
-    try:
-        arr = np.asarray(value, dtype=float)
-    except (TypeError, ValueError):
-        return False
-    return arr.shape == (2,)

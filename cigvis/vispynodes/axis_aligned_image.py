@@ -9,7 +9,7 @@
 # Distributed under the MIT License. See LICENSE for more info.
 # -----------------------------------------------------------------------------
 
-from typing import Callable, List
+from typing import Callable, Dict, List, Tuple
 import numpy as np
 from vispy.scene.visuals import Image, Line, Plane
 from vispy.visuals.transforms import MatrixTransform, STTransform
@@ -54,6 +54,7 @@ class AxisAlignedImage(Image):
                  interpolation=['linear'],
                  method='auto',
                  texture_format=None,
+                 display_range: Dict[str, Tuple[int, int]] = None,
                  offset_factor=2.0,
                  offset_units=2.0):
 
@@ -110,6 +111,7 @@ class AxisAlignedImage(Image):
               'pos={} is outside limit={} range.'.format(pos, limit)
         self.pos = pos
         self.limit = limit
+        self.display_range = display_range
 
         # Get the image_func that returns either image or image shape.
         self.image_funcs = image_funcs  # a list of functions!
@@ -203,12 +205,15 @@ class AxisAlignedImage(Image):
 
     def get_click_pos3d(self, mouse_press_event):
         pos = self._click_pos(mouse_press_event)
+        x0, _ = self._display_axis_range('x')
+        y0, _ = self._display_axis_range('y')
+        z0, _ = self._display_axis_range('z')
         if self.axis == 'x':
-            return [self.pos, *pos]
+            return [self.pos, y0 + pos[0], z0 + pos[1]]
         if self.axis == 'y':
-            return [pos[0], self.pos, pos[1]]
+            return [x0 + pos[0], self.pos, z0 + pos[1]]
         if self.axis == 'z':
-            return [*pos, self.pos]
+            return [x0 + pos[0], y0 + pos[1], self.pos]
 
     def _click_pos(self, mouse_press_event):
         # Get the screen-to-local transform to get camera coordinates.
@@ -344,18 +349,21 @@ class AxisAlignedImage(Image):
 
         # Update the transformation in order to move to new location.
         self.transform.reset()
+        x0, _ = self._display_axis_range('x')
+        y0, _ = self._display_axis_range('y')
+        z0, _ = self._display_axis_range('z')
         if self.axis == 'z':
             # 1. No rotation to do for z axis (y-x) slice. Only translate.
-            self.transform.translate((0, 0, pos2))
+            self.transform.translate((x0, y0, pos2))
         elif self.axis == 'y':
             # 2. Rotation(s) for the y axis (z-x) slice, then translate:
             self.transform.rotate(90, (1, 0, 0))
-            self.transform.translate((0, pos2, 0))
+            self.transform.translate((x0, pos2, z0))
         elif self.axis == 'x':
             # 3. Rotation(s) for the x axis (z-y) slice, then translate:
             self.transform.rotate(90, (1, 0, 0))
             self.transform.rotate(90, (0, 0, 1))
-            self.transform.translate((pos2, 0, 0))
+            self.transform.translate((pos2, y0, z0))
 
         # Update image on the slice based on current position. The numpy array
         # is transposed due to a conversion from i-j to x-y axis system.
@@ -385,19 +393,35 @@ class AxisAlignedImage(Image):
         The function returns a tuple (low_bounds, high_bounds) that represents
         the spatial limits of self obj in the 3D scene.
         """
+        x_range = self._display_axis_range('x')
+        y_range = self._display_axis_range('y')
+        z_range = self._display_axis_range('z')
         # Note: self.size[0] is slow dim size, self.size[1] is fast dim size.
         if self.axis == 'z':
-            if axis_3d == 0: return (0, self.size[0])
-            elif axis_3d == 1: return (0, self.size[1])
+            if axis_3d == 0: return x_range
+            elif axis_3d == 1: return y_range
             elif axis_3d == 2: return (self.pos, self.pos)
         elif self.axis == 'y':
-            if axis_3d == 0: return (0, self.size[0])
+            if axis_3d == 0: return x_range
             elif axis_3d == 1: return (self.pos, self.pos)
-            elif axis_3d == 2: return (0, self.size[1])
+            elif axis_3d == 2: return z_range
         elif self.axis == 'x':
             if axis_3d == 0: return (self.pos, self.pos)
-            elif axis_3d == 1: return (0, self.size[0])
-            elif axis_3d == 2: return (0, self.size[1])
+            elif axis_3d == 1: return y_range
+            elif axis_3d == 2: return z_range
+
+    def _display_axis_range(self, axis: str):
+        if self.display_range is not None and axis in self.display_range:
+            return self.display_range[axis]
+        if axis == self.axis:
+            if self.limit is not None:
+                return (self.limit[0], self.limit[1] + 1)
+            return (0, self.pos + 1)
+        if self.axis == 'z':
+            return (0, self.size[0]) if axis == 'x' else (0, self.size[1])
+        if self.axis == 'y':
+            return (0, self.size[0]) if axis == 'x' else (0, self.size[1])
+        return (0, self.size[0]) if axis == 'y' else (0, self.size[1])
 
     def _set_clipper(self, node, clipper):
         """
@@ -445,6 +469,7 @@ class InteractiveLine(Line):
         connect='strip',
         method='gl',
         antialias=False,
+        display_range=None,
     ):
         super().__init__(pos, color, width, connect, method, antialias)
         """
@@ -452,6 +477,7 @@ class InteractiveLine(Line):
         self.unfreeze()
         self.axis_pair = axis_pair
         self.shape = shape
+        self.display_range = display_range
         self._linked_images = {}  # {axis: Image}
         self.freeze()
 
@@ -471,19 +497,19 @@ class InteractiveLine(Line):
         """ update image border """
         axis = self.axis_pair[0]
         pos = self._linked_images[axis].pos
+        xr = self._display_axis_range('x')
+        yr = self._display_axis_range('y')
+        zr = self._display_axis_range('z')
         # fmt: off
         if axis == 'x':
-            if pos == self.shape[0] - 1:
-                pos += 1
-            lines = [[pos, 0, 0], [pos, 0, self.shape[2]], [pos, self.shape[1], self.shape[2]], [pos, self.shape[1], 0], [pos, 0, 0]]
+            pos = self._line_pos(axis, pos)
+            lines = [[pos, yr[0], zr[0]], [pos, yr[0], zr[1]], [pos, yr[1], zr[1]], [pos, yr[1], zr[0]], [pos, yr[0], zr[0]]]
         elif axis == 'y':
-            if pos == self.shape[1] - 1:
-                pos += 1
-            lines = [[0, pos, 0], [0, pos, self.shape[2]], [self.shape[0], pos, self.shape[2]], [self.shape[0], pos, 0], [0, pos, 0]]
+            pos = self._line_pos(axis, pos)
+            lines = [[xr[0], pos, zr[0]], [xr[0], pos, zr[1]], [xr[1], pos, zr[1]], [xr[1], pos, zr[0]], [xr[0], pos, zr[0]]]
         else:
-            if pos == self.shape[2] - 1:
-                pos += 1
-            lines = [[0, 0, pos], [0, self.shape[1], pos], [self.shape[0], self.shape[1], pos], [self.shape[0], 0, pos], [0, 0, pos]]
+            pos = self._line_pos(axis, pos)
+            lines = [[xr[0], yr[0], pos], [xr[0], yr[1], pos], [xr[1], yr[1], pos], [xr[1], yr[0], pos], [xr[0], yr[0], pos]]
         # fmt: on
         self.set_data(np.array(lines))
 
@@ -498,19 +524,34 @@ class InteractiveLine(Line):
         a_idx = axis_order[self.axis_pair[0]]
         b_idx = axis_order[self.axis_pair[1]]
         third_axis = 3 - a_idx - b_idx
-        if pos_a == self.shape[a_idx] - 1:
-            pos_a += 1
-        if pos_b == self.shape[b_idx] - 1:
-            pos_b += 1
+        pos_a = self._line_pos(axis_a, pos_a)
+        pos_b = self._line_pos(axis_b, pos_b)
 
-        start = [0] * 3
+        ranges = [
+            self._display_axis_range('x'),
+            self._display_axis_range('y'),
+            self._display_axis_range('z'),
+        ]
+        start = [r[0] for r in ranges]
         start[a_idx] = pos_a
         start[b_idx] = pos_b
 
         end = list(start)
-        end[third_axis] = self.shape[third_axis]
+        end[third_axis] = ranges[third_axis][1]
 
         self.set_data(np.array([start, end]))
+
+    def _display_axis_range(self, axis: str):
+        if self.display_range is not None and axis in self.display_range:
+            return self.display_range[axis]
+        idx = {'x': 0, 'y': 1, 'z': 2}[axis]
+        return (0, self.shape[idx])
+
+    def _line_pos(self, axis: str, pos):
+        start, stop = self._display_axis_range(axis)
+        if pos == stop - 1:
+            return stop
+        return pos
 
 
 def get_image_func(axis: str,

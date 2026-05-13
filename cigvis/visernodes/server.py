@@ -165,6 +165,7 @@ class Server(viser.ViserServer):
             '_maskclim2', '_maskcmap2', '_maskalpha2', '_maskexcpt2',
             '_maskclim3', '_maskcmap3', '_maskalpha3', '_maskexcpt3',
             '_gui_scale', '_region_left', '_region_right',
+            '_gui_slice_handles',
         ):
             if hasattr(self, attr):
                 delattr(self, attr)
@@ -233,50 +234,31 @@ class Server(viser.ViserServer):
     def _add_slices_gui(self):
         # gui slices slibers to control slices position
         with self.gui.add_folder("slices pos"):
-            nodex = [
-                node for node in self.nodes
-                if isinstance(node, VolumeSlice) and node.axis == 'x'
-            ]
-            nodey = [
-                node for node in self.nodes
-                if isinstance(node, VolumeSlice) and node.axis == 'y'
-            ]
-            nodez = [
-                node for node in self.nodes
-                if isinstance(node, VolumeSlice) and node.axis == 'z'
-            ]
-            if len(nodex) > 0:
-                nodex = nodex[0]
-                self._guix = self.gui.add_slider(
-                    'x',
-                    min=0,
-                    max=nodex.limit[1] - 1,
-                    step=1,
-                    initial_value=nodex.pos,
-                )
-                self._guix.on_update(lambda _: nodex.update_node(self._guix.value))
+            self._gui_slice_handles = {}
+            for axis, attr in (('x', '_guix'), ('y', '_guiy'), ('z', '_guiz')):
+                axis_nodes = [
+                    node for node in self.nodes
+                    if isinstance(node, VolumeSlice) and node.axis == axis
+                ]
+                handles = []
+                for idx, node in enumerate(axis_nodes):
+                    label = axis if len(axis_nodes) == 1 else f'{axis}{idx}'
+                    handle = self.gui.add_slider(
+                        label,
+                        min=0,
+                        max=node.limit[1] - 1,
+                        step=1,
+                        initial_value=node.pos,
+                    )
+                    handle.on_update(
+                        lambda _, node=node, handle=handle:
+                        node.update_node(handle.value)
+                    )
+                    handles.append(handle)
 
-            if len(nodey) > 0:
-                nodey = nodey[0]
-                self._guiy = self.gui.add_slider(
-                    'y',
-                    min=0,
-                    max=nodey.limit[1] - 1,
-                    step=1,
-                    initial_value=nodey.pos,
-                )
-                self._guiy.on_update(lambda _: nodey.update_node(self._guiy.value))
-
-            if len(nodez) > 0:
-                nodez = nodez[0]
-                self._guiz = self.gui.add_slider(
-                    'z',
-                    min=0,
-                    max=nodez.limit[1] - 1,
-                    step=1,
-                    initial_value=nodez.pos,
-                )
-                self._guiz.on_update(lambda _: nodez.update_node(self._guiz.value))
+                if handles:
+                    setattr(self, attr, handles[0])
+                    self._gui_slice_handles[axis] = handles
 
     def _add_params_gui(self):
         with self.gui.add_folder("parameters"):
@@ -431,12 +413,14 @@ class Server(viser.ViserServer):
             srcclient = list(srcserver.get_clients().values())[-1]
             for server in srcserver._link_servers:
                 server: Server
-                if hasattr(srcserver, "_guix") and hasattr(server, "_guix"):
-                    server._guix.value = self._guix.value
-                if hasattr(srcserver, "_guiy") and hasattr(server, "_guiy"):
-                    server._guiy.value = self._guiy.value
-                if hasattr(srcserver, "_guiz") and hasattr(server, "_guiz"):
-                    server._guiz.value = self._guiz.value
+                src_handles = getattr(srcserver, '_gui_slice_handles', {})
+                dst_handles = getattr(server, '_gui_slice_handles', {})
+                for axis in ('x', 'y', 'z'):
+                    for src_handle, dst_handle in zip(
+                        src_handles.get(axis, []),
+                        dst_handles.get(axis, []),
+                    ):
+                        dst_handle.value = src_handle.value
                 dstclient = list(server.get_clients().values())[-1]
                 dstclient.camera.fov = srcclient.camera.fov
                 dstclient.camera.look_at = srcclient.camera.look_at
@@ -476,10 +460,14 @@ def _print_states(server: Server):
     _print_kw('position', camera.position)
 
     pos = {}
+    slice_handles = getattr(server, '_gui_slice_handles', {})
     for axis, attr in (('x', '_guix'), ('y', '_guiy'), ('z', '_guiz')):
-        handle = getattr(server, attr, None)
-        if handle is not None:
-            pos[axis] = [handle.value]
+        handles = slice_handles.get(axis)
+        if handles is None:
+            handle = getattr(server, attr, None)
+            handles = [] if handle is None else [handle]
+        if handles:
+            pos[axis] = [handle.value for handle in handles]
     if pos:
         print('')
         print("# Paste into cigvis.viserplot.create_slices(...):")

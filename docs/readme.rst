@@ -64,8 +64,6 @@ After installing the GUI extra, the 3D GUI can also be launched from a terminal:
 
 .. code-block:: bash
 
-    cigvis-gui3d
-    # or
     vis-gui3d
 
 
@@ -148,14 +146,12 @@ For new code, ``plot3D`` options should be grouped by ownership:
         ),
         save=cigvis.Plot3DSave(
             path='example.png',
-            size=(3000, 2000),
-            output_policy='fit',
             transparent_bg=True,
         ),
         gui=cigvis.Plot3DGui(enabled=False),
     )
 
-``view`` controls the VisPy canvas, layout, and camera; ``save`` controls screenshot/export behavior; ``cbar`` controls colorbar export options; and ``gui`` controls the optional PySide6 GUI shell. Legacy top-level parameters such as ``size=``, ``savename=``, ``grid=``, ``share=``, ``xyz_axis=``, and ``cbar_region_ratio=`` are deprecated since ``0.2.1`` and scheduled for removal in ``0.4.0``.
+``view`` controls the VisPy canvas, layout, and camera; ``save`` controls automatic screenshot behavior; ``cbar`` controls colorbar export options; and ``gui`` controls the optional PySide6 GUI shell. Legacy top-level parameters such as ``size=``, ``savename=``, ``grid=``, ``share=``, ``xyz_axis=``, and ``cbar_region_ratio=`` are deprecated since ``0.2.1`` and scheduled for removal in ``0.4.0``.
 
 Backend APIs are now explicit. Use top-level ``cigvis.create_*`` and ``cigvis.plot3D`` for VisPy rendering. In Jupyter notebooks, do not rely on ``cigvis.create_*`` to switch to Plotly automatically; import the backend namespace explicitly:
 
@@ -164,6 +160,8 @@ Backend APIs are now explicit. Use top-level ``cigvis.create_*`` and ``cigvis.pl
     from cigvis import plotlyplot
 
     nodes = plotlyplot.create_slices(d)
+    # Optional overlays follow the same flow as the VisPy backend:
+    # nodes = plotlyplot.add_mask(nodes, mask, cmap='jet', interpolation='nearest')
     plotlyplot.plot3D(nodes)
 
 Camera and Dragging

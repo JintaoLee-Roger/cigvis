@@ -111,6 +111,91 @@ def fast_set_cmap(cmap, alpha, excpt):
     return cmap
 
 
+def distinct_colors(n: int, seed: int = 0):
+    """
+    Generate distinct RGBA colors for sparse line-style colormaps.
+
+    Parameters
+    ----------
+    n : int
+        Number of colors.
+    seed : int
+        Random seed used to make the colors reproducible.
+    """
+    if n < 0:
+        raise ValueError("n must be non-negative")
+    if n == 0:
+        return np.zeros((0, 4), dtype=float)
+
+    rng = np.random.RandomState(seed)
+    colors = []
+
+    def dist(c1, c2):
+        return np.linalg.norm(c1[:3] - c2[:3])
+
+    attempts = 0
+    max_attempts = max(1000, n * 200)
+    while len(colors) < n and attempts < max_attempts:
+        attempts += 1
+        color = rng.rand(4)
+        color[3] = 1.0
+        if all(dist(color, c2) > 0.3 for c2 in colors):
+            colors.append(color)
+
+    while len(colors) < n:
+        color = rng.rand(4)
+        color[3] = 1.0
+        colors.append(color)
+
+    return np.array(colors)
+
+
+def line_cmap(cmap=None, n_lines: int = 20, samples: int = 256, seed: int = 0):
+    """
+    Convert a colormap into sparse opaque lines on a transparent background.
+
+    This is useful for overlaying RGT/label-like line responses as masks. It
+    mirrors helpers such as ``set_alpha``: pass a colormap object/name and get a
+    modified matplotlib ``ListedColormap`` back.
+
+    Parameters
+    ----------
+    cmap : str or Colormap or None
+        Source colormap. If None, use reproducible distinct random colors.
+    n_lines : int
+        Number of opaque color samples.
+    samples : int
+        Total number of samples in the returned colormap.
+    seed : int
+        Random seed used when cmap is None.
+    """
+    if n_lines <= 0:
+        raise ValueError("n_lines must be positive")
+    if samples <= 0:
+        raise ValueError("samples must be positive")
+    if n_lines > samples:
+        raise ValueError("n_lines must be less than or equal to samples")
+
+    colors = np.zeros((samples, 4), dtype=float)
+    idx = np.linspace(0, samples - 1, n_lines).astype(int)
+
+    if cmap is None:
+        discrete = distinct_colors(n_lines, seed=seed)
+        name = 'line_cmap'
+    else:
+        cmap = get_cmap_from_str(cmap)
+        if _is_vispy_cmap(cmap):
+            cmap = cmap_to_mpl(cmap)
+        if not isinstance(cmap, mplColormap):
+            raise ValueError("unkown cmap")
+        discrete = cmap(np.linspace(0, 1, n_lines, endpoint=False))
+        discrete[:, 3] = 1.0
+        name = f'{cmap.name}_line'
+
+    colors[idx] = discrete
+    return ListedColormap(colors, name=name)
+
+
 def get_cmap_from_str(cmap: str):
     """
     return a Colormap from a cmap string

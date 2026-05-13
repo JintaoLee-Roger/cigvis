@@ -206,6 +206,7 @@ class ImageParamsWidget(QWidget):
     def __init__(self, mode: str = '3d', compact: bool = False,
                  parent=None) -> None:
         super().__init__(parent)
+        self._params_cb = None
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(5 if compact else 3)
@@ -263,6 +264,17 @@ class ImageParamsWidget(QWidget):
         self.vmax_edit.editingFinished.connect(
             lambda: self.vmax_changed.emit(self.vmax_edit.text()))
         self.interp_combo.currentTextChanged.connect(self.interp_changed)
+        self.cmap_changed.connect(lambda value: self._emit_param('cmap', value))
+        self.vmin_changed.connect(lambda value: self._emit_param('vmin', value))
+        self.vmax_changed.connect(lambda value: self._emit_param('vmax', value))
+        self.interp_changed.connect(lambda value: self._emit_param('interp', value))
+
+    def set_callback(self, cb: Callable) -> None:
+        self._params_cb = cb
+
+    def _emit_param(self, mode: str, value) -> None:
+        if self._params_cb is not None:
+            self._params_cb(mode, value)
 
     def set_vmin(self, v: str) -> None:
         self.vmin_edit.set_value(v)
@@ -273,10 +285,10 @@ class ImageParamsWidget(QWidget):
     def set_params(
         self,
         *,
-        cmap: str | None = None,
-        vmin: str | None = None,
-        vmax: str | None = None,
-        interpolation: str | None = None,
+        cmap: Optional[str] = None,
+        vmin: Optional[str] = None,
+        vmax: Optional[str] = None,
+        interpolation: Optional[str] = None,
     ) -> None:
         widgets = [
             self.vmin_edit,
@@ -337,6 +349,36 @@ class MaskParamsWidget(ImageParamsWidget):
 
         self.alpha_spin.changed.connect(self.alpha_changed)
         self.except_combo.changed.connect(self.except_changed)
+        self.alpha_changed.connect(lambda value: self._emit_param('alpha', value))
+        self.except_changed.connect(lambda value: self._emit_param('except', value))
+
+    def set_params(
+        self,
+        *,
+        cmap: Optional[str] = None,
+        vmin: Optional[str] = None,
+        vmax: Optional[str] = None,
+        interpolation: Optional[str] = None,
+        alpha: Optional[float] = None,
+        excpt: Optional[str] = None,
+    ) -> None:
+        super().set_params(
+            cmap=cmap,
+            vmin=vmin,
+            vmax=vmax,
+            interpolation=interpolation,
+        )
+        widgets = [self.alpha_spin, self.except_combo]
+        for widget in widgets:
+            widget.blockSignals(True)
+        try:
+            if alpha is not None:
+                self.alpha_spin.setValue(float(alpha))
+            if excpt:
+                self.except_combo.setCurrentText(excpt)
+        finally:
+            for widget in widgets:
+                widget.blockSignals(False)
 
 
 # ---------------------------------------------------------------------------

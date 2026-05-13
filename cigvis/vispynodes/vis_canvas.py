@@ -94,7 +94,7 @@ class VisCanvas(scene.SceneCanvas, EventMixin, AxisMixin):
 
         self.pngDir = savedir
         self._shortcut_save_kw = (
-            {'mode': 'screen', 'transparent_bg': True}
+            {'transparent_bg': True}
             if shortcut_save_kw is None
             else dict(shortcut_save_kw)
         )

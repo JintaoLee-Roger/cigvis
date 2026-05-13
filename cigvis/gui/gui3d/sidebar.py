@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Optional, Callable
+from typing import Callable, List, Optional, Union
 
 import numpy as np
 
@@ -170,7 +170,6 @@ class LoadPanel3D(QWidget):
         elif self._load_type == 'mask':
             item = QListWidgetItem(Path(file_path).name)
             pw = MaskParamsWidget(mode='3d')
-            pw.set_callback = lambda cb: cb
             from cigvis.utils import utils
             v1, v2 = utils.auto_clim(data)
             pw.vmin_edit.set_value(_format_float(v1))
@@ -293,9 +292,9 @@ class DisplayPanel3D(QWidget):
     def set_params(
         self,
         *,
-        cmap: str | None = None,
-        clim: list | tuple | None = None,
-        interpolation: str | None = None,
+        cmap: Optional[str] = None,
+        clim: Optional[Union[list, tuple]] = None,
+        interpolation: Optional[str] = None,
     ) -> None:
         vmin = vmax = None
         if clim is not None and len(clim) == 2:
@@ -597,6 +596,30 @@ class OverlaysPanel3D(QWidget):
 
     def add_mask_item(self, item: QListWidgetItem) -> None:
         self.mask_items.add_item(item)
+
+    def set_mask_items(self, params_list: List[dict]) -> None:
+        self.mask_items.clear()
+        for idx, params in enumerate(params_list):
+            self.add_mask_item(self._make_mask_item(idx, params))
+
+    def _make_mask_item(self, idx: int, params: dict) -> QListWidgetItem:
+        item = QListWidgetItem(str(params.get('name') or f'mask_{idx}'))
+        pw = MaskParamsWidget(mode='3d')
+        clim = params.get('clim')
+        vmin = params.get('vmin')
+        vmax = params.get('vmax')
+        if clim is not None and len(clim) == 2:
+            vmin, vmax = clim
+        pw.set_params(
+            cmap=params.get('cmap'),
+            vmin=_format_float(float(vmin)) if vmin is not None else None,
+            vmax=_format_float(float(vmax)) if vmax is not None else None,
+            interpolation=params.get('interpolation'),
+            alpha=params.get('alpha'),
+            excpt=params.get('except'),
+        )
+        item.params_widget = pw
+        return item
 
     def add_horz_item(self, item: QListWidgetItem) -> None:
         self.horz_items.add_item(item)

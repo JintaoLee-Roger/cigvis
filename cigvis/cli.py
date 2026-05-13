@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import argparse
-from typing import Sequence
+from typing import Optional, Sequence
 
 
 def _build_gui3d_parser() -> argparse.ArgumentParser:
@@ -28,7 +28,7 @@ def _build_gui3d_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def gui3d(argv: Sequence[str] | None = None) -> int:
+def gui3d(argv: Optional[Sequence[str]] = None) -> int:
     args = _build_gui3d_parser().parse_args(argv)
 
     try:

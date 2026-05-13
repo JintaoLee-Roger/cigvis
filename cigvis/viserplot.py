@@ -1,4 +1,5 @@
 import time
+import warnings
 
 from typing import List, Dict, Tuple, Union
 import re
@@ -27,6 +28,36 @@ from cigvis.meshs import surface2mesh
 import cigvis.utils as utils
 from cigvis.utils import surfaceutils
 from itertools import combinations
+
+
+def _is_volume_sequence(value) -> bool:
+    if not isinstance(value, (list, tuple)):
+        return False
+    if len(value) == 0:
+        return False
+    return all(hasattr(item, 'ndim') or type(item).__module__ == 'torch' for item in value)
+
+
+def _normalize_single_value(value, name):
+    if isinstance(value, (list, tuple)) and len(value) == 1:
+        return value[0]
+    if isinstance(value, (list, tuple)) and len(value) > 1:
+        raise ValueError(f"add_mask only accepts one {name}; call add_mask repeatedly for multiple masks")
+    return value
+
+
+def _normalize_cmap_value(value):
+    if isinstance(value, dict):
+        return value
+    return _normalize_single_value(value, "cmap")
+
+
+def _normalize_clim_value(value):
+    if value is None:
+        return None
+    if isinstance(value, (list, tuple)) and len(value) == 1 and isinstance(value[0], (list, tuple)):
+        return value[0]
+    return value
 
 
 def create_slices(volume: np.ndarray,
@@ -100,11 +131,14 @@ def create_slices(volume: np.ndarray,
 
 
 def add_mask(nodes: List,
-             volumes: Union[List, np.ndarray],
-             clims: Union[List, Tuple] = None,
-             cmaps: Union[str, List] = None,
+             volume: Union[List, np.ndarray],
+             clim: Union[List, Tuple] = None,
+             cmap: Union[str, Dict] = None,
              alpha=None,
              excpt=None,
+             *,
+             clims: Union[List, Tuple] = None,
+             cmaps: Union[str, Dict] = None,
              **kwargs) -> List:
     """
     Add Mask/Overlay volumes
@@ -113,12 +147,14 @@ def add_mask(nodes: List,
     -----------
     nodes: List[Node]
         A List that contains `AxisAlignedImage` (may be created by `create_slices`)
-    volumes : array-like or List
-        3D array(s), foreground volume(s)/mask(s)
-    clims : List
+    volume : array-like
+        3D foreground volume/mask. Add multiple masks by calling add_mask
+        repeatedly.
+    clim : List
         [vmin, vmax] for foreground slices plotting
-    cmaps : str or Colormap
-        colormap for foreground slices, it can be str or matplotlib's Colormap or vispy's Colormap
+    cmap : str, Dict, or Colormap
+        colormap for foreground slices. A dict such as ``{'x': 'Reds',
+        'z': 'Blues'}`` applies the mask only to those axes.
     alpha : float or List[float]
         if alpha is not None, using `colormap.fast_set_cmap` to set cmap
     excpt : None or str
@@ -129,40 +165,72 @@ def add_mask(nodes: List,
     slices_nodes : List
         list of slice nodes
     """
-    if not isinstance(volumes, List):
-        volumes = [volumes]
+    if cmaps is not None:
+        if cmap is not None:
+            raise ValueError("Specify only one of 'cmap' or deprecated 'cmaps'")
+        warnings.warn(
+            "'cmaps' is deprecated; use 'cmap' instead.",
+            FutureWarning,
+            stacklevel=2,
+        )
+        cmap = cmaps
+    if clims is not None:
+        if clim is not None:
+            raise ValueError("Specify only one of 'clim' or 'clims'")
+        clim = clims
 
-    for volume in volumes:
-        # TODO: check shape as same as base image
-        utils.check_mmap(volume)
+    if _is_volume_sequence(volume):
+        if len(volume) != 1:
+            raise ValueError(
+                "add_mask no longer accepts multiple volumes. "
+                "Call add_mask repeatedly, for example: "
+                "nodes = viserplot.add_mask(nodes, rgt, cmap='stratum'); "
+                "nodes = viserplot.add_mask(nodes, fault, cmap='jet')"
+            )
+        volume = volume[0]
 
-    if clims is None:
-        clims = [utils.auto_clim(v) for v in volumes]
-    if not isinstance(clims[0], (List, Tuple)):
-        clims = [clims]
+    alpha = _normalize_single_value(alpha, "alpha")
+    excpt = _normalize_single_value(excpt, "excpt")
+    cmap = _normalize_cmap_value(cmap)
+    clim = _normalize_clim_value(clim)
+    utils.check_mmap(volume)
 
-    if cmaps is None:
-        raise ValueError("'cmaps' cannot be 'None'")
-    if not isinstance(cmaps, List):
-        cmaps = [cmaps] * len(volumes)
-    if not isinstance(alpha, List):
-        alpha = [alpha] * len(volumes)
-    if not isinstance(excpt, List):
-        excpt = [excpt] * len(volumes)
-    for i in range(len(cmaps)):
-        cmaps[i] = colormap.get_cmap_from_str(cmaps[i])
-        if alpha[i] is not None:
-            cmaps[i] = colormap.fast_set_cmap(cmaps[i], alpha[i], excpt[i])
+    if cmap is None:
+        raise ValueError("'cmap' cannot be None")
+    if clim is None:
+        clim = utils.auto_clim(volume)
+
+    def _prepare_cmap(cmap_value):
+        cmap_value = colormap.get_cmap_from_str(cmap_value)
+        if alpha is not None:
+            cmap_value = colormap.fast_set_cmap(cmap_value, alpha, excpt)
+        return cmap_value
+
+    if isinstance(cmap, dict):
+        cmap_by_axis = {}
+        for axis, cmap_value in cmap.items():
+            axis = str(axis).lower()
+            if axis not in ('x', 'y', 'z'):
+                raise ValueError("cmap dict keys must be one of 'x', 'y', or 'z'")
+            cmap_by_axis[axis] = _prepare_cmap(cmap_value)
+    else:
+        cmap_by_axis = None
+        cmap_value = _prepare_cmap(cmap)
 
     for node in nodes:
         if not isinstance(node, VolumeSlice):
             continue
-        for i in range(len(volumes)):
-            node.add_mask(
-                volumes[i],
-                cmaps[i],
-                clims[i],
-            )
+        if cmap_by_axis is not None:
+            if node.axis not in cmap_by_axis:
+                continue
+            node_cmap = cmap_by_axis[node.axis]
+        else:
+            node_cmap = cmap_value
+        node.add_mask(
+            volume,
+            node_cmap,
+            clim,
+        )
 
     return nodes
 

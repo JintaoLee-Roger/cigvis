@@ -92,6 +92,88 @@ def mmap_max(d: np.ndarray):
             return max([m1, m2, m3])
 
 
+def _is_memmap_backed(d) -> bool:
+    base = getattr(d, 'base', None)
+    while base is not None:
+        if isinstance(base, np.memmap):
+            return True
+        base = getattr(base, 'base', None)
+    return False
+
+
+def _is_in_memory_ndarray(d) -> bool:
+    return (isinstance(d, np.ndarray) and not isinstance(d, np.memmap)
+            and not _is_memmap_backed(d))
+
+
+def _sample_block_shape(shape, max_items=65536):
+    ndim = len(shape)
+    if ndim == 0:
+        return ()
+
+    edge = max(1, int(max_items**(1 / ndim)))
+    return tuple(max(1, min(int(size), edge)) for size in shape)
+
+
+def _sample_block_slices(shape):
+    shape = tuple(int(size) for size in shape)
+    if len(shape) == 0:
+        return [()]
+
+    block_shape = _sample_block_shape(shape)
+    center = tuple((size - block) // 2
+                   for size, block in zip(shape, block_shape))
+
+    starts = [center]
+    for axis, (size, block) in enumerate(zip(shape, block_shape)):
+        for start in (0, max(0, size - block)):
+            item = list(center)
+            item[axis] = start
+            item = tuple(item)
+            if item not in starts:
+                starts.append(item)
+
+    return [
+        tuple(slice(start, start + block)
+              for start, block in zip(item, block_shape))
+        for item in starts
+    ]
+
+
+def _sample_to_numpy(sample):
+    if is_torch_tensor(sample):
+        sample = sample.detach().cpu().numpy()
+    return np.asarray(sample)
+
+
+def _sampled_minmax(d):
+    shape = getattr(d, 'shape', None)
+    if shape is None:
+        return nmin(d), nmax(d)
+
+    mins = []
+    maxs = []
+    for slices in _sample_block_slices(shape):
+        sample = d if slices == () else d[slices]
+        arr = _sample_to_numpy(sample)
+        if arr.size == 0:
+            continue
+        try:
+            valid = ~np.isnan(arr)
+        except TypeError:
+            arr = arr.astype(float)
+            valid = ~np.isnan(arr)
+        if not np.any(valid):
+            continue
+        values = arr[valid]
+        mins.append(np.min(values))
+        maxs.append(np.max(values))
+
+    if not mins:
+        return np.nan, np.nan
+    return min(mins), max(maxs)
+
+
 def is_torch_tensor(d):
     if type(d).__module__ == 'torch' and type(d).__name__ == 'Tensor':
         return True
@@ -123,8 +205,13 @@ def nmax(d):
 
 
 def auto_clim(d, scale=1):
-    v1 = _format(float(nmin(d)))
-    v2 = _format(float(nmax(d)))
+    if _is_in_memory_ndarray(d):
+        vmin, vmax = nmin(d), nmax(d)
+    else:
+        vmin, vmax = _sampled_minmax(d)
+
+    v1 = _format(float(vmin))
+    v2 = _format(float(vmax))
     if v1 == v2:
         return [v1 - 0.1, v1 + 0.2]
     if v1 * v2 < 0:
