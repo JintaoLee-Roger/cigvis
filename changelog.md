@@ -1,6 +1,18 @@
 # Changelog
 
 
+### v0.3.1
+
+**Fixed**
+
+- Fixed transparent-background PNG export so VisPy colorbar visuals keep their
+  alpha channel and remain visible in saved images.
+
+**Changed**
+
+- Updated package metadata to require Python >= 3.9.
+
+
 ### v0.3.0
 
 This release reorganizes the public plotting APIs, replaces the old desktop GUI,
