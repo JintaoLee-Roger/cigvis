@@ -13,8 +13,9 @@ from pathlib import Path
 from git.repo import Repo
 
 DIR = Path(__file__).parent.resolve()
+ROOT = DIR.parent
 
-sys.path.append(str(Path(".").resolve()))
+sys.path.insert(0, str(ROOT))
 
 
 def download_image():
