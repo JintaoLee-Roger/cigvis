@@ -1,11 +1,4 @@
-cigvis
 gitpython==3.1.50
-vispy
-numpy
-scipy
-matplotlib
-plotly
-viser
 pydata-sphinx-theme==0.17.1
 sphinx==9.1.0
 sphinxcontrib-apidoc==0.6.0
