@@ -40,7 +40,7 @@ labl_sf = gaussian(labl_sf, sigma=10)
 labl_sf = labl_sf / labl_sf.max()
 
 # set a colormap for foreground, i.e., label
-labl_cmap = colormap.set_alpha_except_min('jet', 0.6, False)
+labl_cmap = colormap.set_alpha_except_min('jet', 0.6)
 
 nodes = cigvis.create_slices(seis, cmap='Petrel')
 nodes += cigvis.create_surfaces(
@@ -55,4 +55,4 @@ nodes += cigvis.create_surfaces(
 # idx2=1 means select the second cmap, and clim for the select Surface node, (`labl_cmap` in this case).
 nodes += cigvis.create_colorbar_from_nodes(nodes, 'surface', select='surface', idx=0, idx2=1)
 
-cigvis.plot3D(nodes, xyz_axis=False)
+cigvis.plot3D(nodes, view=cigvis.Plot3DView(xyz_axis=False))

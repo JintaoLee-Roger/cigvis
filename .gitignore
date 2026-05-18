@@ -14,6 +14,11 @@ docs/_build
 cpp
 advance/
 .vscode
+*.npy
+*.claude
+.cluade/*
+notes.md
+task-plan.md
 
 test*
 data/*
@@ -26,6 +31,7 @@ docs/gallery/3Dvispy
 docs/gallery/colormap
 docs/gallery/gui
 docs/gallery/viser
+docs/gallery/sliceviewer
 docs/sg_execution_times.rst
 docs/gallery/more_demos/
 images_upload/

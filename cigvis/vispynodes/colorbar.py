@@ -14,7 +14,9 @@ import io
 from typing import List
 import numpy as np
 import matplotlib as mpl
-import matplotlib.pyplot as plt
+from matplotlib.backends.backend_agg import FigureCanvasAgg
+from matplotlib.figure import Figure
+import matplotlib.image as mpimg
 from pathlib import Path
 
 from matplotlib.colors import LinearSegmentedColormap, ListedColormap
@@ -63,6 +65,9 @@ class Colorbar(scene.visuals.Image):
         border size
     border_color : Color
         border color
+    preserve_alpha : bool
+        Preserve cmap alpha in the Matplotlib-rendered colorbar if True.
+        By default, colorbar colors are drawn opaque.
     savedir : str
         colobar image save dir
     visable : bool
@@ -88,6 +93,7 @@ class Colorbar(scene.visuals.Image):
             border_color='black',
 
             height_ratio=0.96,
+            preserve_alpha=False,
             savedir=None,
             visible=True,
             parent=None):
@@ -116,6 +122,7 @@ class Colorbar(scene.visuals.Image):
             assert disc_ticks is not None
         self.disc_ticks = disc_ticks
         self.clim_ = clim  # tuple
+        self.preserve_alpha = bool(preserve_alpha)
 
         # Record the styling parameters.
         self.label_str = label_str
@@ -129,13 +136,13 @@ class Colorbar(scene.visuals.Image):
         self.height_ratio = height_ratio
 
         if self.label_size is None:
-            self.label_size = plt.rcParams['axes.labelsize']
+            self.label_size = mpl.rcParams['axes.labelsize']
         if self.tick_size is None:
-            self.tick_size = plt.rcParams['ytick.labelsize']
+            self.tick_size = mpl.rcParams['ytick.labelsize']
         if self.border_width is None:
-            self.border_width = plt.rcParams['lines.linewidth']
-        self.tick_length = plt.rcParams['ytick.major.size']
-        self.tick_width = plt.rcParams['ytick.major.width']
+            self.border_width = mpl.rcParams['lines.linewidth']
+        self.tick_length = mpl.rcParams['ytick.major.size']
+        self.tick_width = mpl.rcParams['ytick.major.width']
 
         [self.label_size, self.tick_size] = self.get_font_size([self.label_size, self.tick_size]) # yapf: disable
 
@@ -172,6 +179,8 @@ class Colorbar(scene.visuals.Image):
         self.tick_size = kwargs.get('tick_size', self.tick_size)
         self.border_width = kwargs.get('border_width', self.border_width)
         self.border_color = kwargs.get('border_color', self.border_color)
+        preserve_alpha = kwargs.get('preserve_alpha', self.preserve_alpha)
+        self.preserve_alpha = bool(preserve_alpha)
         self.set_data(self._draw_colorbar())
         self.freeze()
 
@@ -214,8 +223,10 @@ class Colorbar(scene.visuals.Image):
 
         sm, ticks = self.get_ScalarMappable()
 
-        # Put the colorbar at proper location on the Matplotlib fig.
-        fig = plt.figure(figsize=figsize)
+        # Put the colorbar at proper location on an Agg figure. Avoid pyplot
+        # here because Colorbar can be redrawn from Qt/VisPy callbacks.
+        fig = Figure(figsize=figsize, dpi=dpi)
+        FigureCanvasAgg(fig)
         width = figsize[1] * 0.2 / figsize[0] / 5
         cbar_axes = fig.add_axes([0.01, 0.01, width, 0.98])
         cb = fig.colorbar(sm, cax=cbar_axes)
@@ -230,7 +241,8 @@ class Colorbar(scene.visuals.Image):
             fontsize=self.label_size * self.dpi_scale,
             fontweight=self.label_bold,
         )
-        plt.setp(plt.getp(cb.ax.axes, 'yticklabels'), color=self.label_color)
+        for tick_label in cb.ax.get_yticklabels():
+            tick_label.set_color(self.label_color)
         cb.ax.yaxis.set_tick_params(
             color=self.label_color,
             labelsize=self.tick_size * self.dpi_scale,
@@ -264,10 +276,8 @@ class Colorbar(scene.visuals.Image):
                 transparent=True,
             )
 
-        plt.close()
-
         buf.seek(0)
-        img = plt.imread(buf, 'png')
+        img = mpimg.imread(buf, format='png')
         buf.flush()
 
         return img
@@ -275,14 +285,11 @@ class Colorbar(scene.visuals.Image):
     def get_ScalarMappable(self):
         # To matplotlib cmap
         if isinstance(self.cmap_, viscolor.Colormap):
-            rgba = self.cmap_.colors.rgba
-            # Blend to white to avoid this Matplotlib rendering issue:
-            # https://github.com/matplotlib/matplotlib/issues/1188
-            for i in range(3):
-                rgba[:, i] = (1 - rgba[:, -1]) + rgba[:, -1] * rgba[:, i]
-            rgba[:, -1] = 1.
+            rgba = np.array(self.cmap_.colors.rgba, copy=True)
             if len(rgba) < 2:  # in special case of 'grays' cmap!
                 rgba = np.array([[0, 0, 0, 1.], [1, 1, 1, 1.]])
+            if not self.preserve_alpha:
+                rgba[:, -1] = 1.
             cmap = LinearSegmentedColormap.from_list('vispy_cmap', rgba)
         elif isinstance(self.cmap_, str):
             cmap = colormap.get_cmap_from_str(self.cmap_)
@@ -290,6 +297,7 @@ class Colorbar(scene.visuals.Image):
             cmap = self.cmap_
         else:
             raise RuntimeError("error type of cmap")
+        cmap = self._with_colorbar_alpha(cmap)
 
         if not self.discrete:
             norm = mpl.colors.Normalize(vmin=self.clim_[0], vmax=self.clim_[1])
@@ -299,6 +307,11 @@ class Colorbar(scene.visuals.Image):
             # get the correspanding colors from cmap, and clim
             colors = colormap.get_colors_from_cmap(cmap, self.clim_,
                                                    self.disc_ticks[0])
+            colors = np.asarray(colors, dtype=float)
+            if colors.ndim == 2 and colors.shape[1] == 3:
+                colors = np.c_[colors, np.ones(len(colors))]
+            if not self.preserve_alpha:
+                colors[:, -1] = 1.
             cmap = ListedColormap(colors)
             # norm of equal intervals
             norm = mpl.colors.BoundaryNorm(
@@ -310,14 +323,23 @@ class Colorbar(scene.visuals.Image):
                 assert len(self.disc_ticks[0]) == len(self.disc_ticks[1])
                 ticks['labels'] = self.disc_ticks[1]
 
-        return plt.cm.ScalarMappable(cmap=cmap, norm=norm), ticks
+        return mpl.cm.ScalarMappable(cmap=cmap, norm=norm), ticks
+
+    def _with_colorbar_alpha(self, cmap):
+        n = max(int(getattr(cmap, 'N', 256)), 2)
+        colors = np.array(cmap(np.linspace(0, 1, n)), copy=True)
+        if not self.preserve_alpha:
+            colors[:, -1] = 1.
+        return ListedColormap(colors, name=getattr(cmap, 'name', 'cbar_cmap'))
 
     def get_font_size(self, fonts):
         if not isinstance(fonts, List):
             fontsl = [fonts]
         else:
             fontsl = fonts
-        fig, ax = plt.subplots()
+        fig = Figure()
+        FigureCanvasAgg(fig)
+        ax = fig.subplots()
         t = ax.text(0.5, 0.5, 'Text')
         font_size = []
         for font in fontsl:
@@ -326,7 +348,6 @@ class Colorbar(scene.visuals.Image):
             else:
                 t.set_fontsize(font)
                 font_size.append(round(t.get_fontsize(), 2))
-        plt.close(fig)
         if not isinstance(fonts, List):
             font_size = font_size[0]
         return font_size

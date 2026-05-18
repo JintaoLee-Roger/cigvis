@@ -63,7 +63,7 @@ if __name__ == '__main__':
 
     # salt (geologic body)
     salt = np.memmap(saltp, np.float32, 'c', shape=shape)
-    nodes += cigvis.create_bodys(salt, 0.0, 0.0, color='cyan')
+    nodes += cigvis.create_bodies(salt, 0.0, 0.0, color='cyan')
 
     # hrizon (surface)
     hz2 = np.fromfile(hz2p, np.float32).reshape(ni, nx)
@@ -73,7 +73,7 @@ if __name__ == '__main__':
     unc = np.fromfile(uncp, np.float32).reshape(shape).astype(np.float32)
     # unconformity (surface)
     unc2 = np.fromfile(unc2p, np.float32).reshape(ni, nx).astype(np.float32)
-    nodes += cigvis.create_surfaces([unc2], volume=unc, value_type='amp')
+    nodes += cigvis.create_surfaces([unc2])
 
     # well logs
     nodes += load_wellLog(root + 'logs.dat')
@@ -83,9 +83,16 @@ if __name__ == '__main__':
                                       endian='>',
                                       values_type='likelihood')
 
-    cigvis.plot3D(nodes,
-                  azimuth=-65.0,
-                  elevation=22.0,
-                  fov=15.0,
-                  axis_scales=(1, 1, 1.7),
-                  zoom_factor=1.4)
+    nodes += cigvis.create_points(np.array([[192, 634.1855, 32.3816], [192, 616.5631, 139.5132], [192, 600.3925, 220.0604]]), r=4, color="cyan")
+
+    cigvis.plot3D(
+        nodes,
+        view=cigvis.Plot3DView(
+            azimuth=-65.0,
+            elevation=22.0,
+            fov=15.0,
+            axis_scales=(1, 1, 1.7),
+            zoom_factor=1.4,
+        ),
+        save=cigvis.Plot3DSave('example.png')
+    )

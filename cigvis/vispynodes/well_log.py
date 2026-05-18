@@ -11,6 +11,7 @@ Create a tube like well log
 from typing import List
 from vispy.visuals.mesh import MeshVisual
 from vispy.scene.visuals import Compound
+from .shading_filter import HeadlightShadingFilter
 import numpy as np
 from numpy.linalg import norm
 from vispy.util.transforms import rotate
@@ -82,11 +83,13 @@ class WellLog(Compound):
         tube_colors = colors[0, ...]
         tube_colors = np.repeat(tube_colors, tube_points, axis=0)
 
-        tube = MeshVisual(tube_vertices,
-                          tube_indices,
-                          vertex_colors=tube_colors,
-                          shading=shading,
-                          mode=mode)
+        if dyn_light and shading is not None:
+            tube = MeshVisual(tube_vertices, tube_indices,
+                              vertex_colors=tube_colors, shading=None, mode=mode)
+            tube.attach(HeadlightShadingFilter(shading=shading))
+        else:
+            tube = MeshVisual(tube_vertices, tube_indices,
+                              vertex_colors=tube_colors, shading=shading, mode=mode)
 
         line_facemesh = []
         # line face mesh

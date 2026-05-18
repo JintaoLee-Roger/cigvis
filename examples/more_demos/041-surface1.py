@@ -5,7 +5,7 @@ Surfaces (N, 3) displayed
 .. Note::
 
     You may feel a lag when rotating, this is due to a bug in vispy. You have two ways to fix it.
-    - turn off the changing light: ```cigvis.plot3D(..., dyn_light=False)```.
+    - turn off dynamic lighting when creating surface nodes, e.g. ```cigvis.create_surfaces(..., dyn_light=False)```.
     - See this pull: https://github.com/vispy/vispy/pull/2532
  
 
@@ -26,10 +26,9 @@ root = Path(__file__).resolve().parent.parent.parent
 
 def show(sx, sfs):
     """
-    sf 除了可以是二维的矩阵, 也可以是 (N, 3) 的点矩阵(无序), 
-    每个 sf 都是独立的, 即 sfs 里面可以同时包含
-    (ni, nx) 的规则网格 和 (N, 3) 的点.
-    N 可以不等于 ni * nx
+    Besides 2D matrices, sf can also be an unordered (N, 3) point array.
+    Each sf is independent, so sfs can contain both regular (ni, nx) grids and
+    (N, 3) point arrays. N does not need to equal ni * nx.
     """
     sfs1 = [sfs[0].copy(), sfs[1].copy()]
     y, x = np.meshgrid(np.arange(192), np.arange(192))
@@ -42,8 +41,8 @@ def show(sx, sfs):
                                      cmap='Petrel',
                                      clim=[sx.min(), sx.max()])
     """
-    当 sf.shape = (N, 3) 时, 可以选择是否启用插值(默认不启用)
-    下面是启用插值的结果
+    When sf.shape = (N, 3), interpolation can be enabled or disabled.
+    The following example enables interpolation.
     """
     sfs2 = [sfs[0].copy(), sfs[1].copy()]
     y, x = np.meshgrid(np.arange(192), np.arange(192))
@@ -59,8 +58,8 @@ def show(sx, sfs):
                                      clim=[sx.min(), sx.max()],
                                      interp=True)
     """
-    当 sf.shape = (N, 3) 时, 可以选择是否启用插值(默认启用)
-    下面是不启用插值的结果
+    When sf.shape = (N, 3), interpolation can be enabled or disabled.
+    The following example disables interpolation.
     """
     sfs3 = [sfs[0].copy(), sfs[1].copy()]
     y, x = np.meshgrid(np.arange(192), np.arange(192))
@@ -76,7 +75,7 @@ def show(sx, sfs):
                                      clim=[sx.min(), sx.max()],
                                      interp=False)
     """
-    添加控制点
+    Add control points.
     """
     nodes4 = cigvis.create_slices(sx)
     nodes4 += cigvis.create_surfaces(sfs,
@@ -89,9 +88,8 @@ def show(sx, sfs):
     nodes4 += cigvis.create_points(points, r=3)
 
     cigvis.plot3D([nodes1, nodes2, nodes3, nodes4],
-                  grid=(2, 2),
-                  share=True,
-                  savename='example.png')
+                  view=cigvis.Plot3DView(grid=(2, 2), share=True),
+                  save=cigvis.Plot3DSave(path='example.png'))
 
 
 if __name__ == '__main__':

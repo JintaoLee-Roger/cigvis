@@ -104,3 +104,57 @@ def arbline2mesh(p, n3, anti_rot=True, vstep=1):
         faces[:, [1, 2]] = faces[:, [2, 1]]
 
     return vertices, faces.astype(int)
+
+
+
+def points2quad(p, r=None, size=None):
+    """
+    Convert points to separate x-y aligned quad meshes.
+
+    Parameters
+    ----------
+    p : array-like
+        Point positions with shape ``(N, 3)``.
+    r : float or tuple, optional
+        Backward-compatible half size of each quad.
+    size : float or tuple, optional
+        Full side length of each quad. A scalar creates square quads; a
+        two-element tuple controls x/y side lengths independently.
+    """
+    p = np.asarray(p)
+    if p.ndim != 2 or p.shape[1] < 3:
+        raise ValueError(f"points must have shape (N, 3), but got {p.shape}")
+
+    if size is not None and r is not None:
+        raise ValueError("Pass either `size` or `r`, not both")
+    if size is None:
+        size = 1.0 if r is None else np.asarray(r) * 2
+
+    size = np.asarray(size, dtype=float)
+    if size.ndim == 0:
+        hx = hy = float(size) / 2
+    elif size.size == 2:
+        hx, hy = size.astype(float) / 2
+    else:
+        raise ValueError("`size` must be a scalar or a two-element tuple")
+
+    x, y, z = p[:, 0], p[:, 1], p[:, 2]
+    mask = np.all(np.isfinite(p[:, :3]), axis=1)
+    x, y, z = x[mask], y[mask], z[mask]
+    n_points = len(x)
+
+    # vertices offset (N, 4, 3)
+    offsets = np.array([
+        [-hx, -hy, 0], [hx, -hy, 0], [hx, hy, 0], [-hx, hy, 0],
+    ])
+    
+    base_coords = np.stack([x, y, z], axis=1) # (N, 3)
+    vertices = base_coords[:, np.newaxis, :] + offsets # (N, 4, 3)
+    vertices = vertices.reshape(-1, 3) # (4N, 3)
+
+    # a point represents two tri faces
+    indices = np.array([0, 1, 2, 0, 2, 3])
+    start_indices = np.arange(0, 4 * n_points, 4)[:, np.newaxis]
+    faces = (start_indices + indices).reshape(-1, 3)
+
+    return vertices.astype(np.float32), faces.astype(np.uint32)

@@ -38,7 +38,7 @@ c5 = [
     ['#9DD0C7', '#9180AC', '#D9BDD8', '#E58579', '#8AB1D2'],
     ['#EEC79F', '#F1DFA4', '#74B69F', '#A6CDE4', '#E2C8D8'],
     ['#CC88B0', '#998DB7', '#DBE0ED', '#87B5B2', '#F4CEB4'],
-    ['#F1DBE7', '#E0F1F7', '#DBD8E9', '#DEECD9', '#D0D2D4'],  # 淡色, 用于边缘填充
+    ['#F1DBE7', '#E0F1F7', '#DBD8E9', '#DEECD9', '#D0D2D4'],  # Light colors for edge fills
     ['#2878b5', '#9ac9db', '#f8ac8c', '#c82423', '#ff8884'],  # Marked! line
 ]
 
@@ -75,7 +75,7 @@ def view_colors(colors):
     6. Histogram
     
     Parameters:
-    colors (list): List of color codes, e.g., ['#9392BE', '#D0E7ED', '#D5E4A8']。
+    colors (list): List of color codes, e.g., ['#9392BE', '#D0E7ED', '#D5E4A8'].
     """
     n = len(colors)
 

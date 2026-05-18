@@ -28,6 +28,9 @@ nodes2 = cigvis.create_slices(sx, cmap='Petrel')
 
 cigvis.plot3D(
     [nodes1, nodes2],
-    grid=(1, 2),  # here, define a grid
-    size=(1000, 800),
-    savename='example.png')
+    view=cigvis.Plot3DView(
+        grid=(1, 2),  # here, define a grid
+        size=(1000, 800),
+    ),
+    save=cigvis.Plot3DSave(path='example.png'),
+)

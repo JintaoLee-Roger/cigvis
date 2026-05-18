@@ -35,7 +35,7 @@ viserplot.link_servers([s1, s2])
 
 nodes1 = viserplot.create_slices(sx, cmap='gray', pos=[20, 20, 100])
 nodes2 = viserplot.create_slices(sx, cmap='gray', pos=[20, 20, 100])
-nodes2 = viserplot.add_mask(nodes2, fx, cmaps='jet', alpha=1, excpt='min')
+nodes2 = viserplot.add_mask(nodes2, fx, cmap='jet', alpha=1, excpt='min')
 
 viserplot.plot3D(nodes1, server=s1, run_app=False)
 viserplot.plot3D(nodes2, server=s2, run_app=False)

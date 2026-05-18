@@ -6,8 +6,7 @@
 Display 3D seismic data and multiple horizons
 ================================================
 
-层位可以是一个 (n1, n2) 大小的 Z 值,
-也可以是 (N, 3) 大小的 N 个点
+Horizons can be either an (n1, n2) array of Z values or an (N, 3) point cloud.
 
 .. image:: ../../_static/cigvis/3Dvispy/05.png
     :alt: image
@@ -43,4 +42,8 @@ nodes += cigvis.create_surfaces([sf1, sf2],
 # add two points
 nodes += cigvis.create_points(np.array([[70, 50, 158], [20, 100, 80]]), r=3)
 
-cigvis.plot3D(nodes, size=(800, 800), savename='example.png')
+cigvis.plot3D(
+    nodes,
+    view=cigvis.Plot3DView(size=(800, 800)),
+    save=cigvis.Plot3DSave(path='example.png'),
+)

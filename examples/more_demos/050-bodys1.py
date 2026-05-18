@@ -19,9 +19,9 @@ root = Path(__file__).resolve().parent.parent.parent
 
 def show1(sx, lx, level):
     nodes = cigvis.create_slices(sx)
-    nodes += cigvis.create_bodys(lx, level, margin=0)
+    nodes += cigvis.create_bodies(lx, level, margin=0)
 
-    cigvis.plot3D(nodes, savename='example.png')
+    cigvis.plot3D(nodes, save=cigvis.Plot3DSave(path='example.png'))
 
 
 if __name__ == '__main__':

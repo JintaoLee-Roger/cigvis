@@ -19,14 +19,17 @@ Paper: [https://library.seg.org/doi/abs/10.1190/geo2024-0041.1](https://library.
 
 To install via PyPI, use:
 ```shell
-# only with vispy and PyQt5, for desktop
-pip install cigvis
+# only with vispy and PySide6, for desktop
+pip install "cigvis[gui]"
 
 # only with plotly, for jupyter
 pip install "cigvis[plotly]"
 
 # only with viser, visualizing in browser
 pip install "cigvis[viser]"
+
+# only with Panel + Plotly, for SSH-friendly 2D slice viewing
+pip install "cigvis[sliceviewer]"
 
 # install all dependencies
 pip install "cigvis[all]"
@@ -35,14 +38,17 @@ pip install "cigvis[all]"
 For local installation, clone the repository from GitHub and then install it using pip:
 ```shell
 git clone https://github.com/JintaoLee-Roger/cigvis.git
-# only with vispy and PyQt5, for desktop
-pip install -e . --config-settings editable_mode=compat
+# only with vispy and PySide6, for desktop
+pip install -e ".[gui]" --config-settings editable_mode=compat
 
 # only with plotly, for jupyter 
 pip install -e ".[plotly]" --config-settings editable_mode=compat
 
 # only with viser, visualizing in browser
 pip install -e ".[viser]" --config-settings editable_mode=compat
+
+# only with Panel + Plotly, for SSH-friendly 2D slice viewing
+pip install -e ".[sliceviewer]" --config-settings editable_mode=compat
 
 # install all dependencies
 pip install -e ".[all]" --config-settings editable_mode=compat
@@ -64,6 +70,7 @@ The fundamental structure of cigvis's visualization code consists of:
 1. Data loading
 2. Creating nodes
 3. Passing nodes to the `plot3D` function
+4. Optionally grouping view, save, colorbar, and GUI settings
 
 For example:
 ```python
@@ -81,6 +88,40 @@ cigvis.plot3D(nodes)
 ```
 
 This basic code structure allows you to quickly visualize your geophysical data using cigvis. Simply load your data, create nodes, and pass them to the `plot3D` function as demonstrated in the example above.
+
+For new code, `plot3D` options should be grouped by ownership:
+
+```python
+cigvis.plot3D(
+    nodes,
+    view=cigvis.Plot3DView(
+        size=(900, 700),
+        grid=(1, 2),
+        share=True,
+        xyz_axis=False,
+        azimuth=-65,
+        elevation=22,
+    ),
+    save=cigvis.Plot3DSave(
+        path='example.png',
+        transparent_bg=True,
+    ),
+    gui=cigvis.Plot3DGui(enabled=False),
+)
+```
+
+`view` controls the VisPy canvas, layout, and camera; `save` controls automatic screenshot behavior; `cbar` controls colorbar export options; and `gui` controls the optional PySide6 GUI shell. Legacy top-level parameters such as `size=`, `savename=`, `grid=`, `share=`, `xyz_axis=`, and `cbar_region_ratio=` are deprecated since `0.2.1` and scheduled for removal in `0.4.0`.
+
+Backend APIs are now explicit. Use top-level `cigvis.create_*` and `cigvis.plot3D` for VisPy rendering. In Jupyter notebooks, do not rely on `cigvis.create_*` to switch to Plotly automatically; import the backend namespace explicitly:
+
+```python
+from cigvis import plotlyplot
+
+nodes = plotlyplot.create_slices(d)
+# Optional overlays follow the same flow as the VisPy backend:
+# nodes = plotlyplot.add_mask(nodes, mask, cmap='jet', interpolation='nearest')
+plotlyplot.plot3D(nodes)
+```
 
 ### Camera and Dragging
 
@@ -119,11 +160,11 @@ These capabilities within cigvis allow for versatile and interactive visualizati
 
 ### Multivolumes in One Canvas
 
-You can pass multiple independent nodes combinations to the `plot3D` function while specifying a grid (e.g., `grid=(2,2)`). This allows you to divide the canvas into multiple independent sub-canvases, where each sub-canvas displays a separate 3D data set within the same canvas. The example code for this can be found in the documentation at [cigvis/gallery/3Dvispy/10](https://cigvis.readthedocs.io/en/latest/gallery/3Dvispy/10-multi_canvas.html#sphx-glr-gallery-3dvispy-10-multi-canvas-py).
+You can pass multiple independent node combinations to the `plot3D` function and set a grid through `view=cigvis.Plot3DView(grid=(2, 2))`. This divides the canvas into multiple independent sub-canvases, where each sub-canvas displays a separate 3D data set within the same canvas. The example code for this can be found in the documentation at [cigvis/gallery/3Dvispy/10](https://cigvis.readthedocs.io/en/latest/gallery/3Dvispy/10-multi_canvas.html#sphx-glr-gallery-3dvispy-10-multi-canvas-py).
 
 ![10](https://raw.githubusercontent.com/JintaoLee-Roger/images/main/cigvis/3Dvispy/10.gif)
 
-Furthermore, you can link the cameras of all sub-canvases together (just need pass `share=True` to `plot3D` function). This means that any rotation, scaling, or slicing performed in one sub-canvas will be mirrored in all other sub-canvases, ensuring that they all exhibit the same changes simultaneously. This feature is highly advantageous when comparing multiple sets of data, such as results from different experiments, results alongside labels, seismic data compared with attributes, and more. 
+Furthermore, you can link the cameras of all sub-canvases together with `view=cigvis.Plot3DView(share=True)`. This means that any rotation, scaling, or slicing performed in one sub-canvas will be mirrored in all other sub-canvases, ensuring that they all exhibit the same changes simultaneously. This feature is highly advantageous when comparing multiple sets of data, such as results from different experiments, results alongside labels, seismic data compared with attributes, and more.
 You can find example code for this functionality in the documentation at [cigvis/gallery/3Dvispy/11](https://cigvis.readthedocs.io/en/latest/gallery/3Dvispy/11-share_cameras.html#sphx-glr-gallery-3dvispy-11-share-cameras-py).
 
 ![11](https://raw.githubusercontent.com/JintaoLee-Roger/images/main/cigvis/3Dvispy/11.gif)
@@ -151,7 +192,7 @@ Based on [viser](https://github.com/nerfstudio-project/viser), cigvis also suppo
 +   viserplot.plot3D(nodes)
 ```
 
-When you are in `jupyter` environment, we recommand to maintain a unique server, otherwise the port will be changed.
+When you are in a `jupyter` environment, we recommend maintaining a unique server, otherwise the port will be changed.
 
 ``` diff
     import numpy as np
@@ -187,7 +228,48 @@ It is not possible to divide multiple canvases in the browser, i.e. it is not po
 
 ![04](https://raw.githubusercontent.com/JintaoLee-Roger/images/main/cigvis/viser/04.gif)
 
-There are sevreal examples in [gallery/viser](https://cigvis.readthedocs.io/en/latest/gallery/viser/index.html) for reference.
+There are several examples in [gallery/viser](https://cigvis.readthedocs.io/en/latest/gallery/viser/index.html) for reference.
+
+### SSH-Friendly 2D SliceViewer
+
+For remote servers where OpenGL is unavailable or a 3D/4D scene is too heavy, `cigvis.sliceviewer` provides a lightweight browser-based 2D viewer. It renders one chosen 2D plane from a 2D/3D/4D array with NumPy/Plotly and serves it through Panel:
+
+```python
+import numpy as np
+from cigvis import sliceviewer as sv
+
+volume = np.fromfile('sx.dat', np.float32).reshape(4, ni, nx)
+nodes = sv.create_slice(
+    volume,
+    display_axes=(1, 2),  # rendered as (Y, X)
+    indices={0: 2},       # fixed index for hidden dimensions
+    aspect=1.0,
+    cmap='gray',
+    interpolation='nearest',
+    render_mode='float',
+)
+
+# Forward the port first when running through SSH:
+# ssh -L 5007:localhost:5007 user@server
+sv.show(nodes, port=5007)
+```
+
+The sidebar can switch `Y axis` / `X axis`, swap X/Y, change fixed indices for the hidden dimensions, adjust aspect (`equal`, `free`, or a custom `Y/X` ratio), choose RGBA image vs float heatmap rendering, and choose interpolation (`nearest`, `linear`, `best`, or `auto`). If `display_axes` is omitted, the two largest dimensions are displayed automatically.
+
+For before/after comparison, pass two or three node lists and choose a grid:
+
+```python
+nodes_raw = sv.create_slice(raw, display_axes=(2, 3), indices={0: 1, 1: 2})
+nodes_out = sv.create_slice(processed, display_axes=(2, 3), indices={0: 1, 1: 2})
+
+sv.show([nodes_raw, nodes_out], grid=(1, 2), port=5007)
+```
+
+For more panels, choose any grid large enough for the inputs, for example `grid=(2, 2)`.
+
+For scripts and tests that only need the Panel object, call `sv.show(nodes, launch=False)` or `sv.build_layout(nodes)`.
+
+`sliceviewer` binds to `localhost` by default, which works for local browsing and SSH port forwarding. Use `address='0.0.0.0'` only when other machines need to connect to the server process directly.
 
 
 
@@ -224,5 +306,3 @@ All data used by examples in the [gallery](https://cigvis.readthedocs.io/gallery
 ## Example Gallery
 
 See: [cigvis/gallery](https://cigvis.readthedocs.io/en/latest/gallery/index.html)
-
-

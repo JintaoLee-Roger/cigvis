@@ -9,8 +9,8 @@ Gallery
   2D/index
   1D/index
   colormap/index
-  gui/index
   more_demos/index
+  sliceviewer/index
 
 
 3Dvispy
@@ -45,10 +45,10 @@ colormap
 See the :doc:`colormap Gallery <colormap/index>` for examples.
 
 
-gui
-----------
+SliceViewer
+--------------
 
-See the :doc:`gui Gallery <gui/index>` for examples.
+See the :doc:`sliceviewer Gallery <sliceviewer/index>` for examples.
 
 
 More Demos 

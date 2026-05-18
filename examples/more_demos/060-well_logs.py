@@ -19,24 +19,24 @@ root = Path(__file__).resolve().parent.parent.parent
 
 def show(sx, points):
     """
-    显示将测井显示为一条等半径的tube,
-    并显示为一个颜色
+    Display the well log as a constant-radius tube with a single color.
     """
 
     nodes1 = cigvis.create_slices(sx)
     nodes1 += cigvis.create_well_logs(points, cmap='orange', radius_tube=3)
     """
-    显示将测井显示为一条等半径的tube,
-    颜色为深度
+    Display the well log as a constant-radius tube colored by depth.
     """
 
     nodes2 = cigvis.create_slices(sx)
     nodes2 += cigvis.create_well_logs(points, cmap='jet', radius_tube=3)
 
     cigvis.plot3D([nodes1, nodes2],
-                  grid=(1, 2),
-                  zoom_factor=4,
-                  savename='example.png')
+                  view=cigvis.Plot3DView(
+                      grid=(1, 2),
+                      zoom_factor=4,
+                  ),
+                  save=cigvis.Plot3DSave(path='example.png'))
 
 
 if __name__ == '__main__':

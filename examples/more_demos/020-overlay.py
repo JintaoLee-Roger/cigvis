@@ -20,7 +20,7 @@ root = Path(__file__).resolve().parent.parent.parent
 
 def show(bg, fg):
     """
-    叠加地震和类别(地震相), alpha=0.5
+    Overlay seismic data and facies labels with alpha=0.5.
     """
     fg[fg == 1] = 100
     values = np.unique(fg)
@@ -29,7 +29,7 @@ def show(bg, fg):
     cmap = colormap.set_alpha(cmap, 0.5)  # Note:
 
     nodes1 = cigvis.create_slices(bg)
-    nodes1 = cigvis.add_mask(nodes1, fg, cmaps=cmap, interpolation='nearest')
+    nodes1 = cigvis.add_mask(nodes1, fg, cmap=cmap, interpolation='nearest')
     nodes1 += cigvis.create_colorbar_from_nodes(
         nodes1,
         label_str='Facies',
@@ -38,7 +38,7 @@ def show(bg, fg):
         disc_ticks=[values.astype(int)],
     )
     """
-    mask 值最小的一类, 但是在colorbar中显示最小的一类(白色)
+    Mask the smallest class, but keep it visible in the colorbar (white).
     """
     values = np.unique(fg)
     colors = ['red', 'green', 'yellow', 'blue', (0, 0.5, 0.5)]
@@ -46,7 +46,7 @@ def show(bg, fg):
     cmap = colormap.set_alpha_except_min(cmap, 0.5)  # Note:
 
     nodes2 = cigvis.create_slices(bg)
-    nodes2 = cigvis.add_mask(nodes2, fg, cmaps=cmap, interpolation='nearest')
+    nodes2 = cigvis.add_mask(nodes2, fg, cmap=cmap, interpolation='nearest')
     nodes2 += cigvis.create_colorbar_from_nodes(
         nodes2,
         label_str='Facies',
@@ -55,7 +55,7 @@ def show(bg, fg):
         disc_ticks=[values.astype(int)],
     )
     """
-    mask 最小的一类, 同时 colorbar 也去除 
+    Mask the smallest class and remove it from the colorbar.
     """
     values = np.unique(fg)
     colors = ['red', 'green', 'yellow', 'blue', (0, 0.5, 0.5)]
@@ -63,7 +63,7 @@ def show(bg, fg):
     cmap = colormap.set_alpha_except_min(cmap, 0.5)  # Note:
 
     nodes3 = cigvis.create_slices(bg)
-    nodes3 = cigvis.add_mask(nodes3, fg, cmaps=cmap, interpolation='nearest')
+    nodes3 = cigvis.add_mask(nodes3, fg, cmap=cmap, interpolation='nearest')
 
     values = values[1:]
 
@@ -75,7 +75,7 @@ def show(bg, fg):
         disc_ticks=[values.astype(int)],
     )
     """
-    mask 最大的一类
+    Mask the largest class.
     """
     values = np.unique(fg)
     colors = ['red', 'green', 'yellow', 'blue', (0, 0.5, 0.5)]
@@ -83,7 +83,7 @@ def show(bg, fg):
     cmap = colormap.set_alpha_except_max(cmap, 0.5)  # Note:
 
     nodes4 = cigvis.create_slices(bg)
-    nodes4 = cigvis.add_mask(nodes4, fg, cmaps=cmap, interpolation='nearest')
+    nodes4 = cigvis.add_mask(nodes4, fg, cmap=cmap, interpolation='nearest')
 
     values = values[:-1]
     nodes4 += cigvis.create_colorbar_from_nodes(
@@ -94,7 +94,7 @@ def show(bg, fg):
         disc_ticks=[values.astype(int)],
     )
     """
-    mask 特定的值, 不是最小或最大, 可以是多个值
+    Mask selected values, not necessarily the minimum or maximum; multiple values are allowed.
     """
     values = np.unique(fg)
     colors = ['red', 'green', 'yellow', 'blue', (0, 0.5, 0.5)]
@@ -105,7 +105,7 @@ def show(bg, fg):
                                             values=[0, 100])
 
     nodes5 = cigvis.create_slices(bg)
-    nodes5 = cigvis.add_mask(nodes5, fg, cmaps=cmap, interpolation='nearest')
+    nodes5 = cigvis.add_mask(nodes5, fg, cmap=cmap, interpolation='nearest')
 
     values = values[values != 0]
     values = values[values != 100]
@@ -118,10 +118,12 @@ def show(bg, fg):
     )
 
     cigvis.plot3D([nodes1, nodes2, nodes3, nodes4, nodes5],
-                  grid=(2, 3),
-                  size=(1300, 800),
-                  cbar_region_ratio=0.24,
-                  savename='example.png')
+                  view=cigvis.Plot3DView(
+                      grid=(2, 3),
+                      size=(1300, 800),
+                      cbar_region_ratio=0.24,
+                  ),
+                  save=cigvis.Plot3DSave(path='example.png'))
 
 
 if __name__ == '__main__':

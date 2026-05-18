@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from cigvis import colormap, ExceptionWrapper
 from cigvis.meshs.surfaces import arbline2mesh
 from cigvis.utils import surfaceutils
+from .base import ViserNodeMixin, auto_scale_from_points, color_to_uint8_rgb
 
 try:
     import viser
@@ -51,7 +52,7 @@ def color2textual(colors: ArrayLike, vertices: ArrayLike):
     return img_pil, uv
 
 
-class MeshNode(trimesh.Trimesh):
+class MeshNode(ViserNodeMixin, trimesh.Trimesh):
     """
     Note: All colors should be in the range [0, 255] in uint8 format.
     """
@@ -69,28 +70,24 @@ class MeshNode(trimesh.Trimesh):
         clim: Optional[ArrayLike] = None,
         **kwargs,
     ):
-        super().__init__(vertices=vertices, faces=faces, **kwargs)
+        trimesh.Trimesh.__init__(self, vertices=vertices, faces=faces, **kwargs)
 
-        self._vertices = vertices
+        self._base_vertices = np.asarray(vertices, dtype=np.float32)
+        self._vertices = self._base_vertices
         self.colored_by = None  # can be 'value', 'vertex', 'face', or 'uniform'
 
         if scale < 0:
-            rx = vertices[:, 0].max() - vertices[:, 0].min()
-            ry = vertices[:, 1].max() - vertices[:, 1].min()
-            rz = vertices[:, 2].max() - vertices[:, 2].min()
-            self._scale = [1 / max([rx, ry, rz])] * 3
-        else:
-            self._scale = [scale] * 3
+            scale = auto_scale_from_points(self._base_vertices, target=1.0)
 
         self._cmap = cmap
         self._clim = clim
-        self._server = None # viser.ViserServer
         self._face_colors = face_colors
         self._vertex_colors = vertex_colors
         self._vertices_values = vertices_values
-        self._color = color
-        self._name = 'mesh'
+        self._color = color_to_uint8_rgb(color)
         self._set_color = False
+        self._init_node_state('mesh', scale)
+        self._on_scale_changed()
 
         if self._face_colors is not None:
             self.colored_by = 'face'
@@ -105,19 +102,34 @@ class MeshNode(trimesh.Trimesh):
             self.colored_by = 'uniform'
 
     def set_colors(self):
-        pass
+        if self.server is None:
+            return
+        if self._set_color:
+            return
 
-    @property
-    def server(self):
-        return self._server
+        self._set_color = True
+        if self.colored_by == 'value':
+            if self.clim is None:
+                self._clim = [
+                    self._vertices_values.min(),
+                    self._vertices_values.max()
+                ]
+            norm = plt.Normalize(vmin=self.clim[0], vmax=self.clim[1])
+            colors = colormap.get_cmap_from_str(self._cmap)(norm(
+                self._vertices_values))
+            self.visual.vertex_colors = color_f2i(colors)
+            return
 
-    @server.setter
-    def server(self, server):
-        if not isinstance(server, viser.ViserServer):
-            raise ValueError("server must be type: viser.ViserServer")
-        self._server = server
-        self._set_color = False
-        self.update_node()
+        if self.colored_by == 'vertex':
+            self.visual.vertex_colors = self._vertex_colors
+        elif self.colored_by == 'face':
+            self.visual.face_colors = self._face_colors
+        elif self.colored_by == 'uniform':
+            self.visual.vertex_colors = np.tile(
+                self._color,
+                (self.vertices.shape[0], 1),
+            )
+        self._set_visual()
 
     @property
     def cmap(self):
@@ -140,15 +152,6 @@ class MeshNode(trimesh.Trimesh):
         self.update_node()
 
     @property
-    def name(self):
-        return self._name
-
-    @name.setter
-    def name(self, name):
-        self._name = name
-        self.update_node()
-
-    @property
     def wxyz(self):
         pass
 
@@ -157,16 +160,19 @@ class MeshNode(trimesh.Trimesh):
         pass
 
     @property
-    def scale(self):
-        return self._scale
+    def data_extent(self):
+        return np.ptp(self._base_vertices[:, :3], axis=0)
 
-    @scale.setter
-    def scale(self, scale):
-        self._scale = scale
-        self.vertices[:, 0] = self._vertices[:, 0] * self._scale[0]
-        self.vertices[:, 1] = self._vertices[:, 1] * self._scale[1]
-        self.vertices[:, 2] = self._vertices[:, 2] * self._scale[2]
-        self.update_node()
+    def _on_scale_changed(self):
+        self.vertices = self._base_vertices * np.asarray(self.scale)
+
+    def _set_visual(self):
+        self.visual = self.visual.to_texture()
+        self.visual.material = self.visual.material.to_pbr()
+        self.visual.material.doubleSided = True
+        self.visual.material.roughnessFactor = 0.72
+        self.visual.material.metallicFactor = 0.0
+        self.visual.material.baseColorFactor = [1.0, 1.0, 1.0, 1.0]
 
     def update_node(self):
         if self.server is None:
@@ -174,9 +180,13 @@ class MeshNode(trimesh.Trimesh):
 
         self.set_colors()
 
+        # trimesh's GLB exporter identifies meshes by class name through its
+        # internal MRO helper. With our multiple-inheritance node class, recent
+        # trimesh versions may export an empty GLB unless we pass a plain mesh.
+        mesh = self.copy()
         self.nodes = self.server.scene.add_mesh_trimesh(
             self.name,
-            self,
+            mesh,
         )
 
 
@@ -208,56 +218,6 @@ class SurfaceNode(MeshNode):
             **kwargs,
         )
 
-    def set_colors(self):
-        if self.server is None:
-            return
-        if self._set_color:
-            return
-
-        self._set_color = True
-        if self.colored_by == 'value':
-            if self.clim is None:
-                self.clim = [
-                    self._vertices_values.min(),
-                    self._vertices_values.max()
-                ]
-            norm = plt.Normalize(vmin=self.clim[0], vmax=self.clim[1])
-            colors = colormap.get_cmap_from_str(self._cmap)(norm(
-                self._vertices_values))
-            colors = color_f2i(colors)
-            # self.visual.vertex_colors = colors
-            img, uv = color2textual(colors, self._vertices)
-            self.visual = TextureVisuals(
-                uv,
-                PBRMaterial(
-                    roughnessFactor=0.4,
-                    baseColorFactor=[110, 110, 110, 255],
-                    metallicFactor=.4,
-                    baseColorTexture=img,
-                    doubleSided=True,
-                ))
-            return
-
-        elif self.colored_by == 'vertex':
-            self.visual.vertex_colors = self._vertex_colors
-        elif self.colored_by == 'face':
-            self.visual.face_colors = self._face_colors
-        elif self.colored_by == 'uniform':
-            self.visual.vertex_colors = np.tile(
-                self._color,
-                (self.vertices.shape[0], 1),
-            )
-        self._set_visual()
-
-    def _set_visual(self):
-        self.visual = self.visual.to_texture()
-        self.visual.material = self.visual.material.to_pbr()
-        self.visual.material.doubleSided = True
-        self.visual.material.roughnessFactor = 0.4
-        self.visual.material.metallicFactor = 0.4
-        self.visual.material.baseColorFactor = [110, 110, 110, 255]
-
-
 class ArbLineNode(MeshNode):
 
     def __init__(
@@ -279,8 +239,8 @@ class ArbLineNode(MeshNode):
         if clim is None:
             clim = [np.nanmin(self.data), np.nanmax(self.data)]
 
-        self.nl, self.nt = data.shape
-        assert len(path) == self.nl
+        self.nl, self.nt = self.data.shape
+        assert len(self.path) == self.nl
 
         vertices, faces = arbline2mesh(self.path[::hstep], self.nt, False, vstep=vstep)
         super().__init__(
@@ -313,9 +273,9 @@ class ArbLineNode(MeshNode):
         self.visual = self.visual.to_texture()
         self.visual.material = self.visual.material.to_pbr()
         self.visual.material.doubleSided = True
-        self.visual.material.roughnessFactor = 0.4
-        self.visual.material.metallicFactor = 0.2
-        self.visual.material.baseColorFactor = [100, 100, 100, 255]
+        self.visual.material.roughnessFactor = 0.72
+        self.visual.material.metallicFactor = 0.0
+        self.visual.material.baseColorFactor = [255, 255, 255, 255]
 
 
     def preprocess(self, path=None, anchor=None, data=None, volume=None):

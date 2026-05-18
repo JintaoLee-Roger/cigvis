@@ -6,7 +6,7 @@
 stratum colormap
 ====================
 
-一个用于显示RGT的colormap (created by Xinming Wu)
+A colormap for displaying RGT values (created by Xinming Wu).
 
 .. image:: ../../_static/cigvis/colormap/03.png
     :alt: image
@@ -27,4 +27,4 @@ nodes, cbar = cigvis.create_slices(d, [[36], [28], [84]],
                                    label_str='stratum cmap for RGT')
 nodes.append(cbar)
 
-cigvis.plot3D(nodes, savename='example.png')
+cigvis.plot3D(nodes, save=cigvis.Plot3DSave(path='example.png'))

@@ -69,12 +69,12 @@ if __name__ == '__main__':
                                  clim=[-2.0, 1.5])
     nodes = cigvis.add_mask(nodes,
                             inter,
-                            clims=fg_clim,
-                            cmaps=fg_cmap,
+                            clim=fg_clim,
+                            cmap=fg_cmap,
                             interpolation='nearest')
 
     salt = np.memmap(saltp, np.float32, 'c', shape=shape)
-    nodes += cigvis.create_bodys(salt, 0.0, 0.0, color='cyan')
+    nodes += cigvis.create_bodies(salt, 0.0, 0.0, color='cyan')
 
     hz2 = np.fromfile(hz2p, np.float32).reshape(ni, nx)
     nodes += cigvis.create_surfaces([hz2],
@@ -90,21 +90,25 @@ if __name__ == '__main__':
                                     step1=step1,
                                     step2=step2)
 
-    nodes += load_wellLog(root + 'logs.dat')
+    # nodes += load_wellLog(root + 'logs.dat')
 
     nodes += cigvis.create_fault_skin(root + 'skins/')
 
-    nodes += cigvis.create_axis(seis.shape,
-                                'axis',
-                                'auto',
-                                ticks_font_size=28,
-                                labels_font_size=32,
-                                ticks_length=6)
-    nodes += cigvis.create_colorbar_from_nodes(nodes, 'Impedance', 'mask')
+    # nodes += cigvis.create_axis(seis.shape,
+    #                             'axis',
+    #                             'auto',
+    #                             ticks_font_size=28,
+    #                             labels_font_size=32,
+    #                             ticks_length=6)
+    # nodes += cigvis.create_colorbar_from_nodes(nodes, 'Impedance', 'mask')
 
-    cigvis.plot3D(nodes,
-                  azimuth=-65.0,
-                  elevation=22.0,
-                  fov=15.0,
-                  axis_scales=(1, 1, 1.7),
-                  zoom_factor=1.4)
+    cigvis.plot3D(
+        nodes,
+        view=cigvis.Plot3DView(
+            azimuth=-65.0,
+            elevation=22.0,
+            fov=15.0,
+            axis_scales=(1, 1, 1.7),
+            zoom_factor=1.4,
+        ),
+    )

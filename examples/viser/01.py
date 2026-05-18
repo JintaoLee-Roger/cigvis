@@ -24,8 +24,8 @@ data = np.fromfile('data/seis_h360x600x400.dat', dtype=np.float32).reshape(shape
 label = np.fromfile('data/label_h360x600x400.dat', dtype=np.float32).reshape(shape)
 nodes = viserplot.create_slices(data, pos=[20, 30, 320], cmap='gray')
 
-cmaps = colormap.set_alpha_except_min('jet', 0.5)
+cmap = colormap.set_alpha_except_min('jet', 0.5)
 
-nodes = viserplot.add_mask(nodes, label, cmaps=cmaps)
+nodes = viserplot.add_mask(nodes, label, cmap=cmap)
 
 viserplot.plot3D(nodes)

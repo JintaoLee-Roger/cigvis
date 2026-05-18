@@ -127,20 +127,21 @@ def _check_is_disceret(data):
 
 def discrete_cbar(im, ticks_label=None, remove_trans=False):
     cmap = im.cmap
-    alpha = im._alpha
+    alpha = im.get_alpha()
     if alpha is not None:
-        cmap = colormap.set_alpha(cmap, alpha, False)
+        cmap = colormap.set_alpha(cmap, alpha)
 
-    if not _check_is_disceret(im._A):
+    data = im.get_array()
+    if not _check_is_disceret(data):
         raise RuntimeError(
             "You data is not disceret, set `discrete=False` or " +
             "discerete data `show_cbar=True` instead")
 
-    values = np.unique(im._A)
+    values = np.unique(data)
     if ticks_label is not None:
         assert len(values) == len(ticks_label)
 
-    clim = [im._norm._vmin, im._norm._vmax]
+    clim = im.get_clim()
     colors = colormap.get_colors_from_cmap(cmap, clim, values)
 
     if remove_trans:

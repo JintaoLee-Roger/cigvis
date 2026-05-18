@@ -6,11 +6,11 @@
 Overlaying fault displays on slices of 3D seismic data bodies
 ===================================================================
 
-``create_overlay``: the first parameters is (background), 
-and the second parameters is (foreground)
+Use ``create_slices`` for the background and ``add_mask`` for the fault
+overlay.
 
 .. Note::
-    foreground 需要合理设置透明度和mask
+    Set foreground transparency and masking carefully.
 
 .. image:: ../../_static/cigvis/3Dvispy/02.png
     :alt: image
@@ -33,12 +33,23 @@ ni, nx, nt = 128, 128, 128
 sx = np.fromfile(sxp, np.float32).reshape(ni, nx, nt)
 fx = np.fromfile(fxp, np.float32).reshape(ni, nx, nt)
 
-# mask min value (0), 0 means no fault
-fg_cmap = colormap.set_alpha_except_min('jet', alpha=1)
+coords = np.argwhere(fx > 0).astype(np.float32)
+
 
 # fx is discrete data, set interpolation as 'nearest'
 nodes = cigvis.create_slices(sx, pos=[[36], [28], [84]], cmap='gray')
-nodes = cigvis.add_mask(nodes, fx, cmaps=fg_cmap, interpolation='nearest')
+
+# mask min value (0), 0 means no fault, 
+# excpt='min' means that set minimum value to transparent
+nodes = cigvis.add_mask(nodes, fx, cmap='jet', interpolation='nearest', alpha=1, excpt='min')
+# this is equivalent to
+# fg_cmap = colormap.set_alpha_except_min('jet', alpha=1)
+# nodes = cigvis.add_mask(nodes, fx, cmaps=fg_cmap, interpolation='nearest')
+
 nodes += cigvis.create_colorbar_from_nodes(nodes, 'Amplitude', select='slices')
 
-cigvis.plot3D(nodes, size=(700, 600), savename='example.png')
+cigvis.plot3D(
+    nodes,
+    view=cigvis.Plot3DView(size=(700, 600)),
+    save=cigvis.Plot3DSave(path='example.png', transparent_bg=False),
+)

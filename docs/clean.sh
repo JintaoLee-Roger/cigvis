@@ -14,6 +14,8 @@ rm -rf gallery/more_demos
 
 rm -rf gallery/viser
 
+rm -rf gallery/sliceviewer
+
 rm -rf api/
 
 rm -rf _build

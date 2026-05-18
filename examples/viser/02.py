@@ -34,8 +34,8 @@ nodes += viserplot.create_surfaces(
     [sf1, sf2],
     volume=sx,
     value_type='amp',
-    cmap='gray',
-    clim=[sx.min(), sx.max()],
+    cmap='seismic',
+    clim=[-3, 3],
 )
 
 
