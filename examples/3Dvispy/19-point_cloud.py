@@ -12,10 +12,10 @@ clear point clouds. This is the VisPy counterpart of
 
     VisPy ``Markers`` uses screen-space marker sizes. The automatic PNG save
     captures the canvas when ``plot3D`` is called; press ``s`` after
-    rotating/zooming/resizing to save the adjusted view. This demo saves with
-    an opaque background because transparent PNG keeps antialiased marker
-    edges as alpha, which can look like pale outlines when image viewers
-    composite the file on a white background.
+    rotating/zooming/resizing to save the adjusted view. Transparent PNG
+    export is supported by default, including the point-cloud markers and
+    colorbar; pass ``Plot3DSave(transparent_bg=False)`` only when an opaque
+    background is desired.
 
 
 .. image:: ../../_static/cigvis/3Dvispy/19.png
@@ -192,7 +192,6 @@ if __name__ == '__main__':
             fov=15.0,
             axis_scales=(1, 1, 1.7),
             zoom_factor=1.35,
-            shortcut_save_kw={'transparent_bg': False},
         ),
-        save=cigvis.Plot3DSave(path='example.png', transparent_bg=False),
+        save=cigvis.Plot3DSave(path='example.png'),
     )

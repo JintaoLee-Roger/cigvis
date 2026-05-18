@@ -8,12 +8,12 @@ authors = [
     {name = "Jintao Li", email = "lijintaobt@gmail.com"},
 ]
 
-version = "0.3.0"
+version = "0.3.1"
 
 description = "CIGVis is a tool for geophysical data visualization"
 readme = "README.md"
 license = { text="MIT" }
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent"
