@@ -6,9 +6,9 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 
-from cigvis import is_line_first
 from cigvis import colormap
 from cigvis.utils import utils
+from cigvis.utils.slice_provider import SliceProvider
 from .axis_aligned_image import AxisAlignedImage, InteractiveLine
 
 
@@ -34,37 +34,6 @@ def _set_visual_metadata(visual, **metadata) -> None:
                 pass
 
 
-def normalize_display_range(display_range, shape) -> Dict[str, Tuple[int, int]]:
-    ranges = {
-        'x': (0, int(shape[0])),
-        'y': (0, int(shape[1])),
-        'z': (0, int(shape[2])),
-    }
-    if display_range is None:
-        return ranges
-    if not isinstance(display_range, dict):
-        raise TypeError("display_range must be a dict like {'z': (0, 900)}")
-
-    for axis, value in display_range.items():
-        axis = str(axis).lower()
-        if axis not in ranges:
-            raise ValueError("display_range keys must be one of 'x', 'y', or 'z'")
-        if value is None:
-            continue
-        if not isinstance(value, (list, tuple)) or len(value) != 2:
-            raise ValueError("display_range values must be (start, stop)")
-        start, stop = value
-        start = 0 if start is None else int(start)
-        stop = ranges[axis][1] if stop is None else int(stop)
-        if start < 0 or stop > ranges[axis][1] or start >= stop:
-            raise ValueError(
-                f"display_range[{axis!r}] must satisfy 0 <= start < stop <= {ranges[axis][1]}, "
-                f"got ({start}, {stop})"
-            )
-        ranges[axis] = (start, stop)
-    return ranges
-
-
 def _normalize_axes(axes=None):
     if axes is None:
         return _AXES
@@ -78,136 +47,6 @@ def _normalize_axes(axes=None):
         if axis not in out:
             out.append(axis)
     return tuple(out)
-
-
-# -------------------------
-# SliceProvider: no closure captures ndarray
-# -------------------------
-@dataclass
-class SliceProvider:
-    """
-    Provide 2D slices from a 3D/4D volume with cached metadata (line_first, rgb_type,
-    axis mapping, etc.). The key idea: the volume reference is mutable via set_volume(),
-    so you can swap ndarray references without replacing image_funcs.
-    """
-    volume: np.ndarray
-    preproc: Optional[Callable] = None
-    forcefp32: bool = False
-    display_range: Optional[Dict[str, Tuple[int, int]]] = None
-
-    def __post_init__(self):
-        self._init_meta()
-
-    def _init_meta(self):
-        self.line_first = is_line_first()
-        assert self.volume.ndim in (3, 4), f"vol.ndim must be 3 or 4, got {self.volume.ndim}"
-        self.ndim = self.volume.ndim
-
-        # NOTE: depending on cigvis.utils implementation, you might need:
-        # self.shape, self.rgb_type = utils.utils.get_shape(self.volume, self.line_first)
-        self.shape, self.rgb_type = utils.get_shape(self.volume, self.line_first)
-
-        # rgb_type:
-        # 0 for (n1, n2, n3)
-        # 1 for (n1, n2, n3, 3/4)
-        # 2 for (3/4, n1, n2, n3)
-        self.channel_dim = None
-        if self.rgb_type == 1:
-            self.channel_dim = 3
-        elif self.rgb_type == 2:
-            self.channel_dim = 0
-
-        dim_x, dim_y, dim_z = (0, 1, 2) if self.line_first else (2, 1, 0)
-        self.axis_to_dim = {'x': dim_x, 'y': dim_y, 'z': dim_z}
-        self.display_range = normalize_display_range(self.display_range, self.shape)
-
-    def set_volume(self, new_volume: np.ndarray, *, validate: bool = True, reinit_meta_if_needed: bool = False):
-        """
-        Swap the backing ndarray reference. For typical workflow (same shape/dtype layout),
-        validate=True is enough. If you might change ndim/rgb layout, set reinit_meta_if_needed=True.
-        """
-        if validate:
-            if new_volume.shape != self.volume.shape:
-                raise ValueError(f"shape mismatch: {new_volume.shape} vs {self.volume.shape}")
-            if new_volume.ndim != self.volume.ndim:
-                raise ValueError(f"ndim mismatch: {new_volume.ndim} vs {self.volume.ndim}")
-
-        self.volume = new_volume
-
-        if reinit_meta_if_needed:
-            # only needed when ndim/rgb layout may change; otherwise keep cached meta for speed
-            self._init_meta()
-
-    def get_shape2d(self, axis: str) -> Tuple[int, int]:
-        axis = axis.lower()
-        if axis == 'x':
-            return (self._axis_len('y'), self._axis_len('z'))
-        if axis == 'y':
-            return (self._axis_len('x'), self._axis_len('z'))
-        if axis == 'z':
-            return (self._axis_len('x'), self._axis_len('y'))
-        raise ValueError("axis must be x/y/z")
-
-    def _axis_len(self, axis: str) -> int:
-        start, stop = self.display_range[axis]
-        return stop - start
-
-    def _wrap_preproc(self, x: np.ndarray) -> np.ndarray:
-        # Keep same RGB transpose behavior as original get_image_func
-        if self.line_first and self.rgb_type == 1:
-            x = np.transpose(x, (1, 2, 0))
-        elif (not self.line_first) and self.rgb_type == 2:
-            x = np.transpose(x, (1, 2, 0))
-
-        if self.preproc is not None:
-            x = self.preproc(x)
-
-        if self.forcefp32:
-            x = np.asarray(x)
-            if x.dtype == np.float16:
-                x = x.astype(np.float32)
-        return x
-
-    def _get_slices(self, axis: str, pos: int):
-        dim = self.axis_to_dim[axis]
-        slices = [slice(None)] * self.ndim
-        if self.channel_dim is not None and dim >= self.channel_dim:
-            slices[dim + 1] = pos
-        else:
-            slices[dim] = pos
-        return tuple(slices)
-
-    def _crop_display_range(self, axis: str, img: np.ndarray) -> np.ndarray:
-        if axis == 'x':
-            ranges = (self.display_range['z'], self.display_range['y'])
-        elif axis == 'y':
-            ranges = (self.display_range['z'], self.display_range['x'])
-        else:
-            ranges = (self.display_range['y'], self.display_range['x'])
-
-        slices = [
-            slice(ranges[0][0], ranges[0][1]),
-            slice(ranges[1][0], ranges[1][1]),
-        ]
-        slices.extend([slice(None)] * max(0, img.ndim - 2))
-        return img[tuple(slices)]
-
-    def slice2d(self, axis: str, pos: int) -> np.ndarray:
-        axis = axis.lower()
-        pos = int(np.round(pos))
-        s = self._get_slices(axis, pos)
-
-        # Keep old behavior: when line_first, take transpose after slicing
-        if self.line_first:
-            img = self._wrap_preproc(self.volume[s].T)
-        else:
-            img = self._wrap_preproc(self.volume[s])
-        return self._crop_display_range(axis, img)
-
-    def __call__(self, axis: str, pos: int, get_shape: bool = False):
-        if get_shape:
-            return self.get_shape2d(axis)
-        return self.slice2d(axis, pos)
 
 
 # -------------------------
@@ -270,7 +109,6 @@ class VolumeImage:
         texture_format: Optional[str] = None,
         display_range: Optional[Dict[str, Tuple[int, int]]] = None,
     ):
-        utils.check_mmap(volume)
         self.volume = volume
 
         self.base_preproc = preproc
@@ -281,19 +119,16 @@ class VolumeImage:
         self.method = method
         self.texture_format = texture_format
 
-        lf = is_line_first()
-        # NOTE: depending on cigvis.utils, may need utils.utils.get_shape
-        self.shape, _ = utils.get_shape(volume, lf)
-        self.display_range = normalize_display_range(display_range, self.shape)
-
         # Providers: base + each volume3d overlay has its own provider
         self._providers: Dict[str, SliceProvider] = {}
         self._providers['__base__'] = SliceProvider(
             self.volume,
             preproc=self.base_preproc,
             forcefp32=False,
-            display_range=self.display_range,
+            display_range=display_range,
         )
+        self.shape = self._providers['__base__'].shape
+        self.display_range = self._providers['__base__'].display_range
 
         # name -> OverlaySpec
         self._overlays: Dict[str, OverlaySpec] = {}
@@ -322,9 +157,16 @@ class VolumeImage:
         axes=None,
         cmap_names: Any = None,
     ):
-        utils.check_mmap(volume)
-        if volume.shape != self.volume.shape:
-            raise ValueError(f"Overlay volume '{name}' shape mismatch: {volume.shape} vs {self.volume.shape}")
+        provider = SliceProvider(
+            volume,
+            preproc=preproc,
+            forcefp32=forcefp32,
+            display_range=self.display_range,
+        )
+        if provider.shape != self.shape:
+            raise ValueError(
+                f"Overlay volume '{name}' shape mismatch: {provider.shape} vs {self.shape}"
+            )
 
         if isinstance(cmap, dict):
             cmap_by_axis = {str(axis).lower(): value for axis, value in cmap.items()}
@@ -370,12 +212,7 @@ class VolumeImage:
         self._overlays[name] = spec
 
         # create provider (mutable ref)
-        self._providers[name] = SliceProvider(
-            volume,
-            preproc=preproc,
-            forcefp32=forcefp32,
-            display_range=self.display_range,
-        )
+        self._providers[name] = provider
 
         # If slices already exist, attach this overlay to existing nodes.
         if any(len(v) for v in self._slices.values()):
@@ -489,9 +326,16 @@ class VolumeImage:
             raise KeyError(f"Overlay '{name}' not registered.")
         spec = self._overlays[name]
 
-        utils.check_mmap(new_volume)
-        if validate and new_volume.shape != self.volume.shape:
-            raise ValueError(f"Overlay '{name}' shape mismatch: {new_volume.shape} vs base {self.volume.shape}")
+        new_provider = SliceProvider(
+            new_volume,
+            preproc=preproc or spec.preproc,
+            forcefp32=spec.forcefp32,
+            display_range=self.display_range,
+        )
+        if validate and new_provider.shape != self.shape:
+            raise ValueError(
+                f"Overlay '{name}' shape mismatch: {new_provider.shape} vs base {self.shape}"
+            )
 
         # update spec reference
         spec.volume = new_volume
@@ -501,17 +345,12 @@ class VolumeImage:
         # update provider reference
         if name not in self._providers:
             # should not happen, but be robust
-            self._providers[name] = SliceProvider(
-                new_volume,
-                preproc=spec.preproc,
-                forcefp32=spec.forcefp32,
-                display_range=self.display_range,
-            )
+            self._providers[name] = new_provider
         else:
             prov = self._providers[name]
             if preproc is not None:
                 prov.preproc = preproc
-            prov.set_volume(new_volume, validate=validate, reinit_meta_if_needed=reinit_meta_if_needed)
+            prov.set_volume(new_volume, validate=validate)
 
         if refresh:
             self.refresh_overlay(name)
@@ -543,14 +382,39 @@ class VolumeImage:
                     _cigvis_interpolation=spec.interpolation,
                 )
 
+    def remove_overlay(self, name: str) -> bool:
+        """Remove an overlay volume from all existing slice nodes."""
+        if name not in self._overlays:
+            return False
+
+        for axis in ('x', 'y', 'z'):
+            for i, node in enumerate(self._slices[axis]):
+                key = (axis, i)
+                mapping = self._overlay_indices.get(key)
+                if not mapping or name not in mapping:
+                    continue
+                overlay_idx = mapping.pop(name)
+                node.remove_mask(overlay_idx)
+                for other, idx in list(mapping.items()):
+                    if idx > overlay_idx:
+                        mapping[other] = idx - 1
+                if not mapping:
+                    self._overlay_indices.pop(key, None)
+
+        self._overlays.pop(name, None)
+        self._providers.pop(name, None)
+        return True
+
     # -------------------------
     # internal helpers
     # -------------------------
-    def _resolve_clim(self, vol: np.ndarray, clim: Optional[Union[List, Tuple]]):
+    def _resolve_clim(self,
+                      vol: np.ndarray,
+                      clim: Optional[Union[List, Tuple]],
+                      provider: SliceProvider = None):
         if clim is None or clim == 'auto':
-            if type(vol) == np.memmap:
-                pass
-            return utils.auto_clim(vol)
+            source = provider.clim_source if provider is not None else vol
+            return utils.auto_clim(source)
         return tuple(clim)
 
     def _bind_provider_func(self, provider_name: str, axis: str):
@@ -571,7 +435,13 @@ class VolumeImage:
         image_funcs = [self._bind_provider_func('__base__', axis)]
 
         cmaps = [self.base_cmap]
-        clims = [self._resolve_clim(self.volume, self.base_clim)]
+        clims = [
+            self._resolve_clim(
+                self.volume,
+                self.base_clim,
+                self._providers['__base__'],
+            )
+        ]
         interps = [self.base_interpolation]
 
         node = AxisAlignedImage(
@@ -623,7 +493,9 @@ class VolumeImage:
                 overlay = VispyImage(
                     parent=node,
                     cmap=spec.cmap_for_axis(axis),
-                    clim=list(spec.clim) if spec.clim is not None else list(self._resolve_clim(spec.volume, None)),
+                    clim=list(spec.clim) if spec.clim is not None else list(
+                        self._resolve_clim(spec.volume, None,
+                                           self._providers[name])),
                     interpolation=spec.interpolation,
                     method=spec.method,
                     texture_format=spec.texture_format,

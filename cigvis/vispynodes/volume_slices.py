@@ -12,14 +12,14 @@
 from typing import Dict, List, Callable, Tuple, Union
 import numpy as np
 from vispy.color import Colormap
-from cigvis import is_line_first
 from cigvis.utils import utils
+from cigvis.utils.slice_provider import SliceProvider
 from .axis_aligned_image import AxisAlignedImage, get_image_func
 
 __all__ = ["volume_slices"]
 
 
-def volume_slices(volumes: Union[np.ndarray, List],
+def volume_slices(volumes: Union[np.ndarray, Dict, List],
                   x_pos: Union[List, int] = None,
                   y_pos: Union[List, int] = None,
                   z_pos: Union[List, int] = None,
@@ -36,8 +36,11 @@ def volume_slices(volumes: Union[np.ndarray, List],
 
     Parameters
     ----------
-    volumes : np.ndarray or List[np.ndarray]
-        input 3D volumes
+    volumes : array-like, dict, or List[array-like]
+        input 3D volumes. A single volume may also be an axis source dict such
+        as ``{'x': iline_source, 'y': xline_source, 'z': time_source}``.
+        Each source value may also be a spec such as
+        ``{'data': time_source, 'axes': ('z', 'y', 'x')}``.
     x_pos : List or int
         x postions
     y_pos : List or int
@@ -128,8 +131,9 @@ def _process_args(volumes: Union[np.ndarray, List],
         assert isinstance(clims, (tuple, list)) \
           and len(clims) >= n_vol \
           and (len(clims[0]) == 2 or clims[0] is None)
+        base_shape = SliceProvider(volumes[0]).shape
         for vol in volumes:
-            assert vol.shape == volumes[0].shape
+            assert SliceProvider(vol).shape == base_shape
     else:
         volumes = [volumes]
         preproc_funcs = [preproc_funcs]
@@ -140,21 +144,21 @@ def _process_args(volumes: Union[np.ndarray, List],
         interpolation = [interpolation] * len(volumes)
     assert len(interpolation) == len(volumes)
 
-    line_first = is_line_first()
-    shape, _ = utils.get_shape(volumes[0], line_first)
+    shape = SliceProvider(volumes[0]).shape
 
     # Automatically set clim (cmap range) if not specified.
     for i_vol in range(n_vol):
         clim = clims[i_vol]
         vol = volumes[i_vol]
         if clim is None or clim == 'auto':
-            if type(vol) == np.memmap:
+            provider = SliceProvider(vol)
+            if type(provider.clim_source) == np.memmap:
                 from warnings import warn
                 warn(
                     "cmap='auto' with np.memmap can significantly impact launching "
                     + "time, clim=(cmin, cmax) is recommended.",
                     UserWarning,
                     stacklevel=2)
-            clims[i_vol] = utils.auto_clim(vol)
+            clims[i_vol] = utils.auto_clim(provider.clim_source)
 
     return volumes, preproc_funcs, cmaps, clims, interpolation, n_vol, shape

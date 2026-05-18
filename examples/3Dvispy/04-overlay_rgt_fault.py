@@ -37,7 +37,7 @@ fx = np.fromfile(fxp, np.float32).reshape(ni, nx, nt)
 
 nodes = cigvis.create_slices(sx, pos=[[36], [28], [84]], cmap='gray')
 
-nodes = cigvis.add_mask(nodes, rgt, cmap='jet', interpolation='cubic', alpha=0.4)
+nodes = cigvis.add_mask(nodes, rgt, cmap='jet', alpha=0.4)
 
 # fx is discrete data, set interpolation as 'nearest'
 nodes = cigvis.add_mask(nodes, fx, cmap='jet', interpolation='nearest', alpha=1, excpt='min')
@@ -48,4 +48,5 @@ cigvis.plot3D(
     nodes,
     view=cigvis.Plot3DView(size=(750, 600)),
     save=cigvis.Plot3DSave(path='example.png'),
+    gui=True
 )

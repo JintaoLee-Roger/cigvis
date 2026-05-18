@@ -18,8 +18,15 @@ sys.path.append(str(Path(".").resolve()))
 
 
 def download_image():
+    static_path = DIR / '_static/cigvis'
+    if static_path.exists():
+        print('Use existing gallery images')
+        return
+
     print('Run git to download images')
     down_path = DIR / '_static/images'
+    if down_path.exists():
+        shutil.rmtree(down_path)
     Repo.clone_from('https://github.com/JintaoLee-Roger/images.git',
                     to_path=down_path)
 
@@ -83,23 +90,22 @@ from sphinx_gallery.sorting import FileNameSortKey
 
 # the following files are ignored from gallery processing
 ignore_files = [
-    'demos/*',
-    r'test_.*\.py',
+    r'demos/.*',
+    r'test.*\.py',
 ]
-ignore_pattern_regex = [re.escape(os.sep) + f for f in ignore_files]
+ignore_pattern_regex = [r'(^|.*/)' + f for f in ignore_files]
 ignore_pattern_regex = "|".join(ignore_pattern_regex)
 
 execute = False
 sphinx_gallery_conf = {
     'examples_dirs': [
         '../examples/3Dvispy', '../examples/2D', '../examples/1D',
-        '../examples/colormap', '../examples/gui', '../examples/more_demos',
-        '../examples/viser', '../examples/sliceviewer'
+        '../examples/colormap', '../examples/more_demos', '../examples/viser',
+        '../examples/sliceviewer'
     ],
     'gallery_dirs': [
         'gallery/3Dvispy', 'gallery/2D', 'gallery/1D', 'gallery/colormap',
-        'gallery/gui', 'gallery/more_demos', 'gallery/viser',
-        'gallery/sliceviewer'
+        'gallery/more_demos', 'gallery/viser', 'gallery/sliceviewer'
     ],
     'filename_pattern':
     re.escape(os.sep),
@@ -125,6 +131,7 @@ os.environ["_VISPY_RUNNING_GALLERY_EXAMPLES"] = "1"
 
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', "**.ipynb_checkpoints"]
+suppress_warnings = ['config.cache']
 # """
 
 # ReadTheDocs has its own way of generating sitemaps, etc.
@@ -185,3 +192,18 @@ html_show_sphinx = True
 html_show_copyright = True
 
 htmlhelp_basename = 'cigvisdoc'
+
+
+def _patch_generated_api_docs(app):
+    """Tweak apidoc output that is regenerated on every Sphinx build."""
+    gui_api = DIR / 'api/cigvis.gui.rst'
+    if gui_api.exists():
+        text = gui_api.read_text()
+        marker = ".. automodule:: cigvis.gui\n"
+        replacement = ".. automodule:: cigvis.gui\n   :no-index:\n"
+        if marker in text and replacement not in text:
+            gui_api.write_text(text.replace(marker, replacement))
+
+
+def setup(app):
+    app.connect('builder-inited', _patch_generated_api_docs, priority=900)

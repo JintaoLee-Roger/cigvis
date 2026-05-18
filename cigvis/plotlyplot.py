@@ -73,6 +73,7 @@ from skimage import transform
 import cigvis
 from cigvis import colormap
 from cigvis.utils import plotlyutils
+from cigvis.utils.slice_provider import SliceProvider
 import cigvis.utils as utils
 
 
@@ -117,6 +118,7 @@ class PlotlyOverlaySpec(PlotlySpec):
     clim: Tuple[float, float]
     interpolation: str = "linear"
     preproc_func: Callable = None
+    provider: Any = None
     show_cbar: bool = False
     cbar_params: Dict = None
     nancolor: Any = None
@@ -135,6 +137,7 @@ class PlotlySliceSpec(PlotlySpec):
     scale: float = 1
     interpolation: str = "cubic"
     display_range: Dict = None
+    provider: Any = None
     overlays: List[PlotlyOverlaySpec] = field(default_factory=list)
     show_cbar: bool = False
     cbar_params: Dict = None
@@ -242,6 +245,10 @@ def _as_list(value) -> List:
 
 
 def _logical_shape(volume) -> Tuple[int, int, int]:
+    if isinstance(volume, SliceProvider):
+        return tuple(volume.shape)
+    if isinstance(volume, dict):
+        return tuple(SliceProvider(volume).shape)
     shape, _ = utils.get_shape(volume, cigvis.is_line_first())
     return tuple(shape)
 
@@ -350,7 +357,9 @@ def _resize_slice(image, scale=1, interpolation="cubic"):
     )
 
 
-def _slice_image(volume, axis, pos, preproc_func=None):
+def _slice_image(volume, axis, pos, preproc_func=None, provider=None):
+    if provider is not None:
+        return provider(axis, pos)
     image = plotlyutils.get_image_func(volume, axis, pos, preproc_func)
     return image
 
@@ -387,8 +396,12 @@ def _make_colorbar_trace(cmap, clim, cbar_params=None, name=None):
 
 
 def _compile_slice(spec: PlotlySliceSpec) -> List:
-    shape = _plotly_shape(spec.volume)
-    base = _slice_image(spec.volume, spec.axis, spec.pos)
+    source = spec.provider or spec.volume
+    shape = _plotly_shape(source)
+    base = _slice_image(spec.volume,
+                        spec.axis,
+                        spec.pos,
+                        provider=spec.provider)
     base = _resize_slice(base, spec.scale, spec.interpolation)
     name = spec.name or f"{spec.axis}/{_DIMNAME[spec.axis]}"
 
@@ -422,6 +435,7 @@ def _compile_slice(spec: PlotlySliceSpec) -> List:
             spec.axis,
             spec.pos,
             overlay.preproc_func,
+            provider=overlay.provider,
         )
         image = _resize_slice(image, spec.scale, overlay.interpolation)
         if image.shape[:2] != base.shape[:2]:
@@ -655,8 +669,11 @@ def create_slices(volume: np.ndarray,
 
     Parameters
     ----------
-    volume : array-like
-        3D array
+    volume : array-like or dict
+        3D array, or an axis source dict such as
+        ``{'x': iline_source, 'y': xline_source, 'z': time_source}``.
+        Each source value may also be a spec such as
+        ``{'data': time_source, 'axes': ('z', 'y', 'x')}``.
     pos : List or Dict
         init position of the slices, can be a List or Dict, such as:
         ```
@@ -678,11 +695,15 @@ def create_slices(volume: np.ndarray,
     specs : List
         List of PlotlySliceSpec
     """
-    utils.check_mmap(volume)
-
-    pos = _normalize_pos(pos, volume)
+    provider = SliceProvider(
+        volume,
+        display_range=display_range,
+        transpose_line_first=True,
+        transpose_rgb=True,
+    )
+    pos = _normalize_pos(pos, provider)
     if clim is None:
-        clim = utils.auto_clim(volume)
+        clim = utils.auto_clim(provider.clim_source)
 
     specs = []
     idx = 0
@@ -698,6 +719,7 @@ def create_slices(volume: np.ndarray,
                     scale=scale,
                     interpolation=interpolation,
                     display_range=display_range,
+                    provider=provider,
                     show_cbar=bool(show_cbar and idx == 0),
                     cbar_params=copy.deepcopy(cbar_params),
                     nancolor=nancolor,
@@ -732,9 +754,12 @@ def add_mask(nodes: List,
     -----------
     nodes: List[PlotlySliceSpec]
         A List that contains specs created by ``create_slices``.
-    volume : array-like
-        3D foreground volume/mask. Add multiple masks by calling add_mask
-        repeatedly.
+    volume : array-like or dict
+        3D foreground volume/mask, or an axis source dict such as
+        ``{'x': iline_source, 'y': xline_source, 'z': time_source}``.
+        Each source value may also be a spec such as
+        ``{'data': time_source, 'axes': ('z', 'y', 'x')}``.
+        Add multiple masks by calling add_mask repeatedly.
     clim : List
         [vmin, vmax] for foreground slices plotting
     cmap : str, Dict, or Colormap
@@ -788,11 +813,26 @@ def add_mask(nodes: List,
     cmap = _normalize_cmap_value(cmap)
     clim = _normalize_clim_value(clim)
 
-    utils.check_mmap(volume)
     if cmap is None:
         raise ValueError("'cmap' cannot be None")
+    base_specs = [
+        node for node in _flatten_nodes(nodes)
+        if isinstance(node, PlotlySliceSpec)
+    ]
+    display_range = None
+    if base_specs:
+        base_provider = base_specs[0].provider
+        display_range = getattr(base_provider, 'display_range',
+                                base_specs[0].display_range)
+    provider = SliceProvider(
+        volume,
+        preproc=preproc_func,
+        display_range=display_range,
+        transpose_line_first=True,
+        transpose_rgb=True,
+    )
     if clim is None:
-        clim = utils.auto_clim(volume)
+        clim = utils.auto_clim(provider.clim_source)
 
     if isinstance(cmap, dict):
         cmap_by_axis = {}
@@ -807,7 +847,7 @@ def add_mask(nodes: List,
     for node in _flatten_nodes(nodes):
         if not isinstance(node, PlotlySliceSpec):
             continue
-        if _logical_shape(node.volume) != _logical_shape(volume):
+        if _logical_shape(node.provider or node.volume) != provider.shape:
             raise ValueError("mask volume shape must match the base slice volume shape")
         if cmap_by_axis is not None:
             if node.axis not in cmap_by_axis:
@@ -822,6 +862,7 @@ def add_mask(nodes: List,
                 clim=tuple(clim),
                 interpolation=interpolation,
                 preproc_func=preproc_func,
+                provider=provider,
                 show_cbar=bool(show_cbar and added == 0),
                 cbar_params=copy.deepcopy(cbar_params),
                 nancolor=nancolor,

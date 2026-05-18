@@ -41,7 +41,8 @@ from cigvis.vispynodes import (
 )
 from cigvis.vispynodes.shading_filter import HeadlightShadingFilter
 
-from vispy.scene.visuals import Mesh, Line
+from vispy.color import ColorArray
+from vispy.scene.visuals import Mesh, Line, Markers
 import vispy
 from scipy.ndimage import gaussian_filter
 from skimage.measure import marching_cubes
@@ -68,6 +69,7 @@ __all__ = [
     "create_Line_logs",
     "create_well_logs",
     "create_points",
+    "create_point_cloud",
     "create_splats",
     "create_fault_skin",
     "create_arbitrary_line",
@@ -79,6 +81,26 @@ __all__ = [
     "plot3D",
     "run",
 ]
+
+
+def _set_cbar_source(cbar, select: str, idx: int = 0, idx2: int = 0) -> None:
+    source = {
+        'select': select,
+        'idx': int(idx),
+        'idx2': int(idx2),
+    }
+    did_unfreeze = False
+    if hasattr(cbar, 'unfreeze'):
+        try:
+            cbar.unfreeze()
+            did_unfreeze = True
+        except Exception:
+            did_unfreeze = False
+    try:
+        cbar._cigvis_cbar_source = source
+    finally:
+        if did_unfreeze and hasattr(cbar, 'freeze'):
+            cbar.freeze()
 
 
 @dataclass
@@ -101,6 +123,7 @@ class Plot3DView:
     axis_scales: Tuple[float, float, float] = None
     title: str = None
     keys: str = None
+    shortcut_save_kw: Dict = None
 
 
 @dataclass
@@ -130,6 +153,7 @@ class Plot3DColorbar:
     tick_size: Any = None
     border_width: Any = None
     border_color: Any = None
+    preserve_alpha: bool = None
 
 
 @dataclass
@@ -454,8 +478,11 @@ def create_slices(volume: np.ndarray,
 
     Parameters
     ----------
-    volume : array-like
-        3D array
+    volume : array-like or dict
+        3D array, or an axis source dict such as
+        ``{'x': iline_source, 'y': xline_source, 'z': time_source}``.
+        Each source value may also be a spec such as
+        ``{'data': time_source, 'axes': ('z', 'y', 'x')}``.
     pos : List or Dict
         init position of the slices, can be a List or Dict, such as:
         ```
@@ -483,7 +510,7 @@ def create_slices(volume: np.ndarray,
         width for intersection lines and border lines, default is 2.0
 
     kwargs : Dict
-        other kwargs for `VolumeImage`
+        internal slice provider options
 
     Returns
     -------
@@ -529,9 +556,12 @@ def add_mask(nodes: List,
     -----------
     nodes: List[Node]
         A List that contains `AxisAlignedImage` (may be created by `create_slices`)
-    volume : array-like
-        3D foreground volume/mask. Add multiple masks by calling add_mask
-        repeatedly.
+    volume : array-like or dict
+        3D foreground volume/mask, or an axis source dict such as
+        ``{'x': iline_source, 'y': xline_source, 'z': time_source}``.
+        Each source value may also be a spec such as
+        ``{'data': time_source, 'axes': ('z', 'y', 'x')}``.
+        Add multiple masks by calling add_mask repeatedly.
     clim : List
         [vmin, vmax] for foreground slices plotting
     cmap : str, Dict, or Colormap
@@ -668,57 +698,6 @@ def add_mask(nodes: List,
     return nodes
 
 
-def create_volume_image(
-    volume: np.ndarray,
-    pos: Union[List, Dict] = None,
-    clim: List = None,
-    cmap: str = 'Petrel',
-    interpolation: str = 'linear',
-    display_range: Dict = None,
-    **kwargs,
-) -> VolumeImage:
-    """
-    Create a VolumeImage manager for one base volume.
-
-    VolumeImage is preferred over create_slices when the volume data may be
-    replaced dynamically (e.g., AI workflow: image -> model -> new image).
-    Use replace_overlay_volume() + refresh_overlay() to update overlays without
-    rebuilding the scene.
-
-    Parameters
-    ----------
-    volume : np.ndarray
-        3D array
-    pos : List or Dict, optional
-        Slice positions, same format as create_slices. Default: x=0, y=0, z=-1
-    clim : List, optional
-        [vmin, vmax]. Default: auto from data percentile
-    cmap : str
-        Colormap name
-    interpolation : str
-        Interpolation method
-
-    Returns
-    -------
-    vi : VolumeImage
-        Call vi.nodes() to get the list of nodes for plot3D
-    """
-    if clim is None:
-        clim = utils.auto_clim(volume)
-
-    vi = VolumeImage(
-        volume,
-        cmap=cmap,
-        clim=clim,
-        interpolation=interpolation,
-        display_range=display_range,
-        **kwargs,
-    )
-
-    vi.create_slices(pos=pos)
-    return vi
-
-
 def create_overlay(bg_volume: np.ndarray,
                    fg_volume: np.ndarray,
                    pos: Union[List, Dict] = None,
@@ -748,6 +727,7 @@ def create_colorbar(cmap,
                     discrete: bool = False,
                     disc_ticks: Union[List, Dict] = None,
                     label_str: str = '',
+                    preserve_alpha: bool = False,
                     **kwargs) -> Colorbar:
     """
     create a `Colorbar` instance. To draw colorbar, must spacify 
@@ -767,7 +747,9 @@ def create_colorbar(cmap,
         from cmap, ticklabels are the labels of colors
     label_str : str
         colorbar label
-
+    preserve_alpha : bool, optional
+        Keep cmap alpha in the colorbar if True. The default draws colorbar
+        colors opaque.
     kwargs : Dict
         params for Colorbar
     """
@@ -781,6 +763,7 @@ def create_colorbar(cmap,
                     discrete=discrete,
                     disc_ticks=disc_ticks,
                     label_str=label_str,
+                    preserve_alpha=preserve_alpha,
                     **kwargs)
 
     return cbar
@@ -791,6 +774,7 @@ def create_colorbar_from_nodes(nodes,
                                select='auto',
                                idx=0,
                                idx2=0,
+                               preserve_alpha: bool = False,
                                **kwargs):
     """
     nodes : List
@@ -804,9 +788,15 @@ def create_colorbar_from_nodes(nodes,
     idx2 : int
         If there are multiple `cmap` and `clim` for a node, select the idx2-th cmap and clim. If only one, ignore this parameters.
         This parameter is only used when select is 'surface' and 'logs'
+    preserve_alpha : bool, optional
+        Keep cmap alpha in the colorbar if True. The default draws colorbar
+        colors opaque.
+    kwargs : Dict
+        Other params for Colorbar.
     """
     # fmt: off
     assert len(nodes) > 0, "there is no node, len(nodes) == 0"
+    source_select = select
     if select == 'auto':
         if any([isinstance(node, AxisAlignedImage) and len(node.overlaid_images) > 1 for node in nodes]):
             select = 'mask'
@@ -824,11 +814,13 @@ def create_colorbar_from_nodes(nodes,
             raise ValueError("No valid nodes")
     elif select == 'fault_skin':
         select = 'mesh'
+    source_select = select
 
     assert select in ['last', 'mask', 'surface', 'slices', 'logs', 'line_logs', 'mesh']
     cmap = None
     clim = None
     if select == 'mask' or (select == 'last' and isinstance(nodes[-1], AxisAlignedImage) and len(nodes[-1].overlaid_images) > 1):
+        source_select = 'mask'
         if select != 'last':
             node = [
                 node for node in nodes
@@ -846,6 +838,7 @@ def create_colorbar_from_nodes(nodes,
         cmap = node[0].overlaid_images[idx + 1].cmap
         clim = node[0].overlaid_images[idx + 1].clim
     elif select == 'surface' or (select == 'last' and isinstance(nodes[-1], SurfaceNode)):
+        source_select = 'surface'
         if select != 'last':
             node = [node for node in nodes if isinstance(node, SurfaceNode)]
             if len(node) == 0:
@@ -864,6 +857,7 @@ def create_colorbar_from_nodes(nodes,
         cmap = node[idx].cmaps[idx2]
         clim = node[idx].clims[idx2]
     elif select == 'slices' or (select == 'last' and isinstance(nodes[-1], AxisAlignedImage) and len(nodes[-1].overlaid_images) == 1):
+        source_select = 'slices'
         if select != 'last':
             node = [node for node in nodes if isinstance(node, AxisAlignedImage)]
             if len(node) == 0:
@@ -873,6 +867,7 @@ def create_colorbar_from_nodes(nodes,
         cmap = node[0].overlaid_images[0].cmap
         clim = node[0].overlaid_images[0].clim
     elif select == 'logs' or (select == 'last' and isinstance(nodes[-1], WellLog)):
+        source_select = 'logs'
         if select != 'last':
             node = [node for node in nodes if isinstance(node, WellLog)]
             if len(node) == 0:
@@ -896,7 +891,12 @@ def create_colorbar_from_nodes(nodes,
             raise ValueError(f"last node is {type(nodes[-1])}, which is not support now")
     # fmt: on
 
-    cbar = Colorbar(cmap=cmap, clim=clim, label_str=label_str, **kwargs)
+    cbar = Colorbar(cmap=cmap,
+                    clim=clim,
+                    label_str=label_str,
+                    preserve_alpha=preserve_alpha,
+                    **kwargs)
+    _set_cbar_source(cbar, source_select, idx, idx2)
     return [cbar]
 
 
@@ -914,7 +914,7 @@ def set_surface_color_by_slices_nodes(nodes, volumes):
         raise ValueError(f"A slice contains {len(alignImage.overlaid_images)} image (base + masks), but got {len(volumes)} volumes") # yapf: disable
 
     for node in surfNode:
-        node.update_colors_by_slice_node([surfNode], volumes)
+        node.update_colors_by_slice_node([alignImage], volumes)
 
     return nodes
 
@@ -927,6 +927,7 @@ def create_surfaces(surfs: List[np.ndarray],
                     shape: Union[Tuple, List] = None,
                     interp: bool = False,
                     quad: bool = False,
+                    quad_size: Union[float, Tuple, List] = 1.0,
                     step1: int = 1,
                     step2: int = 1,
                     shading: str = 'smooth',
@@ -957,6 +958,13 @@ def create_surfaces(surfs: List[np.ndarray],
         if surf's shape is like (n1, n2), shape will be ignored
     interp : bool
         interpolate the surface or not if the surf is not dense
+    quad : bool
+        If True, treat each ``(N, 3)`` input point as a separate x-y aligned
+        quad patch instead of interpolating/connecting points into a grid.
+        This is useful for sparse or incomplete gentle horizons.
+    quad_size : float or tuple
+        Full side length of each quad patch when ``quad=True``. A scalar
+        creates square patches; a two-element tuple controls x/y size.
     step1 : int
         mesh interval in x direction
     step2 : int
@@ -1017,6 +1025,7 @@ def create_surfaces(surfs: List[np.ndarray],
                            step2,
                            interp=interp,
                            quad=quad,
+                           quad_size=quad_size,
                            shading=shading,
                            dyn_light=dyn_light,
                            **kwargs)
@@ -1527,6 +1536,148 @@ def create_points(points: np.ndarray,
     return [point_mesh]
 
 
+def _sample_point_cloud_inputs(pos, values, colors, max_points, seed):
+    if max_points is None or len(pos) <= max_points:
+        return pos, values, colors
+
+    max_points = int(max_points)
+    if max_points <= 0:
+        raise ValueError("max_points must be positive")
+
+    rng = np.random.default_rng(seed)
+    idx = rng.choice(len(pos), max_points, replace=False)
+    pos = pos[idx]
+    if values is not None:
+        values = np.asarray(values)[idx]
+    if colors is not None:
+        colors = np.asarray(colors)[idx]
+    return pos, values, colors
+
+
+def _point_cloud_colors(pos, values, cmap, clim, color, colors):
+    n = len(pos)
+    if color is not None:
+        rgba = ColorArray(color).rgba
+        if rgba.shape == (1, 4):
+            rgba = np.tile(rgba, (n, 1))
+        elif rgba.shape != (n, 4):
+            raise ValueError("color must be a single color or an (N, 4) array")
+        return rgba.astype(np.float32, copy=False)
+
+    if colors is not None:
+        rgba = np.asarray(colors, dtype=np.float32)
+        if rgba.ndim != 2 or rgba.shape[0] != n or rgba.shape[1] not in (3, 4):
+            raise ValueError("colors must have shape (N, 3) or (N, 4)")
+        if rgba.shape[1] == 3:
+            rgba = np.concatenate(
+                [rgba, np.ones((n, 1), dtype=np.float32)], axis=1)
+        else:
+            rgba = rgba.copy()
+        finite = rgba[np.isfinite(rgba)]
+        if finite.size and finite.max() > 1.0:
+            rgba /= 255.0
+        return np.clip(rgba, 0.0, 1.0).astype(np.float32, copy=False)
+
+    if values is None:
+        values = pos[:, 2]
+    values = np.asarray(values, dtype=np.float32)
+    finite = np.isfinite(values)
+    if clim is None:
+        if np.any(finite):
+            clim = [float(np.nanmin(values[finite])),
+                    float(np.nanmax(values[finite]))]
+        else:
+            clim = [0.0, 1.0]
+    if clim[0] == clim[1]:
+        clim = [clim[0], clim[0] + 1.0]
+    return colormap.get_colors_from_cmap(cmap, clim,
+                                         values).astype(np.float32, copy=False)
+
+
+def create_point_cloud(points: np.ndarray,
+                       values: np.ndarray = None,
+                       cmap: str = 'viridis',
+                       clim: List = None,
+                       color=None,
+                       colors: np.ndarray = None,
+                       size: float = 4.0,
+                       symbol: str = 'o',
+                       edge_color=None,
+                       edge_width: float = 0,
+                       max_points: int = None,
+                       seed: int = 0,
+                       depth_test: bool = True,
+                       depth_mask: bool = True,
+                       blend: bool = False,
+                       **kwargs):
+    """
+    Create a lightweight VisPy marker point-cloud node.
+
+    Parameters
+    ----------
+    points : array-like
+        Point positions. Shape can be ``(N, 3)``, ``(N, 4)`` with scalar
+        values in the last column, or ``(N, 6)/(N, 7)`` with RGB/RGBA colors
+        in the trailing columns.
+    values : array-like, optional
+        Per-point scalar values mapped by ``cmap`` and ``clim``.
+    color, colors : optional
+        A single color, or per-point RGB/RGBA colors.
+    size : float
+        Marker size in screen pixels.
+    max_points : int, optional
+        Randomly subsample points before upload.
+
+    Returns
+    -------
+    nodes : List
+        A one-item list containing a ``Markers`` node, or an empty list when
+        no points are provided.
+    """
+    points = np.asarray(points, dtype=np.float32)
+    if points.ndim != 2 or points.shape[1] not in (3, 4, 6, 7):
+        raise ValueError("points must have shape (N,3), (N,4), (N,6), or (N,7)")
+    if len(points) == 0:
+        return []
+
+    n = len(points)
+    pos = np.ascontiguousarray(points[:, :3], dtype=np.float32)
+    if values is None and color is None and colors is None:
+        if points.shape[1] == 4:
+            values = points[:, 3]
+        elif points.shape[1] in (6, 7):
+            colors = points[:, 3:]
+
+    if values is not None:
+        values = np.asarray(values, dtype=np.float32)
+        if values.shape != (n, ):
+            raise ValueError("values must have shape (N,)")
+
+    if color is not None:
+        color_arr = np.asarray(color)
+        if color_arr.ndim == 2:
+            colors = color_arr
+            color = None
+
+    pos, values, colors = _sample_point_cloud_inputs(pos, values, colors,
+                                                     max_points, seed)
+    face_color = _point_cloud_colors(pos, values, cmap, clim, color, colors)
+    if edge_color is None:
+        edge_color = face_color
+
+    marker = Markers(**kwargs)
+    marker.set_data(pos=pos,
+                    size=float(size),
+                    face_color=face_color,
+                    edge_color=edge_color,
+                    edge_width=edge_width,
+                    symbol=symbol)
+    marker.set_gl_state(depth_test=depth_test,
+                        depth_mask=depth_mask,
+                        blend=blend)
+    return [marker]
+
+
 def create_fault_skin(skin_dir,
                       suffix='*',
                       endian='>',
@@ -1769,6 +1920,7 @@ def _build_plot3d_options(view, save, cbar, gui, legacy_kwargs):
     canvas_keys = {
         'size', 'show', 'bgcolor', 'scale_factor', 'center', 'fov', 'azimuth',
         'elevation', 'zoom_factor', 'axis_scales', 'title', 'keys',
+        'shortcut_save_kw',
     }
     view_keys = layout_keys | canvas_keys | {'cbar_region_ratio'}
 
@@ -1951,6 +2103,9 @@ def plot3D(nodes: List,
     save_path = opts['save_path']
     save_dir = opts['save_dir']
     save_kw = opts['save_kw']
+    if 'shortcut_save_kw' not in canvas_kw and save_kw:
+        canvas_kw = dict(canvas_kw)
+        canvas_kw['shortcut_save_kw'] = dict(save_kw)
 
     if grid is None:
         w, h = size
@@ -2013,7 +2168,7 @@ def plot3D(nodes: List,
                                 **cbar_kw)
 
     if opts['gui_enabled']:
-        from cigvis.gui.gui3d import gui3d as _gui3d
+        from cigvis.gui.gui3d import launch_plot3d_gui
 
         gui_canvas_kw = dict(canvas_kw)
         gui_canvas_kw.update({
@@ -2021,7 +2176,7 @@ def plot3D(nodes: List,
             'cbar_region_ratio': cbar_region_ratio,
             'savedir': save_dir,
         })
-        win = _gui3d(
+        win = launch_plot3d_gui(
             nodes=nodes,
             grid=grid,
             share=share,

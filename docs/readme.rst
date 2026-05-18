@@ -60,14 +60,6 @@ To install via PyPI, use
     # install all dependencies
     pip install "cigvis[all]"
 
-After installing the GUI extra, the 3D GUI can also be launched from a terminal:
-
-.. code-block:: bash
-
-    vis-gui3d
-
-
-
 For local installation, clone the repository from GitHub and then install it using pip:
 
 .. code-block:: bash
@@ -318,13 +310,15 @@ For remote servers where OpenGL is unavailable or a 3D/4D scene is too heavy, ``
        indices={0: 2},       # fixed index for hidden dimensions
        aspect=1.0,
        cmap='gray',
+       interpolation='nearest',
+       render_mode='float',
    )
 
    # Forward the port first when running through SSH:
    # ssh -L 5007:localhost:5007 user@server
    sv.show(nodes, port=5007)
 
-The sidebar can switch ``Y axis`` / ``X axis``, change fixed indices for the hidden dimensions, and adjust aspect (``equal``, ``free``, or a custom ``Y/X`` ratio). If ``display_axes`` is omitted, the two largest dimensions are displayed automatically.
+The sidebar can switch ``Y axis`` / ``X axis``, swap X/Y, change fixed indices for the hidden dimensions, adjust aspect (``equal``, ``free``, or a custom ``Y/X`` ratio), choose RGBA image vs float heatmap rendering, and choose interpolation (``nearest``, ``linear``, ``best``, or ``auto``). If ``display_axes`` is omitted, the two largest dimensions are displayed automatically.
 
 For before/after comparison, pass two or three node lists and choose a grid:
 

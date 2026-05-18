@@ -486,57 +486,44 @@ class Gui3dWindow(QMainWindow):
 
 
 # ---------------------------------------------------------------------------
-# Entry point
+# plot3D entry point
 # ---------------------------------------------------------------------------
 
-def gui3d(
-    nx: Optional[int] = None,
-    ny: Optional[int] = None,
-    nz: Optional[int] = None,
-    clear_dim: bool = True,
-    data: Optional[np.ndarray] = None,
-    decode_fn: Optional[callable] = None,
-    theme: str = 'light',
-    nodes: Optional[list] = None,
-    grid: Optional[tuple] = None,
-    share: bool = False,
-    canvas_kwargs: Optional[Dict[str, Any]] = None,
-    run_app: bool = True,
-) -> Gui3dWindow:
-    """
-    Launch the 3D viewer.
+_REMOVED_MESSAGE = (
+    "The standalone cigvis 3D GUI has been removed. For existing VisPy nodes, "
+    "use `cigvis.plot3D(..., gui=True)`."
+)
 
-    Parameters
-    ----------
-    data : ndarray, optional
-        Pre-load a 3D volume on startup.
-    decode_fn : callable, optional
-        SAM-like inference function. Signature:
-            decode_fn(base_vol, prompts, xyz) -> ndarray (same shape as base_vol)
-        If provided, a SAM tab appears in the sidebar.
-    theme : str
-        UI theme, ``'light'`` (default) or ``'dark'``.
-    nodes : list, optional
-        Existing vispy nodes to show in the same gui3d shell. This is the
-        bridge used by ``cigvis.vispyplot.plot3D(..., gui=True)``.
-    """
-    from vispy.app import use_app
-    app_vispy = use_app("pyside6")
-    app_vispy.create()
 
+Plot3DGuiWindow = Gui3dWindow
+
+
+def _configure_font(qt_app: QApplication) -> None:
     system = platform.system()
-    qt_app = QApplication.instance() or QApplication(sys.argv)
-
     if system == 'Linux':
         qt_app.setFont(QFont('Ubuntu'))
     elif system == 'Windows':
         qt_app.setFont(QFont('Segoe UI'))
 
+
+def launch_plot3d_gui(
+    *,
+    nodes: Optional[list] = None,
+    grid: Optional[tuple] = None,
+    share: bool = False,
+    theme: str = 'dark',
+    canvas_kwargs: Optional[Dict[str, Any]] = None,
+    run_app: bool = True,
+) -> Plot3DGuiWindow:
+    """Launch the retained ``plot3D(gui=True)`` PySide6 shell."""
+    from vispy.app import use_app
+    app_vispy = use_app("pyside6")
+    app_vispy.create()
+
+    qt_app = QApplication.instance() or QApplication(sys.argv)
+    _configure_font(qt_app)
+
     win = Gui3dWindow(
-        nx=nx, ny=ny, nz=nz,
-        clear_dim=clear_dim,
-        data=data,
-        decode_fn=decode_fn,
         theme=theme,
         nodes=nodes,
         grid=grid,
@@ -547,3 +534,8 @@ def gui3d(
     if run_app:
         app_vispy.run()
     return win
+
+
+def gui3d(*_args, **_kwargs):
+    """Removed standalone 3D GUI entry point."""
+    raise RuntimeError(_REMOVED_MESSAGE)

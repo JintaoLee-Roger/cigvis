@@ -4,6 +4,7 @@ import warnings
 from typing import List, Dict, Tuple, Union
 import re
 import matplotlib.pyplot as plt
+from matplotlib.colors import to_rgba
 import numpy as np
 import viser
 from PIL import Image, ImageDraw
@@ -22,11 +23,13 @@ from cigvis.visernodes import (
     LogPoints,
     LogLineSegments,
     LogBase,
+    GaussianSplatNode,
     Server,
 )
 from cigvis.meshs import surface2mesh
 import cigvis.utils as utils
 from cigvis.utils import surfaceutils
+from cigvis.utils.slice_provider import SliceProvider
 from itertools import combinations
 
 
@@ -74,8 +77,11 @@ def create_slices(volume: np.ndarray,
 
     Parameters
     ----------
-    volume : array-like
-        3D array
+    volume : array-like or dict
+        3D array, or an axis source dict such as
+        ``{'x': iline_source, 'y': xline_source, 'z': time_source}``.
+        Each source value may also be a spec such as
+        ``{'data': time_source, 'axes': ('z', 'y', 'x')}``.
     pos : List or Dict
         init position of the slices, can be a List or Dict, such as:
         ```
@@ -91,8 +97,12 @@ def create_slices(volume: np.ndarray,
         color for nan values, default is None (i.e., transparent)
     """
     # set pos
-    # ni, nx, nt = volume.shape
-    shape, _ = utils.get_shape(volume, cigvis.is_line_first())
+    provider = SliceProvider(
+        volume,
+        transpose_line_first=False,
+        transpose_rgb=False,
+    )
+    shape = provider.shape
     nt = shape[2]
     if pos is None:
         pos = dict(x=[0], y=[0], z=[nt - 1])
@@ -106,7 +116,7 @@ def create_slices(volume: np.ndarray,
     assert isinstance(pos, Dict)
 
     if clim is None:
-        clim = utils.auto_clim(volume)
+        clim = utils.auto_clim(provider.clim_source)
 
     nodes = []
     for axis, p in pos.items():
@@ -119,6 +129,7 @@ def create_slices(volume: np.ndarray,
                     cmap,
                     clim,
                     nancolor=nancolor,
+                    provider=provider,
                     **kwargs,
                 ))
 
@@ -147,9 +158,12 @@ def add_mask(nodes: List,
     -----------
     nodes: List[Node]
         A List that contains `AxisAlignedImage` (may be created by `create_slices`)
-    volume : array-like
-        3D foreground volume/mask. Add multiple masks by calling add_mask
-        repeatedly.
+    volume : array-like or dict
+        3D foreground volume/mask, or an axis source dict such as
+        ``{'x': iline_source, 'y': xline_source, 'z': time_source}``.
+        Each source value may also be a spec such as
+        ``{'data': time_source, 'axes': ('z', 'y', 'x')}``.
+        Add multiple masks by calling add_mask repeatedly.
     clim : List
         [vmin, vmax] for foreground slices plotting
     cmap : str, Dict, or Colormap
@@ -193,12 +207,16 @@ def add_mask(nodes: List,
     excpt = _normalize_single_value(excpt, "excpt")
     cmap = _normalize_cmap_value(cmap)
     clim = _normalize_clim_value(clim)
-    utils.check_mmap(volume)
+    provider = SliceProvider(
+        volume,
+        transpose_line_first=False,
+        transpose_rgb=False,
+    )
 
     if cmap is None:
         raise ValueError("'cmap' cannot be None")
     if clim is None:
-        clim = utils.auto_clim(volume)
+        clim = utils.auto_clim(provider.clim_source)
 
     def _prepare_cmap(cmap_value):
         cmap_value = colormap.get_cmap_from_str(cmap_value)
@@ -230,6 +248,7 @@ def add_mask(nodes: List,
             volume,
             node_cmap,
             clim,
+            provider=provider,
         )
 
     return nodes
@@ -332,7 +351,7 @@ def create_surfaces(surfs: List[np.ndarray],
 
     cmap = colormap.get_cmap_from_str(cmap)
     if alpha < 1:
-        cmap = colormap.set_alpha(cmap, alpha, False)
+        cmap = colormap.set_alpha(cmap, alpha)
 
     mesh_nodes = []
     for s, v, c in zip(surfaces, values, colors):
@@ -477,6 +496,358 @@ def create_points(points: np.ndarray,
             point_shape=point_shape,
             color=color,
             **kwargs,
+        )
+    ]
+
+
+_POINT_CLOUD_MODE_PRESETS = {
+    'point': {
+        'size': 5.0,
+        'point_shape': 'circle',
+        'point_shading': 'gradient',
+        'precision': 'float16',
+    },
+    'surface': {
+        'size': 2.2,
+        'point_shape': 'circle',
+        'point_shading': 'gradient',
+        'precision': 'float16',
+    },
+    'volume': {
+        'size': 2.0,
+        'point_shape': 'circle',
+        'point_shading': 'gradient',
+        'precision': 'float16',
+    },
+}
+
+
+def _point_cloud_mode(mode: str) -> str:
+    aliases = {
+        'point': 'point',
+        'points': 'point',
+        'pick': 'point',
+        'picks': 'point',
+        'surface': 'surface',
+        'surf': 'surface',
+        'splat': 'surface',
+        'splats': 'surface',
+        'volume': 'volume',
+        'voxel': 'volume',
+        'voxels': 'volume',
+    }
+    key = aliases.get(str(mode).lower())
+    if key is None:
+        raise ValueError("mode must be 'point', 'surface', or 'volume'")
+    return key
+
+
+def _sample_point_cloud_inputs(pos, values, colors, size, max_points, seed):
+    if max_points is None or len(pos) <= max_points:
+        return pos, values, colors, size
+
+    max_points = int(max_points)
+    if max_points <= 0:
+        raise ValueError("max_points must be positive")
+
+    rng = np.random.default_rng(seed)
+    idx = rng.choice(len(pos), max_points, replace=False)
+    pos = pos[idx]
+
+    if values is not None:
+        values = np.asarray(values)[idx]
+    if colors is not None:
+        colors = np.asarray(colors)[idx]
+
+    return pos, values, colors, size
+
+
+def create_splats(pos: np.ndarray,
+                  values: np.ndarray = None,
+                  cmap: str = 'viridis',
+                  clim: List = None,
+                  color=None,
+                  size=None,
+                  mode: str = 'surface',
+                  point_shape: str = None,
+                  point_shading: str = None,
+                  precision: str = None,
+                  max_points: int = None,
+                  seed: int = 0,
+                  **kwargs) -> List:
+    """
+    Create point-cloud splats for the Viser backend.
+
+    Viser renders these as browser-native point clouds. The API mirrors the
+    VisPy ``create_splats`` helper where possible, but per-point size and true
+    Gaussian blending are backend-specific and are not available here.
+    """
+    pos = np.asarray(pos, dtype=np.float32)
+    if pos.ndim != 2 or pos.shape[1] not in (3, 4, 6, 7):
+        raise ValueError("pos must have shape (N,3), (N,4), (N,6), or (N,7)")
+    if len(pos) == 0:
+        return []
+
+    preset = dict(_POINT_CLOUD_MODE_PRESETS[_point_cloud_mode(mode)])
+    if size is not None:
+        preset['size'] = size
+    if point_shape is not None:
+        preset['point_shape'] = point_shape
+    if point_shading is not None:
+        preset['point_shading'] = point_shading
+    if precision is not None:
+        preset['precision'] = precision
+    if np.asarray(preset['size']).ndim != 0:
+        raise ValueError("viserplot.create_splats only supports scalar size")
+
+    if values is not None:
+        values = np.asarray(values, dtype=np.float32)
+        if values.shape != (len(pos), ):
+            raise ValueError("values must have shape (N,)")
+
+    colors = None
+    color_arg = color
+    if values is None and color is None:
+        if pos.shape[1] == 4:
+            values = pos[:, 3]
+        elif pos.shape[1] in (6, 7):
+            colors = pos[:, 3:]
+
+    if color is not None:
+        color_arr = np.asarray(color)
+        if color_arr.ndim == 2:
+            if color_arr.shape[0] != len(pos) or color_arr.shape[1] not in (3, 4):
+                raise ValueError("per-point color must have shape (N,3) or (N,4)")
+            colors = color_arr
+            color_arg = None
+
+    pos, values, colors, size = _sample_point_cloud_inputs(
+        pos, values, colors, preset['size'], max_points, seed)
+
+    if values is not None and colors is None and color_arg is None:
+        pts = np.column_stack([pos[:, :3], values])
+    else:
+        pts = pos[:, :3]
+
+    return create_points(
+        pts,
+        r=size,
+        color=color_arg,
+        cmap=cmap,
+        clim=clim,
+        values=values,
+        colors=colors,
+        point_shape=preset['point_shape'],
+        point_shading=preset['point_shading'],
+        precision=preset['precision'],
+        **kwargs,
+    )
+
+
+_GAUSSIAN_SPLAT_MODE_PRESETS = {
+    'point': {
+        'radius': 2.0,
+        'opacity': 0.75,
+    },
+    'surface': {
+        'radius': (4.0, 4.0, 0.8),
+        'opacity': 0.45,
+    },
+    'volume': {
+        'radius': 2.5,
+        'opacity': 0.28,
+    },
+}
+
+
+def _sample_gaussian_splat_inputs(pos, values, colors, radius, covariances,
+                                  opacity, max_points, seed):
+    if max_points is None or len(pos) <= max_points:
+        return pos, values, colors, radius, covariances, opacity
+
+    max_points = int(max_points)
+    if max_points <= 0:
+        raise ValueError("max_points must be positive")
+
+    n = len(pos)
+    rng = np.random.default_rng(seed)
+    idx = rng.choice(n, max_points, replace=False)
+    pos = pos[idx]
+
+    if values is not None:
+        values = np.asarray(values)[idx]
+    if colors is not None:
+        colors = np.asarray(colors)[idx]
+    if covariances is not None:
+        covariances = np.asarray(covariances)[idx]
+
+    radius_arr = np.asarray(radius)
+    if radius_arr.shape == (n, 3) or (radius_arr.shape == (n, ) and n != 3):
+        radius = radius_arr[idx]
+
+    opacity_arr = np.asarray(opacity)
+    if opacity_arr.ndim > 0 and opacity_arr.shape[0] == n:
+        opacity = opacity_arr[idx]
+
+    return pos, values, colors, radius, covariances, opacity
+
+
+def _rgb_float(color, n):
+    if color is None:
+        return None
+
+    arr = np.asarray(color)
+    if arr.ndim == 2:
+        if arr.shape != (n, 3) and arr.shape != (n, 4):
+            raise ValueError("per-point color must have shape (N,3) or (N,4)")
+        rgbs = arr[:, :3].astype(np.float32)
+        if rgbs.size and rgbs.max() > 1:
+            rgbs = rgbs / 255.0
+        return np.clip(rgbs, 0.0, 1.0)
+
+    if arr.ndim == 1 and arr.size in (3, 4):
+        rgb = arr[:3].astype(np.float32)
+        if rgb.size and rgb.max() > 1:
+            rgb = rgb / 255.0
+        return np.tile(np.clip(rgb, 0.0, 1.0), (n, 1))
+
+    rgba = np.asarray(to_rgba(color), dtype=np.float32)
+    return np.tile(rgba[:3], (n, 1))
+
+
+def _gaussian_rgbs(pos, values, colors, color, cmap, clim):
+    n = len(pos)
+    rgbs = _rgb_float(color, n)
+    if rgbs is not None:
+        return rgbs.astype(np.float32)
+
+    rgbs = _rgb_float(colors, n)
+    if rgbs is not None:
+        return rgbs.astype(np.float32)
+
+    if values is None:
+        values = pos[:, 2]
+    values = np.asarray(values, dtype=np.float32)
+    if clim is None:
+        finite = np.isfinite(values)
+        if np.any(finite):
+            clim = [float(np.nanmin(values[finite])), float(np.nanmax(values[finite]))]
+        else:
+            clim = [0.0, 1.0]
+    rgba = colormap.get_colors_from_cmap(cmap, clim, values)
+    return np.asarray(rgba[:, :3], dtype=np.float32)
+
+
+def _gaussian_opacities(opacity, n):
+    arr = np.asarray(opacity, dtype=np.float32)
+    if arr.ndim == 0:
+        arr = np.full((n, 1), float(arr), dtype=np.float32)
+    elif arr.shape == (n, ):
+        arr = arr[:, None]
+    elif arr.shape != (n, 1):
+        raise ValueError("opacity must be a scalar, (N,), or (N,1)")
+    return np.clip(arr, 0.0, 1.0).astype(np.float32)
+
+
+def _gaussian_covariances(radius, covariances, n):
+    if covariances is not None:
+        covariances = np.asarray(covariances, dtype=np.float32)
+        if covariances.shape != (n, 3, 3):
+            raise ValueError("covariances must have shape (N,3,3)")
+        return covariances
+
+    radius = np.asarray(radius, dtype=np.float32)
+    if radius.ndim == 0:
+        radii = np.full((n, 3), float(radius), dtype=np.float32)
+    elif radius.shape == (3, ):
+        radii = np.tile(radius, (n, 1)).astype(np.float32)
+    elif radius.shape == (n, ):
+        radii = np.repeat(radius[:, None], 3, axis=1).astype(np.float32)
+    elif radius.shape == (n, 3):
+        radii = radius.astype(np.float32)
+    else:
+        raise ValueError("radius must be scalar, (3,), (N,), or (N,3)")
+
+    cov = np.zeros((n, 3, 3), dtype=np.float32)
+    idx = np.arange(3)
+    cov[:, idx, idx] = np.square(np.clip(radii, 1e-6, None))
+    return cov
+
+
+def create_gaussian_splats(pos: np.ndarray,
+                           values: np.ndarray = None,
+                           cmap: str = 'viridis',
+                           clim: List = None,
+                           color=None,
+                           radius=None,
+                           covariances=None,
+                           opacity=None,
+                           mode: str = 'surface',
+                           max_points: int = None,
+                           seed: int = 0,
+                           scale=-1) -> List:
+    """
+    Create true Gaussian splats for the Viser backend.
+
+    This wraps ``viser.SceneApi.add_gaussian_splats``. ``radius`` is expressed
+    in the input data coordinate system before CIGVis scene scaling.
+    """
+    pos = np.asarray(pos, dtype=np.float32)
+    if pos.ndim != 2 or pos.shape[1] not in (3, 4, 6, 7):
+        raise ValueError("pos must have shape (N,3), (N,4), (N,6), or (N,7)")
+    if len(pos) == 0:
+        return []
+
+    preset = dict(_GAUSSIAN_SPLAT_MODE_PRESETS[_point_cloud_mode(mode)])
+    if radius is not None:
+        preset['radius'] = radius
+    if opacity is not None:
+        preset['opacity'] = opacity
+
+    if values is not None:
+        values = np.asarray(values, dtype=np.float32)
+        if values.shape != (len(pos), ):
+            raise ValueError("values must have shape (N,)")
+
+    colors = None
+    color_arg = color
+    if values is None and color is None:
+        if pos.shape[1] == 4:
+            values = pos[:, 3]
+        elif pos.shape[1] in (6, 7):
+            colors = pos[:, 3:]
+
+    if color is not None:
+        color_arr = np.asarray(color)
+        if color_arr.ndim == 2:
+            if color_arr.shape[0] != len(pos) or color_arr.shape[1] not in (3, 4):
+                raise ValueError("per-point color must have shape (N,3) or (N,4)")
+            colors = color_arr
+            color_arg = None
+
+    pos, values, colors, radius, covariances, opacity = _sample_gaussian_splat_inputs(
+        pos,
+        values,
+        colors,
+        preset['radius'],
+        covariances,
+        preset['opacity'],
+        max_points,
+        seed,
+    )
+    centers = pos[:, :3].astype(np.float32)
+    n = len(centers)
+    rgbs = _gaussian_rgbs(centers, values, colors, color_arg, cmap, clim)
+    opacities = _gaussian_opacities(opacity, n)
+    covariances = _gaussian_covariances(radius, covariances, n)
+
+    return [
+        GaussianSplatNode(
+            centers,
+            covariances,
+            rgbs,
+            opacities,
+            scale=scale,
         )
     ]
 

@@ -152,7 +152,8 @@ def _as_rgba(intensity_or_color, default_rgb=(1.0, 1.0, 1.0)):
 
 class HeadlightShadingFilter(Filter):
     """
-    Apply shading to a MeshVisual using a camera-relative light source (Headlamp style).
+    Apply shading to a MeshVisual using a camera-relative light source
+    (headlamp style).
     
     Key features:
     1. The light source follows the camera (camera-relative lighting).
@@ -167,7 +168,11 @@ class HeadlightShadingFilter(Filter):
         Camera/screen-relative light direction (x, y, z).
         (0, 0, 1) means the light points straight into the screen.
         (10, 5, 10) means the light comes from the upper-right screen direction.
-    Other parameters match the original VisPy shading filter.
+
+    Other Parameters
+    ----------------
+    ``**kwargs``
+        Other parameters match the original VisPy shading filter.
     """
     _shaders = {
         'vertex': shading_vertex_template,

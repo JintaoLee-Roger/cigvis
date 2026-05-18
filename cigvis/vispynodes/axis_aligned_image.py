@@ -15,6 +15,7 @@ from vispy.scene.visuals import Image, Line, Plane
 from vispy.visuals.transforms import MatrixTransform, STTransform
 from vispy.gloo.wrappers import set_polygon_offset
 import cigvis
+from cigvis.utils.slice_provider import SliceProvider
 
 
 class AxisAlignedImage(Image):
@@ -116,22 +117,27 @@ class AxisAlignedImage(Image):
         # Get the image_func that returns either image or image shape.
         self.image_funcs = image_funcs  # a list of functions!
         shape = self.image_funcs[0](self.pos, get_shape=True)
-        # self._shape = shape
+        self._image_size = self._image_local_size(shape)
+        highlight_width, highlight_height = self._image_size
 
         # The selection highlight (a Plane visual with transparent color).
         # The plane is initialized before any rotation, on '+z' direction.
         self.highlight = Plane(
             parent=self,
-            width=shape[0],
-            height=shape[1],
+            width=highlight_width,
+            height=highlight_height,
             direction='+z',
             color=(1, 1, 0, 0.1),  # transparent yellow color
         )
         # Move the plane to align with the image.
-        self.highlight.transform = STTransform(translate=(shape[0] / 2,
-                                                          shape[1] / 2, 0))
-        # This is to make sure we can see highlight plane through the images.
-        self.highlight.set_gl_state('additive', depth_test=True)
+        self.highlight.transform = STTransform(
+            translate=(highlight_width / 2, highlight_height / 2, 0))
+        self.highlight.set_gl_state(
+            depth_test=True,
+            blend=True,
+            depth_func='lequal',
+            blend_func=('src_alpha', 'one_minus_src_alpha'),
+        )
         self.highlight.visible = False  # only show when selected
 
         # Set the anchor point (2D local world coordinates). The mouse will
@@ -145,6 +151,11 @@ class AxisAlignedImage(Image):
         self._update_location()
 
         self.freeze()
+
+    def _image_local_size(self, shape):
+        # vispy Image maps array shape (rows, cols[, channels]) to local
+        # coordinates (width=cols, height=rows).
+        return int(shape[1]), int(shape[0])
 
     def add_mask(self,
                  vol: np.ndarray,
@@ -417,11 +428,12 @@ class AxisAlignedImage(Image):
             if self.limit is not None:
                 return (self.limit[0], self.limit[1] + 1)
             return (0, self.pos + 1)
+        width, height = self._image_size
         if self.axis == 'z':
-            return (0, self.size[0]) if axis == 'x' else (0, self.size[1])
+            return (0, width) if axis == 'x' else (0, height)
         if self.axis == 'y':
-            return (0, self.size[0]) if axis == 'x' else (0, self.size[1])
-        return (0, self.size[0]) if axis == 'y' else (0, self.size[1])
+            return (0, width) if axis == 'x' else (0, height)
+        return (0, width) if axis == 'y' else (0, height)
 
     def _set_clipper(self, node, clipper):
         """
@@ -566,70 +578,15 @@ def get_image_func(axis: str,
     i_vol : int
         index of the volumes
     """
-    def _eq_3_or_4(k):
-        return k == 3 or k == 4
-    line_first = cigvis.is_line_first()
-    assert _eq_3_or_4(vol.ndim), f"Volume's dims must be 3 or 4 (RGB), but got {vol.ndim}"
-    # rgb_type, 0 for (n1, n2, n3), 1 for (n1, n2, n3, 3/4), 2 for (3/4, n1, n2, n3)
-    ndim = vol.ndim
-    channel_dim = None
-    dim_x, dim_y, dim_z = (0, 1, 2) if line_first else (2, 1, 0)
-    axis_to_dim = {'x': dim_x, 'y': dim_y, 'z': dim_z}
-    shape, rgb_type = cigvis.utils.get_shape(vol, line_first)
-    if rgb_type == 1:
-        channel_dim = 3
-    elif rgb_type == 2:
-        channel_dim = 0
-
-    def wrap_preproc_f(x, func=None, forcefp32=False):
-        if line_first and rgb_type == 1:
-            x = np.transpose(x, (1, 2, 0))
-        elif (not line_first) and rgb_type == 2:
-            x = np.transpose(x, (1, 2, 0))
-        if func is not None:
-            x = func(x)
-        if not forcefp32:
-            return x
-
-        x = np.array(x)
-        if x.dtype == np.float16:
-            x = x.astype(np.float32)
-        return x
-
-    _preproc_f = lambda x: wrap_preproc_f(x, preproc_f, forcefp32)
-
-    def _get_slices(axis, pos):
-        dim = axis_to_dim.get(axis)
-        slices = [slice(None)] * ndim
-        if channel_dim is not None and dim >= channel_dim:
-            slices[dim + 1] = pos
-        else:
-            slices[dim] = pos
-        return tuple(slices)
+    provider = SliceProvider(
+        vol,
+        preproc=preproc_f,
+        forcefp32=forcefp32,
+        transpose_line_first=True,
+        transpose_rgb=True,
+    )
 
     def slicing_at_axis(pos, get_shape=False):
-        if get_shape:  # just return the shape information
-            if axis == 'x': return shape[1], shape[2]
-            elif axis == 'y': return shape[0], shape[2]
-            elif axis == 'z': return shape[0], shape[1]
-        else:  # will slice the volume and return an np array image
-            pos = int(np.round(pos))
-            s = _get_slices(axis, pos)
-            if line_first:
-                return _preproc_f(vol[s].T)
-            else:
-                return _preproc_f(vol[s])
-            # if line_first:
-            #     if axis == 'x': 
-            #         if rgb_type == 2:
-            #             return _preproc_f(vol[:, pos, :, :].T)
-            #         else:
-            #             return _preproc_f(vol[pos, :, :].T)
-            #     elif axis == 'y': return _preproc_f(vol[:, pos, :].T)
-            #     elif axis == 'z': return _preproc_f(vol[:, :, pos].T)
-            # else:
-            #     if axis == 'x': return _preproc_f(vol[:, :, pos])
-            #     elif axis == 'y': return _preproc_f(vol[:, pos, :])
-            #     elif axis == 'z': return _preproc_f(vol[pos, :, :])
+        return provider(axis, pos, get_shape=get_shape)
 
     return slicing_at_axis

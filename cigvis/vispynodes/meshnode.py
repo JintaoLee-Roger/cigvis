@@ -9,11 +9,12 @@ Based on the `Mesh` of vispy, we create a new class to maintenance the instance 
 from typing import List, Tuple
 import warnings
 import numpy as np
+from scipy.ndimage import map_coordinates
 from vispy.scene import Mesh
 import cigvis
 from cigvis import colormap
 from cigvis.meshs import surface2mesh, arbline2mesh, points2quad
-from cigvis.utils import surfaceutils
+from cigvis.utils import surfaceutils, utils
 from .axis_aligned_image import AxisAlignedImage
 import matplotlib.colors as mcolors
 from .shading_filter import HeadlightShadingFilter
@@ -34,6 +35,7 @@ class SurfaceNode(Mesh):
                  interval: List = [1, 1, 1],
                  interp: bool = True,
                  quad: bool = False,
+                 quad_size=1.0,
                  anti_rot: bool = True,
                  shading: str = 'smooth',
                  dyn_light: bool = True,
@@ -53,12 +55,14 @@ class SurfaceNode(Mesh):
         self.is_instance = False
         self._interp = interp
         self._quad = quad
+        self.quad_size = quad_size
+        self._quad_valid = None
         self.render_type = -1  # 0 for colors, 1 for vetex_values, and 2 for vetex_colors
         self.dyn_light = dyn_light
 
         # define shape
         if volume is None and shape is None:
-            if surf.shape[1] == 3:
+            if surf.shape[1] == 3 and not quad:
                 raise ValueError(
                     "must pass at least one parameters of `volume`, `shape`")
             else:
@@ -93,6 +97,9 @@ class SurfaceNode(Mesh):
         """
         surf = self.orig_surf
         assert surf.ndim == 2, f"surface's shape must be (ni, nx), or (N, 3), but got {surf.shape}"
+        if self._quad and surf.shape[1] != 3:
+            raise ValueError(
+                "quad=True only supports point surfaces with shape (N, 3)")
         if surf.shape[1] == 3:
             surf = (surf + self.offset) / self.interval
             if not self._quad:
@@ -114,8 +121,9 @@ class SurfaceNode(Mesh):
             )
         else:
             self.surf = surf 
-            self.mask = np.zeros(self.shape).astype(bool)
-            vertices, faces = points2quad(surf)
+            self._quad_valid = np.all(np.isfinite(surf[:, :3]), axis=1)
+            self.mask = ~self._quad_valid
+            vertices, faces = points2quad(surf, size=self.quad_size)
         return vertices, faces
 
     @property
@@ -170,7 +178,168 @@ class SurfaceNode(Mesh):
             return
         self.seis_value = surfaceutils.interp_surf(self.volume, self.surf)
 
+    def interp_quad_value(self):
+        if self.volume is None:
+            raise RuntimeError('to interp, volume must be input')
+        if self.seis_value is not None:
+            return
+
+        self.seis_value = np.full(self.surf.shape[0], np.nan, dtype=float)
+        valid = self._quad_valid
+        if not np.any(valid):
+            return
+
+        coords = self.surf[valid, :3].T
+        if not cigvis.is_line_first():
+            coords = coords[[2, 1, 0]]
+        self.seis_value[valid] = map_coordinates(
+            self.volume,
+            coords,
+            order=1,
+            mode='reflect',
+        )
+
+    @staticmethod
+    def _safe_clim(values):
+        values = np.asarray(values)
+        finite = values[np.isfinite(values)]
+        if finite.size == 0:
+            return [0, 1]
+        return [float(np.nanmin(finite)), float(np.nanmax(finite))]
+
+    @staticmethod
+    def _normalize_point_colors(colors):
+        colors = np.asarray(colors)
+        if colors.dtype == np.uint8:
+            colors = colors.astype(np.float32) / 255
+        else:
+            colors = colors.astype(np.float32)
+        if colors.shape[1] == 3:
+            alpha = np.ones((colors.shape[0], 1), dtype=colors.dtype)
+            colors = np.concatenate([colors, alpha], axis=1)
+        return colors
+
+    def process_quad_values(self):
+        if not isinstance(self.values, List):
+            self.values = [self.values]
+        if not isinstance(self._cmaps, List):
+            self._cmaps = [self._cmaps]
+
+        if self._clims is None:
+            self._clims = [None] * len(self.values)
+        if isinstance(self._clims, (List, Tuple)):
+            if len(self._clims) > 1 and not isinstance(self._clims[0], (List, Tuple)): # yapf: disable
+                self._clims = [self._clims]
+
+        assert len(self._clims) == len(self.values), "clims must be the same length as values" # yapf: disable
+        assert len(self._cmaps) == len(self.values), "cmaps must be the same length as values" # yapf: disable
+
+        n_points = self.surf.shape[0]
+        valid = self._quad_valid
+        scalar_values = []
+        uniform_color = None
+        point_colors = None
+
+        for i, value in enumerate(self.values):
+            scalar_value = None
+
+            if isinstance(value, str) and value == 'depth':
+                scalar_value = self.surf[:, 2]
+            elif isinstance(value, str) and value == 'amp':
+                self.interp_quad_value()
+                scalar_value = self.seis_value
+                if self._clims[i] is None and self.volume is not None:
+                    self._clims[i] = utils.auto_clim(self.volume)
+            elif isinstance(value, str):
+                try:
+                    uniform_color = mcolors.to_rgba(value)
+                except Exception:
+                    raise ValueError(f"Invalid value {value}")
+            elif isinstance(value, tuple) and isinstance(value[0], str) and len(value) == 2:
+                try:
+                    assert value[1] <= 1 and value[1] >= 0, "alpha must between 0 and 1" # yapf: disable
+                    uniform_color = mcolors.to_rgba(value[0], value[1])
+                except Exception:
+                    raise ValueError(f"Invalid value {value}")
+            elif isinstance(value, tuple) and len(value) >= 3 and len(value) <= 4:
+                try:
+                    uniform_color = mcolors.to_rgba(value)
+                except Exception:
+                    raise ValueError(f"Invalid value {value}")
+            else:
+                value = np.asarray(value)
+                if value.ndim == 1:
+                    scalar_value = value
+                elif value.ndim == 2 and value.shape[1] == 1:
+                    scalar_value = value[:, 0]
+                elif value.ndim == 2 and value.shape[1] in [3, 4]:
+                    point_colors = self._normalize_point_colors(value)
+                else:
+                    raise ValueError(
+                        "quad=True value_type must be 'depth', 'amp', a color, "
+                        "an (N,) value array, or an (N, 3/4) color array")
+
+            if scalar_value is not None:
+                scalar_value = np.asarray(scalar_value)
+                if scalar_value.shape[0] != n_points:
+                    raise ValueError(
+                        f"quad value length must be {n_points}, but got {scalar_value.shape[0]}")
+                scalar_values.append(scalar_value)
+                if self._clims[i] is None:
+                    self._clims[i] = self._safe_clim(scalar_value[valid])
+                self._cmaps[i] = colormap.get_cmap_from_str(self._cmaps[i])
+
+        if len(scalar_values) > 0 and (uniform_color is not None or point_colors is not None): # yapf: disable
+            raise ValueError("quad=True cannot mix scalar values with direct colors")
+        if point_colors is not None and point_colors.shape[0] != n_points:
+            raise ValueError(
+                f"quad color length must be {n_points}, but got {point_colors.shape[0]}")
+
+        if uniform_color is not None:
+            if self.render_type == 0 or self.render_type == -1:
+                self.color = uniform_color
+            else:
+                self.set_data(vertices=self._meshdata.get_vertices(),
+                              faces=self._meshdata.get_faces(),
+                              color=uniform_color)
+            self.render_type = 0
+        elif point_colors is not None:
+            colors = np.repeat(point_colors[valid], 4, axis=0)
+            if self.render_type == 2 or self.render_type == -1:
+                self._meshdata.set_vertex_colors(colors)
+            else:
+                self.set_data(vertices=self._meshdata.get_vertices(),
+                              faces=self._meshdata.get_faces(),
+                              vertex_colors=colors)
+            self.render_type = 2
+        elif len(scalar_values) == 1:
+            value = np.repeat(scalar_values[0][valid], 4, axis=0)
+            if self.render_type == 1 or self.render_type == -1:
+                self._meshdata.set_vertex_values(value)
+            else:
+                self.set_data(vertices=self._meshdata.get_vertices(),
+                              faces=self._meshdata.get_faces(),
+                              vertex_values=value)
+            self.render_type = 1
+            self.cmap = colormap.cmap_to_vispy(self._cmaps[0])
+            self.clim = self._clims[0]
+        else:
+            images = [value[valid][:, np.newaxis] for value in scalar_values]
+            colors = colormap.arrs_to_image(images, self._cmaps, self._clims)
+            colors = np.repeat(colors[:, 0, :], 4, axis=0)
+            if self.render_type == 2 or self.render_type == -1:
+                self._meshdata.set_vertex_colors(colors)
+            else:
+                self.set_data(vertices=self._meshdata.get_vertices(),
+                              faces=self._meshdata.get_faces(),
+                              vertex_colors=colors)
+            self.render_type = 2
+
     def process_values(self):
+        if self._quad:
+            self.process_quad_values()
+            return
+
         if not isinstance(self.values, List):
             self.values = [self.values]
         if not isinstance(self._cmaps, List):
@@ -195,10 +364,7 @@ class SurfaceNode(Mesh):
                 self.interp_value()
                 self.values[i] = self.seis_value
                 if self._clims[i] is None:
-                    self._clims[i] = [
-                        np.nanmin(self.volume),
-                        np.nanmax(self.volume)
-                    ]
+                    self._clims[i] = utils.auto_clim(self.volume)
 
             # render the whole mesh with a single color, e.g., 'red'
             elif isinstance(value, str):

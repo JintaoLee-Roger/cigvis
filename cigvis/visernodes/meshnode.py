@@ -117,17 +117,7 @@ class MeshNode(ViserNodeMixin, trimesh.Trimesh):
             norm = plt.Normalize(vmin=self.clim[0], vmax=self.clim[1])
             colors = colormap.get_cmap_from_str(self._cmap)(norm(
                 self._vertices_values))
-            colors = color_f2i(colors)
-            img, uv = color2textual(colors, self._base_vertices)
-            self.visual = TextureVisuals(
-                uv,
-                PBRMaterial(
-                    roughnessFactor=0.72,
-                    baseColorFactor=[255, 255, 255, 255],
-                    metallicFactor=0.0,
-                    baseColorTexture=img,
-                    doubleSided=True,
-                ))
+            self.visual.vertex_colors = color_f2i(colors)
             return
 
         if self.colored_by == 'vertex':
@@ -182,7 +172,7 @@ class MeshNode(ViserNodeMixin, trimesh.Trimesh):
         self.visual.material.doubleSided = True
         self.visual.material.roughnessFactor = 0.72
         self.visual.material.metallicFactor = 0.0
-        self.visual.material.baseColorFactor = [255, 255, 255, 255]
+        self.visual.material.baseColorFactor = [1.0, 1.0, 1.0, 1.0]
 
     def update_node(self):
         if self.server is None:
@@ -190,9 +180,13 @@ class MeshNode(ViserNodeMixin, trimesh.Trimesh):
 
         self.set_colors()
 
+        # trimesh's GLB exporter identifies meshes by class name through its
+        # internal MRO helper. With our multiple-inheritance node class, recent
+        # trimesh versions may export an empty GLB unless we pass a plain mesh.
+        mesh = self.copy()
         self.nodes = self.server.scene.add_mesh_trimesh(
             self.name,
-            self,
+            mesh,
         )
 
 

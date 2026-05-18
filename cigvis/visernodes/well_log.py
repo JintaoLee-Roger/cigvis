@@ -89,6 +89,8 @@ class LogPoints(LogBase):
         point_shape: str = 'square',
         color=None,
         scale: int = -1,
+        precision: str = 'float16',
+        point_shading: str = 'gradient',
         **kwargs,
     ):
         super().__init__(points, values, colors, cmap, clim, scale)
@@ -98,6 +100,8 @@ class LogPoints(LogBase):
         self._color = color
         self.point_size = point_size
         self.point_shape = point_shape
+        self.precision = precision
+        self.point_shading = point_shading
         self.base_name = 'point'
 
     def process_points(self):
@@ -139,6 +143,8 @@ class LogPoints(LogBase):
             self.colors,
             point_size=self.point_size * max(self.scale),
             point_shape=self.point_shape,
+            precision=self.precision,
+            point_shading=self.point_shading,
         )
 
 

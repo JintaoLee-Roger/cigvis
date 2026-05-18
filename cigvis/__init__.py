@@ -86,9 +86,8 @@ from . import colormap
 from . import meshs
 _has_pyside6 = importlib.util.find_spec("PySide6") is not None
 
-# GUI is loaded lazily to avoid importing Qt unless the user asks for it.
-# Access it as cigvis.gui, or import directly:
-#   from cigvis.gui import gui2d, gui3d
+# GUI compatibility stubs are loaded lazily to avoid importing Qt unless needed.
+# Standalone gui2d/gui3d have been removed; use plot3D(gui=True) for node inspection.
 _lazy_modules = {}
 if _has_vispy and _has_pyside6:
     _lazy_modules['gui'] = 'cigvis.gui'

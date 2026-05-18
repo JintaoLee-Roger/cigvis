@@ -1,38 +1,45 @@
-"""
-CigVis GUI — modern PySide6-based viewer.
+"""Compatibility stubs for removed standalone cigvis GUI entry points.
 
-Provides:
-  gui2d : 2D viewer (matplotlib) with collapsible sidebar
-           - supports 3D data as collection of 2D slices
-           - SAM-like point/box/brush annotation
-  gui3d : 3D viewer (vispy) with collapsible sidebar
-           - uses VolumeImage (faster overlay management)
-           - optional SAM-like interactive segmentation
-
-Quick start::
-
-    from cigvis.gui import gui2d, gui3d
-
-    # 2D viewer
-    gui2d(nx=256, ny=512)
-
-    # 3D viewer
-    gui3d(nx=128, ny=128, nz=512)
-
-    # 3D viewer with pre-loaded data
-    import numpy as np
-    data = np.fromfile("volume.dat", np.float32).reshape(128, 128, 512)
-    gui3d(data=data)
-
-    # 3D viewer with SAM inference
-    def my_decode(base_vol, prompts, xyz):
-        # ... run your model ...
-        return mask   # ndarray, same shape as base_vol
-
-    gui3d(data=data, decode_fn=my_decode)
+The old standalone 2D/3D viewers have been removed. The only GUI kept inside
+``cigvis`` is the lightweight shell used internally by
+``cigvis.plot3D(..., gui=True)``.
 """
 
-from .gui2d import gui2d, Gui2dWindow
-from .gui3d import gui3d, Gui3dWindow
+from __future__ import annotations
 
-__all__ = ['gui2d', 'Gui2dWindow', 'gui3d', 'Gui3dWindow']
+
+_REMOVED_MESSAGE = (
+    "The standalone cigvis GUI has been removed. For existing VisPy nodes, "
+    "use `cigvis.plot3D(..., gui=True)`. For SSH-friendly 2D slice viewing, "
+    "install and use the `cigvis[sliceviewer]` extra."
+)
+
+
+Gui2dWindow = None
+
+try:
+    from .gui3d import Gui3dWindow, Plot3DGuiWindow, launch_plot3d_gui
+except Exception:
+    Gui3dWindow = None
+    Plot3DGuiWindow = None
+    launch_plot3d_gui = None
+
+
+def gui2d(*_args, **_kwargs):
+    """Removed standalone 2D GUI entry point."""
+    raise RuntimeError(_REMOVED_MESSAGE)
+
+
+def gui3d(*_args, **_kwargs):
+    """Removed standalone 3D GUI entry point."""
+    raise RuntimeError(_REMOVED_MESSAGE)
+
+
+__all__ = [
+    "gui2d",
+    "gui3d",
+    "Gui2dWindow",
+    "Gui3dWindow",
+    "Plot3DGuiWindow",
+    "launch_plot3d_gui",
+]

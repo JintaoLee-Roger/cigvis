@@ -1,25 +1,30 @@
 # Copyright (c) 2026 Jintao Li.
-# Computational and Interpretation Group (CIG),
-# University of Science and Technology of China (USTC).
 # All rights reserved.
 """
-Gaussian splats on the F3 demo
-==============================
+Native VisPy point clouds on the F3 demo
+========================================
 
-Use the F3 scene from ``examples/more_demos/070-f3.py`` and convert several
-interpreted objects into splats with ``cigvis.create_splats``.
+Use VisPy's built-in ``Markers`` visual to render interpreted F3 objects as
+clear point clouds. This is the VisPy counterpart of
+``examples/viser/06_point_cloud.py``.
 
-The geobody is sampled as boundary voxels, not as the full solid volume, so the
-demo stays responsive and the result behaves more like a surface display.
+.. note::
+
+    VisPy ``Markers`` uses screen-space marker sizes. The automatic PNG save
+    captures the canvas when ``plot3D`` is called; press ``s`` after
+    rotating/zooming/resizing to save the adjusted view. This demo saves with
+    an opaque background because transparent PNG keeps antialiased marker
+    edges as alpha, which can look like pale outlines when image viewers
+    composite the file on a white background.
 
 
-.. image:: ../../_static/cigvis/3Dvispy/17.png
+.. image:: ../../_static/cigvis/3Dvispy/19.png
     :alt: image
     :align: center
 
 """
 
-# sphinx_gallery_thumbnail_path = '_static/cigvis/3Dvispy/17.png'
+# sphinx_gallery_thumbnail_path = '_static/cigvis/3Dvispy/19.png'
 
 
 from pathlib import Path
@@ -31,51 +36,35 @@ import cigvis
 from cigvis.io import load_skins
 
 
-def _normalize(values, low=2.0, high=98.0):
-    values = np.asarray(values, dtype=np.float32)
-    out = np.zeros(values.shape, dtype=np.float32)
-    finite = np.isfinite(values)
-    if not np.any(finite):
-        return out
-
-    lo, hi = np.nanpercentile(values[finite], [low, high])
-    if not np.isfinite(lo) or not np.isfinite(hi) or hi <= lo:
-        return out
-
-    out[finite] = np.clip((values[finite] - lo) / (hi - lo), 0.0, 1.0)
-    return out
-
-
 def _extend(nodes, new_nodes):
     if new_nodes:
         nodes.extend(new_nodes)
 
 
-def salt_body_splats(salt, step=(5, 7, 4), max_points=50000):
+def salt_body_points(salt, step=(5, 7, 4), max_points=30000):
     sample = np.asarray(salt[::step[0], ::step[1], ::step[2]]) > 0.0
     if not np.any(sample):
         return []
 
-    eroded = binary_erosion(sample,
-                            structure=np.ones((3, 3, 3), dtype=bool),
-                            border_value=0)
+    eroded = binary_erosion(
+        sample,
+        structure=np.ones((3, 3, 3), dtype=bool),
+        border_value=0,
+    )
     boundary = sample & ~eroded
     pos = np.argwhere(boundary).astype(np.float32)
     pos *= np.asarray(step, dtype=np.float32)
 
-    return cigvis.create_splats(
+    return cigvis.create_point_cloud(
         pos,
-        mode='surface',
         color=(0.0, 0.92, 0.95, 1.0),
-        size=5.5,
-        alpha=0.62,
+        size=4.0,
         max_points=max_points,
         seed=11,
-        canvas_size_limits=(2.0, 16),
     )
 
 
-def surface_splats(surface, zmax, step=10, cmap='viridis', alpha=0.75):
+def surface_points(surface, zmax, step=10, cmap='viridis', max_points=45000):
     ii = np.arange(0, surface.shape[0], step, dtype=np.float32)
     jj = np.arange(0, surface.shape[1], step, dtype=np.float32)
     grid_i, grid_j = np.meshgrid(ii, jj, indexing='ij')
@@ -87,37 +76,31 @@ def surface_splats(surface, zmax, step=10, cmap='viridis', alpha=0.75):
         return []
 
     pos = np.column_stack([grid_i[valid], grid_j[valid], depth[valid]])
-    return cigvis.create_splats(
+    return cigvis.create_point_cloud(
         pos.astype(np.float32),
         values=depth[valid],
-        mode='surface',
         cmap=cmap,
-        size=5.0,
-        alpha=alpha,
-        max_points=55000,
+        size=3.4,
+        max_points=max_points,
         seed=13,
-        canvas_size_limits=(2.0, 14),
     )
 
 
-def fault_skin_splats(skin_dir, max_points=45000):
+def fault_skin_points(skin_dir, max_points=35000):
     vertices, _faces, likelihood = load_skins(str(skin_dir),
                                               endian='>',
                                               values_type='likelihood')
-    return cigvis.create_splats(
+    return cigvis.create_point_cloud(
         vertices.astype(np.float32, copy=False),
         values=likelihood.astype(np.float32, copy=False),
-        mode='surface',
         cmap='autumn',
-        size=3.5,
-        alpha=0.85,
+        size=3.0,
         max_points=max_points,
         seed=17,
-        canvas_size_limits=(1.5, 13),
     )
 
 
-def well_log_splats(log_path, zmax, sample_step=14):
+def well_log_points(log_path, zmax, sample_step=14):
     nlog = 4
     npoints = 2121
     x = np.asarray([259, 619, 339, 141], dtype=np.float32)
@@ -148,30 +131,24 @@ def well_log_splats(log_path, zmax, sample_step=14):
 
     pos = np.concatenate(all_pos).astype(np.float32)
     values = np.concatenate(all_values).astype(np.float32)
-    sizes = 5.0 + 8.0 * _normalize(values)
-
-    return cigvis.create_splats(
+    return cigvis.create_point_cloud(
         pos,
         values=values,
-        mode='point',
         cmap='viridis',
-        size=sizes.astype(np.float32),
-        alpha=0.95,
+        size=5.0,
     )
 
 
-def pick_splats():
+def pick_points():
     pos = np.asarray([
         [192, 634.1855, 32.3816],
         [192, 616.5631, 139.5132],
         [192, 600.3925, 220.0604],
     ], dtype=np.float32)
-    return cigvis.create_splats(
+    return cigvis.create_point_cloud(
         pos,
-        mode='point',
         color=(0.0, 0.95, 1.0, 1.0),
-        size=18.0,
-        alpha=0.98,
+        size=10.0,
     )
 
 
@@ -194,19 +171,17 @@ if __name__ == '__main__':
                                  clim=[-2.0, 1.5])
 
     salt = np.memmap(saltp, np.float32, 'c', shape=shape)
-    _extend(nodes, salt_body_splats(salt))
+    _extend(nodes, salt_body_points(salt))
 
     hz2 = np.fromfile(hz2p, np.float32).reshape(ni, nx)
-    _extend(nodes, surface_splats(hz2, nt, step=10,
-                                  cmap='viridis', alpha=0.78))
+    _extend(nodes, surface_points(hz2, nt, step=10, cmap='viridis'))
 
     unc2 = np.fromfile(unc2p, np.float32).reshape(ni, nx)
-    _extend(nodes, surface_splats(unc2, nt, step=12,
-                                  cmap='cool', alpha=0.72))
+    _extend(nodes, surface_points(unc2, nt, step=12, cmap='cool'))
 
-    _extend(nodes, fault_skin_splats(skin_dir))
-    _extend(nodes, well_log_splats(logp, nt))
-    _extend(nodes, pick_splats())
+    _extend(nodes, fault_skin_points(skin_dir))
+    _extend(nodes, well_log_points(logp, nt))
+    _extend(nodes, pick_points())
 
     cigvis.plot3D(
         nodes,
@@ -217,6 +192,7 @@ if __name__ == '__main__':
             fov=15.0,
             axis_scales=(1, 1, 1.7),
             zoom_factor=1.35,
+            shortcut_save_kw={'transparent_bg': False},
         ),
-        save=cigvis.Plot3DSave(path='example.png'),
+        save=cigvis.Plot3DSave(path='example.png', transparent_bg=False),
     )

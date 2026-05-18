@@ -35,12 +35,6 @@ pip install "cigvis[sliceviewer]"
 pip install "cigvis[all]"
 ```
 
-安装 GUI 依赖后，可以在终端启动 3D GUI：
-
-```shell
-vis-gui3d
-```
-
 本地开发安装：
 
 ```shell
@@ -224,6 +218,8 @@ nodes = sv.create_slice(
     indices={0: 2},       # 隐藏维度的固定索引
     aspect=1.0,
     cmap='gray',
+    interpolation='nearest',
+    render_mode='float',
 )
 
 # SSH 场景下先转发端口：
@@ -231,7 +227,7 @@ nodes = sv.create_slice(
 sv.show(nodes, port=5007)
 ```
 
-侧边栏可以切换 `Y axis` / `X axis`，调整隐藏维度索引，并设置纵横比。如果省略 `display_axes`，默认显示最大的两个维度。
+侧边栏可以切换 `Y axis` / `X axis`、交换 X/Y、调整隐藏维度索引、设置纵横比，选择 RGBA 图像或 float heatmap 渲染，并选择插值方式（`nearest`、`linear`、`best` 或 `auto`）。如果省略 `display_axes`，默认显示最大的两个维度。
 
 前后对比时，可以传入两个或三个节点列表并指定网格：
 

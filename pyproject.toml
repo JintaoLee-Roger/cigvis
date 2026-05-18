@@ -27,9 +27,6 @@ dependencies = [
     "vispy"
 ]
 
-[project.scripts]
-vis-gui3d = "cigvis.cli:gui3d"
-
 [project.optional-dependencies]
 default = ["PySide6"]
 gui = ["PySide6"]

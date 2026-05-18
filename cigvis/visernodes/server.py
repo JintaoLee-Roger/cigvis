@@ -9,6 +9,7 @@ import numpy as np
 from .volume_slice import VolumeSlice
 from .meshnode import MeshNode
 from .well_log import LogBase
+from .splat import GaussianSplatNode
 from cigvis import colormap
 from packaging import version
 import imageio.v3 as iio
@@ -194,7 +195,7 @@ class Server(viser.ViserServer):
                 self.draw_slices = i
 
         self.init_scale = init_scale
-        sliceid, meshid, logsid = 0, 0, 0
+        sliceid, meshid, logsid, splatid = 0, 0, 0, 0
         for node in nodes:
             _apply_node_scale(node, init_scale, self._axis_scales)
             if isinstance(node, VolumeSlice):
@@ -206,6 +207,9 @@ class Server(viser.ViserServer):
             elif isinstance(node, LogBase):
                 node.name = f'logs{logsid}-{node.base_name}'
                 logsid += 1
+            elif isinstance(node, GaussianSplatNode):
+                node.name = f'gaussian-splats{splatid}'
+                splatid += 1
             node.server = self
         
         if self.draw_slices >= 0:

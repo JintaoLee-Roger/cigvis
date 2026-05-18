@@ -53,6 +53,9 @@ def _api_axis_scales(factors):
 
 class EventMixin:
 
+    def _scene_views(self):
+        return getattr(self, 'view', None) or []
+
     def _get_xyz_from_event(self, event):
         hover_on = self.visual_at(event.pos)
         if hasattr(hover_on, 'get_click_pos3d'):
@@ -61,6 +64,11 @@ class EventMixin:
         return None, hover_on
 
     def on_mouse_press(self, event):
+        views = self._scene_views()
+        if not views:
+            self.drag_mode = False
+            return
+
         # Hold <Alt> and click left to print position
         if (event.button == 1) and (keys.ALT in event.modifiers) and (keys.CONTROL not in event.modifiers) and (not self.drag_mode):
             hover_on = self.visual_at(event.pos)
@@ -77,7 +85,7 @@ class EventMixin:
             # Temporarily disable the interactive flag of the ViewBox because it
             # is masking all the visuals. See details at:
             # https://github.com/vispy/vispy/issues/1336
-            for view in self.view:
+            for view in views:
                 view.interactive = False
             hover_on = self.visual_at(event.pos)
 
@@ -95,10 +103,14 @@ class EventMixin:
                 # Nothing to do if the cursor is NOT on a valid visual node.
 
             # Reenable the ViewBox interactive flag.
-            for view in self.view:
+            for view in views:
                 view.interactive = True
 
     def on_mouse_release(self, event):
+        if not self._scene_views():
+            self.drag_mode = False
+            return
+
         # Hold <Ctrl> to enter drag mode or press <d> to toggle.
         if keys.CONTROL in event.modifiers or self.drag_mode:
             if self.selected is not None:
@@ -109,12 +121,17 @@ class EventMixin:
                 self.selected2 = []
 
     def on_mouse_move(self, event):
+        views = self._scene_views()
+        if not views:
+            self.drag_mode = False
+            return
+
         # Hold <Ctrl> to enter drag mode or press <d> to toggle.
         if keys.CONTROL in event.modifiers or self.drag_mode:
             # Temporarily disable the interactive flag of the ViewBox because it
             # is masking all the visuals. See details at:
             # https://github.com/vispy/vispy/issues/1336
-            for view in self.view:
+            for view in views:
                 view.interactive = False
             hover_on = self.visual_at(event.pos)
 
@@ -140,7 +157,7 @@ class EventMixin:
                         self.hover_on.highlight.visible = True
 
             # Reenable the ViewBox interactive flag.
-            for view in self.view:
+            for view in views:
                 view.interactive = True
 
     def on_key_press(self, event):
@@ -148,9 +165,12 @@ class EventMixin:
             self.unfreeze()
             self.keymove = 0
             self.freeze()
+        views = self._scene_views()
         # Press <Space> to reset camera.
         if event.text == ' ':
-            for view in self.view:
+            if not views:
+                return
+            for view in views:
                 view.camera.fov = self.fov
                 view.camera.azimuth = self.azimuth
                 view.camera.elevation = self.elevation
@@ -179,23 +199,27 @@ class EventMixin:
 
         # Press <d> to toggle drag mode.
         if event.text == 'd':
+            if not views:
+                return
             if not self.drag_mode:
                 self.drag_mode = True
-                for view in self.view:
+                for view in views:
                     view.camera.viewbox.events.mouse_move.disconnect(
                         view.camera.viewbox_mouse_event)
             else:
                 self.drag_mode = False
                 self._exit_drag_mode()
-                for view in self.view:
+                for view in views:
                     view.camera.viewbox.events.mouse_move.connect(
                         view.camera.viewbox_mouse_event)
 
         # Press <a> to get the parameters of all visual nodes.
         if event.text == 'a':
+            if not views:
+                return
             print("===== Copyable cigvis state =====")
-            camera_state = self.view[0].camera.get_state()
-            factors = list(self.view[0].camera._flip_factors)
+            camera_state = views[0].camera.get_state()
+            factors = list(views[0].camera._flip_factors)
             view_kwargs = {
                 'size': tuple(self.size),
                 'scale_factor': camera_state.get('scale_factor'),
@@ -217,7 +241,7 @@ class EventMixin:
             print("),")
 
             pos_dict = {'x': [], 'y': [], 'z': []}
-            for node in self.view[0].scene.children:
+            for node in views[0].scene.children:
                 axis = getattr(node, 'axis', None)
                 if self._check_drag(node) and axis in pos_dict:
                     pos_dict[axis].append(_python_value(node.pos))
@@ -227,7 +251,7 @@ class EventMixin:
             _print_kw('pos', pos_dict)
 
             xyz_axis_locs = []
-            for node in self.view[0].children:
+            for node in views[0].children:
                 if isinstance(node, XYZAxis):
                     xyz_axis_locs.append(_python_value(node.loc))
             if xyz_axis_locs:
@@ -244,7 +268,9 @@ class EventMixin:
 
         # zoom in z axis, press <z>
         if event.text == 'z':
-            for view in self.view:
+            if not views:
+                return
+            for view in views:
                 factors = list(view.camera._flip_factors)
                 factors[2] += (0.2 * (1 - 2 * cigvis.is_z_reversed()))
                 view.camera._flip_factors = factors
@@ -254,7 +280,9 @@ class EventMixin:
 
         # zoom out z axis, press <Z>, i.e. <Shift>+<z>
         if event.text == 'Z':
-            for view in self.view:
+            if not views:
+                return
+            for view in views:
                 factors = list(view.camera._flip_factors)
                 factors[2] -= (0.2 * (1 - 2 * cigvis.is_z_reversed()))
                 view.camera._flip_factors = factors
@@ -264,12 +292,16 @@ class EventMixin:
 
         # zoom in fov, press <f>
         if event.text == 'f':
-            for view in self.view:
+            if not views:
+                return
+            for view in views:
                 view.camera.fov += 5
 
         # zoom out fov, press <F>
         if event.text == 'F':
-            for view in self.view:
+            if not views:
+                return
+            for view in views:
                 view.camera.fov -= 5
 
         if event.key == keys.LEFT:

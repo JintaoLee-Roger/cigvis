@@ -160,8 +160,10 @@ def line_cmap(cmap=None, n_lines: int = 20, samples: int = 256, seed: int = 0):
 
     Parameters
     ----------
-    cmap : str or Colormap or None
-        Source colormap. If None, use reproducible distinct random colors.
+    cmap : str or Colormap or int or None
+        Source colormap. If None, use reproducible distinct random colors. If
+        an integer is passed, it is interpreted as ``n_lines`` so calls such as
+        ``line_cmap(28, 256)`` mean ``n_lines=28, samples=256``.
     n_lines : int
         Number of opaque color samples.
     samples : int
@@ -169,6 +171,9 @@ def line_cmap(cmap=None, n_lines: int = 20, samples: int = 256, seed: int = 0):
     seed : int
         Random seed used when cmap is None.
     """
+    if isinstance(cmap, (int, np.integer)):
+        n_lines, samples, cmap = int(cmap), int(n_lines), None
+
     if n_lines <= 0:
         raise ValueError("n_lines must be positive")
     if samples <= 0:

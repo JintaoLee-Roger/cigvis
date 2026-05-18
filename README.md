@@ -35,11 +35,6 @@ pip install "cigvis[sliceviewer]"
 pip install "cigvis[all]"
 ```
 
-After installing the GUI extra, the 3D GUI can also be launched from a terminal:
-```shell
-vis-gui3d
-```
-
 For local installation, clone the repository from GitHub and then install it using pip:
 ```shell
 git clone https://github.com/JintaoLee-Roger/cigvis.git
@@ -250,6 +245,8 @@ nodes = sv.create_slice(
     indices={0: 2},       # fixed index for hidden dimensions
     aspect=1.0,
     cmap='gray',
+    interpolation='nearest',
+    render_mode='float',
 )
 
 # Forward the port first when running through SSH:
@@ -257,7 +254,7 @@ nodes = sv.create_slice(
 sv.show(nodes, port=5007)
 ```
 
-The sidebar can switch `Y axis` / `X axis`, change fixed indices for the hidden dimensions, and adjust aspect (`equal`, `free`, or a custom `Y/X` ratio). If `display_axes` is omitted, the two largest dimensions are displayed automatically.
+The sidebar can switch `Y axis` / `X axis`, swap X/Y, change fixed indices for the hidden dimensions, adjust aspect (`equal`, `free`, or a custom `Y/X` ratio), choose RGBA image vs float heatmap rendering, and choose interpolation (`nearest`, `linear`, `best`, or `auto`). If `display_axes` is omitted, the two largest dimensions are displayed automatically.
 
 For before/after comparison, pass two or three node lists and choose a grid:
 

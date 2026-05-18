@@ -1,29 +1,56 @@
 """
-Comparison grid
-===============
+Real data comparison grid
+=========================
 
-Compare two or three processed volumes with shared dimension/index controls.
+Compare seismic, RGT, and fault volumes with shared dimension/index controls.
+
+
+.. image:: ../../_static/cigvis/sliceviewer/02.png
+    :alt: image
+    :align: center
+
 """
+
+# sphinx_gallery_thumbnail_path = '_static/cigvis/sliceviewer/02.png'
+
+
+from pathlib import Path
 
 import numpy as np
 
 from cigvis import sliceviewer as sv
 
 
-rng = np.random.default_rng(12)
-raw = rng.normal(size=(3, 4, 64, 96)).astype(np.float32)
-denoised = 0.65 * raw + 0.35 * raw.mean(axis=0, keepdims=True)
-attribute = np.gradient(denoised, axis=-1).astype(np.float32)
+ROOT = Path(__file__).resolve().parents[2]
+DATA = ROOT / "data" / "rgt"
+SHAPE = (128, 128, 128)
+INLINE = 40
 
-nodes_raw = sv.create_slice(raw, display_axes=(2, 3), indices={0: 1, 1: 2})
-nodes_denoised = sv.create_slice(denoised, display_axes=(2, 3), indices={0: 1, 1: 2})
-nodes_attribute = sv.create_slice(attribute, display_axes=(2, 3), indices={0: 1, 1: 2})
+seismic = np.fromfile(DATA / "sx.dat", np.float32).reshape(SHAPE)
+rgt = np.fromfile(DATA / "ux.dat", np.float32).reshape(SHAPE)
+fault = np.fromfile(DATA / "fx.dat", np.float32).reshape(SHAPE)
+
+axis_labels = ("inline", "crossline", "time")
+slice_kwargs = dict(
+    display_axes=(2, 1),
+    indices={0: INLINE},
+    axis_labels=axis_labels,
+    interpolation="nearest",
+    render_mode="float",
+)
+
+nodes_seismic = sv.create_slice(seismic, cmap="gray", **slice_kwargs)
+nodes_rgt = sv.create_slice(rgt, cmap="jet", **slice_kwargs)
+nodes_fault = sv.create_slice(fault, cmap="jet", **slice_kwargs)
+nodes_overlay = sv.create_slice(seismic, cmap="gray", **slice_kwargs)
+nodes_overlay = sv.add_mask(nodes_overlay, fault, cmap="jet", alpha=0.45, excpt="min")
 
 
 if __name__ == "__main__":
     sv.show(
-        [nodes_raw, nodes_denoised, nodes_attribute],
+        [nodes_seismic, nodes_rgt, nodes_fault, nodes_overlay],
         grid=(2, 2),
         port=5007,
-        title="Processing comparison",
+        title="RGT data comparison",
+        plot_height=340,
     )

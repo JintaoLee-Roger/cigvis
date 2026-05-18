@@ -5,6 +5,7 @@ from cigvis import colormap, ExceptionWrapper
 import matplotlib.pyplot as plt
 from matplotlib.colors import to_rgba as matplotlib_to_rgba
 from cigvis.utils import utils
+from cigvis.utils.slice_provider import SliceProvider
 from cigvis import is_line_first
 
 try:
@@ -23,17 +24,23 @@ class VolumeSlice:
                  cmap='gray',
                  clim=None,
                  scale=-1,
-                 nancolor=None):
+                 nancolor=None,
+                 provider: SliceProvider = None):
         self._server = None  # viser.ViserServer
         self._name = f'slice-{axis}-{pos}'
         self.volume = volume
+        self.provider = provider or SliceProvider(
+            volume,
+            transpose_line_first=False,
+            transpose_rgb=False,
+        )
         self.axis = axis
         self.pos = pos
         self.cmap = cmap
         self._cmap_preset = cmap
-        self.clim = clim if clim is not None else utils.auto_clim(volume)
+        self.clim = clim if clim is not None else utils.auto_clim(self.provider.clim_source)
 
-        self.init_scale = [1.5 / max(volume.shape)] * 3
+        self.init_scale = [1.5 / max(self.provider.shape)] * 3
         self.nancolor = nancolor
 
         # lines
@@ -41,20 +48,7 @@ class VolumeSlice:
         self._img = None # save the original image (without white lines)
 
         # HACK: to deal with rgb or rgba image
-        def _eq_3_or_4(k):
-            return k == 3 or k == 4
-        line_first = is_line_first()
-        assert _eq_3_or_4(volume.ndim), f"Volume's dims must be 3 or 4 (RGB), but got {volume.ndim}"
-        # rgb_type, 0 for (n1, n2, n3), 1 for (n1, n2, n3, 3/4), 2 for (3/4, n1, n2, n3)
-        ndim = volume.ndim
-        self.channel_dim = None
-        dim_x, dim_y, dim_z = (0, 1, 2) if line_first else (2, 1, 0)
-        self.axis_to_dim = {'x': dim_x, 'y': dim_y, 'z': dim_z}
-        self.vol_shape, self.rgb_type = utils.get_shape(volume, line_first)
-        if self.rgb_type == 1:
-            self.channel_dim = 3
-        elif self.rgb_type == 2:
-            self.channel_dim = 0
+        self.vol_shape = self.provider.shape
 
         if isinstance(scale, (int, float)):
             if scale < 0:
@@ -132,24 +126,14 @@ class VolumeSlice:
             img = img.detach().cpu().numpy()
         return img
 
-    def _get_slices(self, axis, pos):
-        dim = self.axis_to_dim.get(axis)
-        slices = [slice(None)] * self.volume.ndim
-        if self.channel_dim is not None and dim >= self.channel_dim:
-            slices[dim + 1] = pos
-        else:
-            slices[dim] = pos
-        return tuple(slices)
-
     def _auto_transpose(self, img):
         if not is_line_first():
             img = np.transpose(img, (1, 0, 2))
         return img
 
     def to_img(self):
-        s = self._get_slices(self.axis, self.pos)
-        bg = self.volume[s]
-        fg = [mask[s] for mask in self.masks]
+        bg = self.provider(self.axis, self.pos)
+        fg = [mask(self.axis, self.pos) for mask in self.masks]
 
         bg = self._to_np(bg)
         fg = [self._to_np(g) for g in fg]
@@ -249,12 +233,20 @@ class VolumeSlice:
 
         self.update_node(self.pos)
 
-    def add_mask(self, vol, cmap: str, clim: List = None):
-        mask_shape, _ = utils.get_shape(vol, is_line_first())
-        assert mask_shape == self.vol_shape, f"mask.shape: {vol.shape} != vol.shape: {self.vol_shape}"
-        self.masks.append(vol)
+    def add_mask(self,
+                 vol,
+                 cmap: str,
+                 clim: List = None,
+                 provider: SliceProvider = None):
+        provider = provider or SliceProvider(
+            vol,
+            transpose_line_first=False,
+            transpose_rgb=False,
+        )
+        assert provider.shape == self.vol_shape, f"mask.shape: {provider.shape} != vol.shape: {self.vol_shape}"
+        self.masks.append(provider)
         if clim is None:
-            clim = utils.auto_clim(vol)
+            clim = utils.auto_clim(provider.clim_source)
         self.fg_cmaps.append(cmap)
         self._fg_cmaps_preset.append(cmap)
         self.fg_clims.append(clim)

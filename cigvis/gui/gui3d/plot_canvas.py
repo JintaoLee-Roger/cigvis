@@ -3,7 +3,7 @@
 
 Key changes from old gui3d:
   - Uses VolumeImage instead of cigvis.create_slices
-  - SamLikeVolumeApp wired in for optional SAM-like interaction
+  - Prompt-decoder interaction can be wired in by the GUI shell
 """
 
 from __future__ import annotations
@@ -13,6 +13,7 @@ from typing import Any, Optional, List, Dict, Callable, Tuple
 
 import numpy as np
 
+from PySide6.QtCore import QEvent
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QMessageBox
 import cigvis
 from cigvis import colormap
@@ -20,6 +21,9 @@ from cigvis.vispynodes import VisCanvas
 from cigvis.vispynodes.volume_image import VolumeImage
 from cigvis.vispynodes.axis_aligned_image import AxisAlignedImage
 from cigvis.vispynodes.meshnode import SurfaceNode
+from cigvis.vispynodes.colorbar import Colorbar
+from cigvis.vispynodes.splat import Splat
+from cigvis.gui.cmap_utils import resolve_gui_cmap
 
 
 _KNOWN_CMAPS = (
@@ -99,6 +103,18 @@ def _guess_cmap_alpha(cmap, default: float = 0.5) -> float:
     return default
 
 
+def _source_matches(source, select: str, idx: int = 0, idx2: int = 0) -> bool:
+    if not isinstance(source, dict):
+        return False
+    if source.get('select') != select:
+        return False
+    if int(source.get('idx', 0)) != int(idx):
+        return False
+    if int(source.get('idx2', 0)) != int(idx2):
+        return False
+    return True
+
+
 # ---------------------------------------------------------------------------
 # Mixins
 # ---------------------------------------------------------------------------
@@ -106,31 +122,122 @@ def _guess_cmap_alpha(cmap, default: float = 0.5) -> float:
 class BaseVolumeMixin:
     """Manage the base VolumeImage node."""
 
-    def set_base_data(self, data: np.ndarray) -> None:
+    def _samples_hint(self, source=None) -> int:
+        if source is None:
+            if self._vol is not None:
+                shape = getattr(self._vol, 'shape', None)
+            else:
+                shape = getattr(self._data, 'shape', None)
+        else:
+            shape = getattr(source, 'shape', None)
+        if shape is not None and len(shape) >= 3:
+            return int(shape[2])
+        return 256
+
+    def _sync_colorbars(
+        self,
+        select: str,
+        idx: int = 0,
+        idx2: int = 0,
+        cmap: Any = None,
+        clim: Any = None,
+        preserve_alpha: Optional[bool] = None,
+    ) -> bool:
+        params: Dict[str, Any] = {}
+        if cmap is not None:
+            params['cmap'] = cmap
+        if clim is not None:
+            params['clim'] = list(clim)
+        if preserve_alpha is not None:
+            params['preserve_alpha'] = bool(preserve_alpha)
+        if not params:
+            return False
+
+        updated = False
+        for cbar in self._cbar_nodes:
+            source = getattr(cbar, '_cigvis_cbar_source', None)
+            if not _source_matches(source, select, idx, idx2):
+                continue
+            if getattr(cbar, 'cbar_size', None) is None:
+                continue
+            try:
+                cbar.update_params(**params)
+                updated = True
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Colorbar update error: {e}")
+        return updated
+
+    def _sync_surface_colorbars(self, idx: int) -> bool:
+        if idx < 0 or idx >= len(self._horz_nodes):
+            return False
+        node = self._horz_nodes[idx]
+        updated = False
+        for cbar in self._cbar_nodes:
+            source = getattr(cbar, '_cigvis_cbar_source', None)
+            if not isinstance(source, dict) or source.get('select') != 'surface':
+                continue
+            if int(source.get('idx', 0)) != int(idx):
+                continue
+            idx2 = int(source.get('idx2', 0))
+            try:
+                cmap = node.cmaps[idx2]
+                clim = node.clims[idx2]
+            except Exception:
+                continue
+            updated |= self._sync_colorbars(
+                'surface',
+                idx=idx,
+                idx2=idx2,
+                cmap=cmap,
+                clim=clim,
+            )
+        return updated
+
+    def set_base_data(self,
+                      data: np.ndarray,
+                      display_range: Optional[Dict[str, Tuple[int, int]]] = None
+                      ) -> None:
+        old_data = self._data
         if self._vol is not None:
-            self.clear()
+            self.clear(close_data=data is not old_data)
 
         self._data = data
+        self._base_params['display_range'] = display_range
+        cmap_name = self._base_params.get('cmap', 'gray')
+        resolved = resolve_gui_cmap(
+            cmap_name,
+            samples_hint=self._samples_hint(data),
+        )
+        self._base_params['cmap_v'] = resolved.cmap
         self._vol = VolumeImage(
             data,
-            cmap=self._base_params.get('cmap', 'gray'),
+            cmap=resolved.cmap,
             clim=self._base_params.get('clim'),
             interpolation=self._base_params.get('interpolation', 'linear'),
+            display_range=display_range,
         )
 
-        nx, ny, nz = self._vol.shape
-        xi = nx // 2
-        yi = ny // 2
-        zi = nz // 2
+        ranges = self._vol.display_range
+        xi = (ranges['x'][0] + ranges['x'][1] - 1) // 2
+        yi = (ranges['y'][0] + ranges['y'][1] - 1) // 2
+        zi = (ranges['z'][0] + ranges['z'][1] - 1) // 2
         self._vol.create_slices([xi], [yi], [zi])
         nodes = self._vol.nodes(intersection_lines=True)
         for n in nodes:
             self._nodes.append(n)
+            if isinstance(n, AxisAlignedImage):
+                base = _base_image(n)
+                _set_visual_metadata(base, _cigvis_cmap_name=cmap_name)
+                _set_visual_metadata(n, _cigvis_cmap_name=cmap_name)
         self.canvas.add_nodes(nodes)
 
     def set_cmap(self, cmap_name: str) -> None:
         try:
-            cmap_v = colormap.cmap_to_vispy(cmap_name)
+            resolved = resolve_gui_cmap(
+                cmap_name,
+                samples_hint=self._samples_hint(),
+            )
+            cmap_v = resolved.cmap
             self._base_params['cmap'] = cmap_name
             self._base_params['cmap_v'] = cmap_v
             for n in self._nodes:
@@ -139,6 +246,11 @@ class BaseVolumeMixin:
                     base.cmap = cmap_v
                     _set_visual_metadata(base, _cigvis_cmap_name=cmap_name)
                     _set_visual_metadata(n, _cigvis_cmap_name=cmap_name)
+            self._sync_colorbars(
+                'slices',
+                cmap=cmap_v,
+                preserve_alpha=resolved.is_line_cmap,
+            )
             self.canvas.update()
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Colormap error: {e}")
@@ -155,6 +267,7 @@ class BaseVolumeMixin:
             for n in self._nodes:
                 if isinstance(n, AxisAlignedImage):
                     _base_image(n).clim = clim
+            self._sync_colorbars('slices', clim=clim)
             self.canvas.update()
 
     def set_vmax(self, vmax_str: str) -> None:
@@ -169,6 +282,7 @@ class BaseVolumeMixin:
             for n in self._nodes:
                 if isinstance(n, AxisAlignedImage):
                     _base_image(n).clim = clim
+            self._sync_colorbars('slices', clim=clim)
             self.canvas.update()
 
     def set_interp(self, interp: str) -> None:
@@ -230,11 +344,18 @@ class MaskMixin3D:
                 if spec:
                     spec.clim = tuple(clim)
                     self._vol.refresh_overlay(name)
+                    self._sync_colorbars('mask', idx=idx, cmap=spec.cmap_for_axis('x'), clim=clim)
                     self.canvas.update()
 
         elif mode == 'cmap':
             mp['cmap'] = value
-            cmap_v = self._build_cmap(value, mp.get('alpha', 0.5), mp.get('except', 'None'))
+            cmap_res = self._resolve_mask_cmap(
+                value,
+                mp.get('alpha', 0.5),
+                mp.get('except', 'None'),
+                samples_hint=self._samples_hint(self._masks[idx]),
+            )
+            cmap_v = cmap_res.cmap if cmap_res else None
             if cmap_v:
                 mp['cmap_v'] = cmap_v
                 spec = self._vol._overlays.get(name)
@@ -244,11 +365,24 @@ class MaskMixin3D:
                     spec.axis_cmaps = None
                     spec.axis_cmap_names = None
                     self._vol.refresh_overlay(name)
+                    self._sync_colorbars(
+                        'mask',
+                        idx=idx,
+                        cmap=cmap_v,
+                        clim=spec.clim,
+                        preserve_alpha=cmap_res.is_line_cmap,
+                    )
                     self.canvas.update()
 
         elif mode == 'alpha':
             mp['alpha'] = float(value)
-            cmap_v = self._build_cmap(mp.get('cmap', 'jet'), float(value), mp.get('except', 'None'))
+            cmap_res = self._resolve_mask_cmap(
+                mp.get('cmap', 'jet'),
+                float(value),
+                mp.get('except', 'None'),
+                samples_hint=self._samples_hint(self._masks[idx]),
+            )
+            cmap_v = cmap_res.cmap if cmap_res else None
             if cmap_v:
                 mp['cmap_v'] = cmap_v
                 spec = self._vol._overlays.get(name)
@@ -258,11 +392,24 @@ class MaskMixin3D:
                     spec.axis_cmaps = None
                     spec.axis_cmap_names = None
                     self._vol.refresh_overlay(name)
+                    self._sync_colorbars(
+                        'mask',
+                        idx=idx,
+                        cmap=cmap_v,
+                        clim=spec.clim,
+                        preserve_alpha=cmap_res.is_line_cmap,
+                    )
                     self.canvas.update()
 
         elif mode == 'except':
             mp['except'] = value
-            cmap_v = self._build_cmap(mp.get('cmap', 'jet'), mp.get('alpha', 0.5), value)
+            cmap_res = self._resolve_mask_cmap(
+                mp.get('cmap', 'jet'),
+                mp.get('alpha', 0.5),
+                value,
+                samples_hint=self._samples_hint(self._masks[idx]),
+            )
+            cmap_v = cmap_res.cmap if cmap_res else None
             if cmap_v:
                 mp['cmap_v'] = cmap_v
                 spec = self._vol._overlays.get(name)
@@ -272,6 +419,13 @@ class MaskMixin3D:
                     spec.axis_cmaps = None
                     spec.axis_cmap_names = None
                     self._vol.refresh_overlay(name)
+                    self._sync_colorbars(
+                        'mask',
+                        idx=idx,
+                        cmap=cmap_v,
+                        clim=spec.clim,
+                        preserve_alpha=cmap_res.is_line_cmap,
+                    )
                     self.canvas.update()
 
         elif mode == 'interp':
@@ -282,29 +436,45 @@ class MaskMixin3D:
                 self._vol.refresh_overlay(name)
                 self.canvas.update()
 
-    def _build_cmap(self, cmap_name, alpha, excpt):
+    def _resolve_mask_cmap(self, cmap_name, alpha, excpt, samples_hint=None):
         try:
-            if excpt == 'None':
-                return colormap.cmap_to_vispy(colormap.set_alpha(cmap_name, alpha))
-            elif excpt == 'min':
-                return colormap.cmap_to_vispy(colormap.set_alpha_except_min(cmap_name, alpha))
-            elif excpt == 'max':
-                return colormap.cmap_to_vispy(colormap.set_alpha_except_max(cmap_name, alpha))
-            elif excpt == 'ramp':
-                return colormap.cmap_to_vispy(colormap.ramp(cmap_name))
+            return resolve_gui_cmap(
+                cmap_name,
+                alpha=alpha,
+                excpt=excpt,
+                samples_hint=samples_hint,
+            )
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Colormap: {e}")
         return None
 
+    def _build_cmap(self, cmap_name, alpha, excpt, samples_hint=None):
+        resolved = self._resolve_mask_cmap(cmap_name, alpha, excpt, samples_hint)
+        return resolved.cmap if resolved else None
+
     def remove_mask(self, idx: int) -> None:
         if idx < 0 or idx >= len(self._masks):
             return
+        name = self._mask_params[idx].get('name')
+        if self._vol is not None and name:
+            try:
+                self._vol.remove_overlay(name)
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Remove mask error: {e}")
+                return
         self._masks.pop(idx)
         self._mask_params.pop(idx)
-        # Rebuild overlays (simplest approach for now)
-        # TODO: proper remove if VolumeImage gains a remove_overlay method
+        self.canvas.update()
 
     def mask_clear(self) -> None:
+        if self._vol is not None:
+            for params in list(self._mask_params):
+                name = params.get('name')
+                if name:
+                    try:
+                        self._vol.remove_overlay(name)
+                    except Exception:
+                        pass
         self._masks.clear()
         self._mask_params.clear()
 
@@ -343,10 +513,23 @@ class HorizonMixin3D:
                 if self._nodes:
                     node.update_colors_by_slice_node(
                         self._nodes, [self._data] + self._masks)
+            self._sync_surface_colorbars(idx)
+            self.canvas.update()
         elif mode == 'cmap':
             hp['cmaps'] = value
             try:
-                node.cmaps = [value]
+                resolved = resolve_gui_cmap(
+                    value,
+                    samples_hint=self._samples_hint(),
+                )
+                node.cmaps = [resolved.cmap]
+                self._sync_colorbars(
+                    'surface',
+                    idx=idx,
+                    cmap=resolved.cmap,
+                    preserve_alpha=resolved.is_line_cmap,
+                )
+                self.canvas.update()
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Cmap: {e}")
 
@@ -361,6 +544,119 @@ class HorizonMixin3D:
     def horz_clear(self) -> None:
         for i in range(len(self._horzs)):
             self.remove_horizon(0)
+
+
+class SplatMixin3D:
+    """Manage Gaussian splat overlay nodes."""
+
+    def add_splat(self, data: np.ndarray, params: Optional[dict] = None) -> bool:
+        if self._vol is None or not getattr(self.canvas, 'view', None):
+            QMessageBox.critical(self, "Error", "Load base data before adding splats.")
+            return False
+        params = dict(params or {})
+        name = params.get('name') or f'splat_{len(self._splat_nodes)}'
+        try:
+            pos, values = self._splat_payload(
+                data,
+                threshold=float(params.get('threshold', 0.0)),
+            )
+            if len(pos) == 0:
+                QMessageBox.warning(self, "Empty", "No non-zero splat points found.")
+                return False
+            from cigvis.vispyplot import create_splats
+            nodes = create_splats(
+                pos,
+                values=values,
+                cmap=params.get('cmap', 'viridis'),
+                size=float(params.get('size', 3.0)),
+                mode=params.get('mode', 'volume'),
+                alpha=float(params.get('alpha', 0.45)),
+                max_points=params.get('max_points'),
+            )
+            if not nodes:
+                QMessageBox.warning(self, "Empty", "No splat node was created.")
+                return False
+            node = nodes[0]
+            self.canvas.add_node(node)
+            self._splat_nodes.append(node)
+            self._splat_params.append({'name': name, **params})
+            self.canvas.update()
+            return True
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Splat error: {e}")
+            return False
+
+    def _splat_payload(self, data: np.ndarray, threshold: float = 0.0):
+        arr = np.asarray(data)
+        if arr.ndim == 2 and arr.shape[1] >= 3:
+            pos = arr[:, :3].astype(np.float32, copy=False)
+            values = arr[:, 3].astype(np.float32, copy=False) if arr.shape[1] > 3 else None
+            return pos, values
+        if arr.ndim != 3:
+            raise ValueError("Splat data must be a 3D mask volume or an (N,3)/(N,4) array.")
+
+        display_range = self._vol.display_range if self._vol is not None else {
+            'x': (0, arr.shape[0]),
+            'y': (0, arr.shape[1]),
+            'z': (0, arr.shape[2]),
+        }
+        xs, xe = display_range['x']
+        ys, ye = display_range['y']
+        zs, ze = display_range['z']
+        sub = np.asarray(arr[xs:xe, ys:ye, zs:ze])
+        finite = np.isfinite(sub)
+        if threshold > 0:
+            mask = finite & (np.abs(sub) > threshold)
+        else:
+            mask = finite & (sub != 0)
+        coords = np.argwhere(mask)
+        if coords.size == 0:
+            return np.empty((0, 3), dtype=np.float32), None
+        offsets = np.array([xs, ys, zs], dtype=np.float32)
+        pos = coords.astype(np.float32) + offsets
+        values = sub[mask].astype(np.float32, copy=False)
+        return pos, values
+
+    def set_splat_params(self, params: list) -> None:
+        idx, mode, value = params
+        if idx < 0 or idx >= len(self._splat_nodes):
+            return
+        node = self._splat_nodes[idx]
+        sp = self._splat_params[idx]
+        try:
+            if mode == 'alpha':
+                sp['alpha'] = float(value)
+                node.alpha = float(value)
+            elif mode == 'visible':
+                sp['visible'] = bool(value)
+                node.visible = bool(value)
+            elif mode == 'size':
+                sp['size'] = float(value)
+                data = getattr(node, '_data', None)
+                if data is not None:
+                    node.set_data(
+                        pos=data['a_position'],
+                        size=float(value),
+                        color=data['a_color'],
+                    )
+            self.canvas.update()
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Splat update error: {e}")
+
+    def remove_splat(self, idx: int) -> None:
+        if idx < 0 or idx >= len(self._splat_nodes):
+            return
+        node = self._splat_nodes.pop(idx)
+        self._splat_params.pop(idx)
+        try:
+            self.canvas.remove_node(node)
+        except Exception:
+            node.parent = None
+        self.canvas.update()
+
+    def splat_clear(self) -> None:
+        while self._splat_nodes:
+            self.remove_splat(0)
 
 
 class CameraMixin3D:
@@ -427,15 +723,59 @@ class DragDropMixin3D:
 
     def enable_drop(self) -> None:
         self.setAcceptDrops(True)
+        native = getattr(getattr(self, 'canvas', None), 'native', None)
+        if native is not None:
+            native.setAcceptDrops(True)
+            native.installEventFilter(self)
 
     def dragEnterEvent(self, event) -> None:
-        if event.mimeData().hasUrls():
-            event.acceptProposedAction()
+        self._accept_file_drag(event)
+
+    def dragMoveEvent(self, event) -> None:
+        self._accept_file_drag(event)
 
     def dropEvent(self, event) -> None:
-        path = event.mimeData().urls()[0].toLocalFile()
-        if path and self.parent() and hasattr(self.parent(), 'on_file_dropped'):
-            self.parent().on_file_dropped(path)
+        self._handle_file_drop(event)
+
+    def eventFilter(self, obj, event):
+        native = getattr(getattr(self, 'canvas', None), 'native', None)
+        if obj is native:
+            if event.type() in (QEvent.DragEnter, QEvent.DragMove):
+                return self._accept_file_drag(event)
+            if event.type() == QEvent.Drop:
+                return self._handle_file_drop(event)
+        return super().eventFilter(obj, event)
+
+    def _accept_file_drag(self, event) -> bool:
+        if self._local_file_from_drop(event):
+            event.acceptProposedAction()
+            return True
+        event.ignore()
+        return False
+
+    def _handle_file_drop(self, event) -> bool:
+        path = self._local_file_from_drop(event)
+        if not path:
+            event.ignore()
+            return False
+        target = self.window()
+        if target is not None and hasattr(target, 'on_file_dropped'):
+            target.on_file_dropped(path)
+            event.acceptProposedAction()
+            return True
+        event.ignore()
+        return False
+
+    def _local_file_from_drop(self, event) -> Optional[str]:
+        mime = event.mimeData()
+        if not mime.hasUrls():
+            return None
+        for url in mime.urls():
+            if url.isLocalFile():
+                path = url.toLocalFile()
+                if path:
+                    return path
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -443,12 +783,13 @@ class DragDropMixin3D:
 # ---------------------------------------------------------------------------
 
 class PlotCanvas3D(
-    QWidget,
     DragDropMixin3D,
+    QWidget,
     CameraMixin3D,
     BaseVolumeMixin,
     MaskMixin3D,
     HorizonMixin3D,
+    SplatMixin3D,
 ):
     """
     3D vispy canvas widget using VolumeImage.
@@ -499,6 +840,9 @@ class PlotCanvas3D(
         self._horzs: List[np.ndarray] = []
         self._horz_params: List[dict] = []
         self._horz_nodes: List = []
+        self._splat_nodes: List[Splat] = []
+        self._splat_params: List[dict] = []
+        self._cbar_nodes: List[Colorbar] = []
 
         self._plot_nodes = None
 
@@ -575,6 +919,7 @@ class PlotCanvas3D(
         flat_nodes = self._flatten_nodes(nodes)
         self._nodes = [n for n in flat_nodes if isinstance(n, AxisAlignedImage)]
         self._horz_nodes = [n for n in flat_nodes if isinstance(n, SurfaceNode)]
+        self._cbar_nodes = [n for n in flat_nodes if isinstance(n, Colorbar)]
         managers = self._volume_image_managers(nodes)
         if len(managers) == 1:
             self._vol = managers[0]
@@ -638,7 +983,8 @@ class PlotCanvas3D(
                 params['vmax'] = float(clim[1])
         return params
 
-    def clear(self) -> None:
+    def clear(self, close_data: bool = True) -> None:
+        self.splat_clear()
         self.horz_clear()
         self.mask_clear()
         for n in self._nodes:
@@ -647,11 +993,15 @@ class PlotCanvas3D(
             except Exception:
                 pass
         self._nodes.clear()
-        try:
-            if hasattr(self._data, 'close'):
-                self._data.close()
-        except Exception:
-            pass
+        if close_data:
+            try:
+                if hasattr(self._data, 'close'):
+                    self._data.close()
+            except Exception:
+                pass
         self._data = None
         self._vol = None
+        self._cbar_nodes.clear()
+        self._splat_nodes.clear()
+        self._splat_params.clear()
         self._base_params = {'cmap': 'gray', 'interpolation': 'linear'}

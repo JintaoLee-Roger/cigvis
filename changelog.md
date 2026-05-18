@@ -15,18 +15,21 @@ and separates backend-specific interfaces more explicitly.
   - `cigvis.Plot3DGui` for the optional PySide6 GUI shell.
 - Added automatic screenshot export through `Plot3DSave`; PNG export uses the current canvas framebuffer and supports transparent backgrounds.
 - Added `plot3D(..., gui=True)` integration with the modern 3D GUI shell, so existing `plot3D` nodes can be opened with a lightweight control panel.
-- Added `VolumeImage` and `create_volume_image` for managing a base volume plus mutable overlays without replacing slice callbacks; this is now the preferred internal path for GUI-style workflows that update masks or overlays repeatedly.
+- Added axis-aware slice sources for VisPy, Viser, and Plotly slice APIs, so `volume` may be a dict such as `{'x': iline_source, 'y': xline_source, 'z': time_source}`.
+- Added per-source physical axis order declarations such as `{'data': time_source, 'axes': ('z', 'y', 'x')}`, allowing each slice direction to use a source optimized for its own storage layout.
+- Added `display_range` for slice APIs to limit visible x/y/z ranges and push those ranges into slice reads, which is useful for large lazy volumes with unused samples such as deep time/depth tails.
 - Added camera-relative `HeadlightShadingFilter` for mesh, surface, point, and well-log lighting. Lighting is now attached to the visual node itself rather than globally managed by `VisCanvas`.
 - Added Gaussian splat rendering (`Splat`) for dense point/voxel-style displays.
+- Added `create_surfaces(..., quad=True, quad_size=...)` support for point-style horizon patch rendering, where each `(x, y, z)` point becomes an independent quad patch.
+- Added editable `line_cmap` support in GUI colormap controls for 2D images/masks and 3D base slices, masks, and surfaces. GUI expressions such as `line_cmap`, `line_cmap('jet')`, and `line_cmap(28, 256)` are supported, with default samples inferred from the volume z length when available.
 - Added a Panel+Plotly `sliceviewer` backend for SSH/Jupyter-friendly 2D viewing of 2D/3D/4D arrays, including runtime dimension selection and automatic two-largest-dimension defaults for thin-volume workflows.
-- Added terminal entry points for the 3D GUI:
-  - `vis-gui3d`
 
 **Changed**
 
-- Replaced the old PyQt5 GUI package with the modern PySide6 GUI implementation. The old `gui` package has been removed and replaced by the new GUI implementation.
+- Replaced the old PyQt5 GUI implementation with PySide6-backed GUI components. The importable `cigvis.gui` package remains as a compatibility layer, while the retained GUI surface is the `plot3D(gui=True)` inspector.
+- Removed the standalone `cigvis.gui.gui2d()` and `cigvis.gui.gui3d()` viewers from `cigvis`. `plot3D(gui=True)` remains available as a lightweight plot inspector for existing VisPy nodes.
 - Simplified the 3D GUI sidebar and removed GUI-level Shading/Lighting controls. Mesh, surface, point, and well-log lighting should now be configured when creating nodes, for example through `create_surfaces(..., shading=..., dyn_light=...)`.
-- Fixed surface interpolation handling and added quad rendering support for point-style surfaces.
+- Fixed surface interpolation handling and made point-style quad surfaces handle depth coloring and valid `z=0` points correctly.
 - Removed the old `VisCanvas` light-management mixin; camera-relative lighting is now handled by `HeadlightShadingFilter` on each visual.
 - `plot3D` no longer uses `dyn_light` as a canvas-level option; node lighting is controlled at node creation time.
 - `cigvis` no longer switches its top-level `create_*` functions to Plotly implementations automatically inside Jupyter notebooks. The top-level `cigvis.create_*` functions are the VisPy API when VisPy is available.
@@ -40,11 +43,18 @@ and separates backend-specific interfaces more explicitly.
 - Cleaned colormap helpers by removing old deprecated helpers/parameters such as `blend_two_arrays`, `blend_multiple`, `includevispy`, and `forvispy`.
 - Renamed `AxisAlignedImage.set_visable` to `set_visible`.
 - Fixed several small Viser/volume-slice issues, including linked-line updates when some axes are absent and the "parameters" GUI label typo.
+- Extended the retained `plot3D(gui=True)` GUI shell and internal GUI components with display-range controls, splat loading/management, overlay removal cleanup, and non-blocking file loading with busy feedback.
+- Added display-range Apply/Reload controls and made splat layer items appear only after the splat node is created successfully.
 - Updated examples, README, and docs to use the new `plot3D(view=..., save=..., cbar=..., gui=...)` API style.
 - Updated transparent-background documentation to use `Plot3DSave(transparent_bg=True)` instead of post-processing a special background color.
 - PNG screenshot/export now uses transparent backgrounds by default; pass `Plot3DSave(transparent_bg=False)` for a solid background.
 - Removed the independent `Plot3DSave.size`/`output_policy` export-size controls. Use `Plot3DView(size=...)` to control the canvas size; automatic saves and the `s` shortcut now share the same framebuffer capture path.
+- `Plot3DSave` screenshot options are also passed to the `s` shortcut unless `Plot3DView(shortcut_save_kw=...)` is set explicitly.
+- PNG screenshot/export now captures the visible framebuffer directly and no longer re-composites colorbars after capture, avoiding duplicate colorbar labels in saved images.
+- Colorbars created by `create_colorbar_from_nodes` now carry source metadata, and `plot3D(gui=True)` keeps matching slice, mask, and surface colorbars in sync when GUI colormap/range controls change.
+- Colorbar image rendering now uses Matplotlib's Agg canvas directly, avoiding pyplot/Qt backend work during GUI callbacks.
 - Surface/point splats now write depth by default to avoid dense translucent layers smearing over each other during camera or slice movement; volume splats keep the translucent-cloud behavior.
+- `line_cmap` can now be called as `line_cmap(28, 256)` to mean `n_lines=28, samples=256`; mask alpha controls scale only the opaque line entries and keep transparent background entries transparent.
 - `auto_clim` now samples non in-memory array-like inputs instead of forcing a full array read.
 - Updated user-facing comments and examples to use English comments consistently.
 

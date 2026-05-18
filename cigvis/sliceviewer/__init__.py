@@ -45,6 +45,8 @@ def create_slice(
     cmap: str = "gray",
     clim: Optional[List] = None,
     aspect: Union[str, float] = 1.0,
+    interpolation: Optional[Union[str, bool]] = "nearest",
+    render_mode: str = "rgba",
     axis_labels: Optional[Sequence[str]] = None,
 ) -> List[SliceNode]:
     """
@@ -68,6 +70,15 @@ def create_slice(
     aspect : {"auto"} or float
         Plot aspect. ``1.0`` keeps equal sample spacing; ``"auto"`` lets the
         browser fill the available plotting area.
+    interpolation : {"nearest", "linear", "best", "auto"} or bool, optional
+        Image interpolation used by Plotly. ``"nearest"`` maps to no smoothing,
+        ``"linear"`` maps to Plotly's fast smoothing, ``"best"`` maps to
+        Plotly Heatmap's best smoothing, and ``"auto"`` leaves the
+        browser/Plotly default. RGBA image rendering maps ``"best"`` to
+        Plotly Image's fast smoothing because Image does not support ``"best"``.
+    render_mode : {"rgba", "float"}, optional
+        ``"rgba"`` sends a pre-colored RGBA image to Plotly. ``"float"`` sends
+        scalar 2D arrays as Plotly heatmaps and lets Plotly apply the colorscale.
     axis_labels : Sequence[str], optional
         Human-readable labels for data axes. Defaults to ``dim 0``,
         ``dim 1``, ... .
@@ -87,6 +98,8 @@ def create_slice(
         cmap=_cmap_mod.get_cmap_from_str(cmap),
         clim=(0.0, 1.0),
         aspect=_normalize_aspect(aspect),
+        interpolation=_normalize_interpolation(interpolation),
+        render_mode=_normalize_render_mode(render_mode),
         axis_labels=_normalize_axis_labels(axis_labels, volume.ndim),
     )
     node.clim = _finite_range(node.get_frame(), percentiles=(2, 98)) \
@@ -131,8 +144,15 @@ def add_horizon(
     name: str = "horizon",
     color: str = "yellow",
     width: float = 1.5,
+    axes: Optional[Sequence[int]] = None,
 ) -> List[go.Scatter]:
-    """Add a horizon line annotation."""
+    """
+    Add a horizon line annotation.
+
+    ``axes`` is ``(x_axis, y_axis)`` in data-axis coordinates. If omitted, the
+    axes are bound to the current SliceNode display axes when the viewer is
+    built.
+    """
     return [
         go.Scatter(
             x=np.asarray(x),
@@ -140,6 +160,7 @@ def add_horizon(
             mode="lines",
             name=name,
             line=dict(color=color, width=width),
+            meta=_annotation_meta(axes),
         )
     ]
 
@@ -150,6 +171,7 @@ def add_fault(
     name: str = "fault",
     color: str = "red",
     width: float = 1.5,
+    axes: Optional[Sequence[int]] = None,
 ) -> List[go.Scatter]:
     """Add a fault line annotation."""
     return [
@@ -159,6 +181,7 @@ def add_fault(
             mode="lines",
             name=name,
             line=dict(color=color, width=width),
+            meta=_annotation_meta(axes),
         )
     ]
 
@@ -169,6 +192,7 @@ def add_well(
     name: str = "well",
     color: str = "white",
     size: float = 6,
+    axes: Optional[Sequence[int]] = None,
 ) -> List[go.Scatter]:
     """Add well positions as scatter points."""
     x = np.asarray(x)
@@ -181,6 +205,7 @@ def add_well(
             text=[name] * len(x),
             textposition="top center",
             marker=dict(color=color, size=size),
+            meta=_annotation_meta(axes),
         )
     ]
 
@@ -192,11 +217,13 @@ def add_scatter(
     mode: str = "markers",
     color: str = "cyan",
     size: float = 6,
+    axes: Optional[Sequence[int]] = None,
     **kwargs,
 ) -> List[go.Scatter]:
     """Add a generic scatter or line annotation."""
     marker = dict(color=color, size=size)
     marker.update(kwargs.pop("marker", {}))
+    meta = kwargs.pop("meta", None)
     return [
         go.Scatter(
             x=np.asarray(x),
@@ -204,9 +231,22 @@ def add_scatter(
             mode=mode,
             name=name,
             marker=marker,
+            meta=_annotation_meta(axes, meta),
             **kwargs,
         )
     ]
+
+
+def _annotation_meta(axes, user_meta=None):
+    if axes is not None:
+        axes = tuple(int(axis) for axis in axes)
+        if len(axes) != 2 or axes[0] == axes[1]:
+            raise ValueError("annotation axes must be two different data-axis indices")
+    meta = dict(user_meta) if isinstance(user_meta, dict) else {}
+    if user_meta is not None and not isinstance(user_meta, dict):
+        meta["user_meta"] = user_meta
+    meta["_cigvis_sliceviewer"] = {"axes": axes}
+    return meta
 
 
 def _normalize_display_axes(
@@ -287,6 +327,44 @@ def _normalize_aspect(aspect: Union[str, float]) -> Union[str, float]:
     if not np.isfinite(aspect) or aspect <= 0:
         raise ValueError("aspect must be positive")
     return aspect
+
+
+def _normalize_interpolation(interpolation: Optional[Union[str, bool]]):
+    if interpolation is None:
+        return "auto"
+    if isinstance(interpolation, bool):
+        return "linear" if interpolation else "nearest"
+    interpolation = str(interpolation).strip().lower()
+    aliases = {
+        "none": "nearest",
+        "false": "nearest",
+        "nearest": "nearest",
+        "linear": "linear",
+        "fast": "linear",
+        "best": "best",
+        "smooth": "linear",
+        "auto": "auto",
+        "default": "auto",
+    }
+    if interpolation not in aliases:
+        raise ValueError(
+            "interpolation must be 'nearest', 'linear', 'best', 'auto', or a bool")
+    return aliases[interpolation]
+
+
+def _normalize_render_mode(render_mode: str) -> str:
+    render_mode = str(render_mode).strip().lower()
+    aliases = {
+        "rgba": "rgba",
+        "rgb": "rgba",
+        "image": "rgba",
+        "float": "float",
+        "scalar": "float",
+        "heatmap": "float",
+    }
+    if render_mode not in aliases:
+        raise ValueError("render_mode must be 'rgba' or 'float'")
+    return aliases[render_mode]
 
 
 def _normalize_axis_labels(axis_labels: Optional[Sequence[str]],

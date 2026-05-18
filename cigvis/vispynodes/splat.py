@@ -133,9 +133,11 @@ class SplatVisual(Visual):
     ----------
     scaling : {"fixed","scene","visual"} or bool
         Same semantics as MarkersVisual.
+
         - "fixed": a_size in pixels
         - "scene": a_size in scene units (affected by camera zoom)
         - "visual": a_size in visual units (affected by Visual transform)
+
         Back-compat: False->"fixed", True->"scene"
     alpha : float
         Global opacity multiplier.
@@ -202,9 +204,12 @@ class SplatVisual(Visual):
         Parameters
         ----------
         pos : (N,2) or (N,3) array
+            Marker positions.
         size : float or (N,) array
-            Marker diameter in pixels (fixed) or in scene/visual units (scaling on).
+            Marker diameter in pixels (fixed) or in scene/visual units
+            (scaling on).
         color : Color or (N,4) array
+            Marker color.
         """
         if pos is None or len(pos) == 0:
             self._data = None
@@ -402,3 +407,5 @@ class SplatVisual(Visual):
 
 
 Splat = create_visual_node(SplatVisual)
+Splat.__module__ = __name__
+Splat.__doc__ = """Scene node wrapper for :class:`SplatVisual`."""

@@ -27,6 +27,8 @@ class SliceNode:
     cmap: object
     clim: Tuple[float, float]
     aspect: Union[str, float] = 1.0
+    interpolation: Optional[Union[str, bool]] = "nearest"
+    render_mode: str = "rgba"
     axis_labels: Tuple[str, ...] = field(default_factory=tuple)
     masks: List[MaskSpec] = field(default_factory=list)
     _linked: Optional['SliceNode'] = field(default=None, repr=False)

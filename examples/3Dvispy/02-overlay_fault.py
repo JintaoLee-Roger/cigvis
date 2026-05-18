@@ -51,5 +51,5 @@ nodes += cigvis.create_colorbar_from_nodes(nodes, 'Amplitude', select='slices')
 cigvis.plot3D(
     nodes,
     view=cigvis.Plot3DView(size=(700, 600)),
-    save=cigvis.Plot3DSave(path='example.png'),
+    save=cigvis.Plot3DSave(path='example.png', transparent_bg=False),
 )

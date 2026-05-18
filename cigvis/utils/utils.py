@@ -15,6 +15,14 @@ DEPRECATION_REMOVAL_VERSION = '0.4.0'
 
 
 def check_mmap(d: np.ndarray) -> None:
+    if isinstance(d, dict):
+        seen = set()
+        for value in d.values():
+            if id(value) in seen:
+                continue
+            seen.add(id(value))
+            check_mmap(value)
+        return
     if isinstance(d, np.memmap):
         if d.mode != 'r' and d.mode != 'c':
             warnings.warn(
@@ -205,6 +213,10 @@ def nmax(d):
 
 
 def auto_clim(d, scale=1):
+    if isinstance(d, dict):
+        from .slice_provider import clim_source
+        d = clim_source(d)
+
     if _is_in_memory_ndarray(d):
         vmin, vmax = nmin(d), nmax(d)
     else:
@@ -231,12 +243,21 @@ def _format(v):
 
 
 def get_shape(vol, line_first):
+    if isinstance(vol, dict):
+        from .slice_provider import clim_source
+        vol = clim_source(vol)
+
     def _eq_3_or_4(k):
         return k == 3 or k == 4
 
-    assert _eq_3_or_4(vol.ndim), f"Volume's dims must be 3 or 4 (RGB), but got {vol.ndim}"
+    shape_attr = getattr(vol, 'shape', None)
+    if shape_attr is None:
+        raise AttributeError("volume-like input must expose a shape attribute")
+
+    ndim = getattr(vol, 'ndim', len(shape_attr))
+    assert _eq_3_or_4(ndim), f"Volume's dims must be 3 or 4 (RGB), but got {ndim}"
     rgb_type = 0
-    shape = list(vol.shape)
+    shape = list(shape_attr)
     if len(shape) == 4: # RGB volumes
         if _eq_3_or_4(shape[-1]):
             shape = shape[:3]
