@@ -1,6 +1,10 @@
 3D vispy
 ==========
 
+``00-select_vispy_backend.py`` shows how to inspect or choose the VisPy
+application backend before importing ``cigvis``. Use ``pyside6`` when calling
+``plot3D(..., gui=True)`` because the GUI inspector is a PySide6 Qt window.
+
 The fault overlay examples include ``02b-overlay_fault_axis_colors.py``, which
 shows how to pass a ``cmap`` dictionary to ``add_mask`` so faults on x/y/z slice
 planes use different colors.
