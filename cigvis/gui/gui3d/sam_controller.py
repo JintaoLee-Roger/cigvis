@@ -1,4 +1,4 @@
-"""SAM-like prompt controller used by the PySide6 3D GUI."""
+"""SAM-like prompt controller used by the Qt 3D GUI."""
 
 from __future__ import annotations
 

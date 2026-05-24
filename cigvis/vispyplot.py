@@ -158,7 +158,7 @@ class Plot3DColorbar:
 
 @dataclass
 class Plot3DGui:
-    """Options that control the optional PySide6 GUI shell in ``plot3D``."""
+    """Options that control the optional Qt GUI shell in ``plot3D``."""
 
     enabled: bool = True
     theme: str = 'dark'

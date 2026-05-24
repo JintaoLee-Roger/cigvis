@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from typing import Optional
 
-from PySide6.QtWidgets import QPushButton, QSizePolicy, QVBoxLayout, QWidget
+from cigvis.gui.qt_compat import (
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+    SizePolicyExpanding,
+    SizePolicyFixed,
+)
 
 
 class CollapsibleSection(QWidget):
@@ -29,7 +35,7 @@ class CollapsibleSection(QWidget):
         self._btn.setCheckable(True)
         self._btn.setChecked(not collapsed)
         self._btn.setFlat(True)
-        self._btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self._btn.setSizePolicy(SizePolicyExpanding, SizePolicyFixed)
         self._btn.clicked.connect(self._on_toggle)
         root.addWidget(self._btn)
 

@@ -4,8 +4,19 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from PySide6.QtWidgets import QLabel, QHBoxLayout, QStackedWidget, QToolButton, QVBoxLayout, QWidget
-from PySide6.QtCore import QPropertyAnimation, QEasingCurve, QPoint, Signal, Qt
+from cigvis.gui.qt_compat import (
+    QHBoxLayout,
+    QLabel,
+    QPoint,
+    QPropertyAnimation,
+    QStackedWidget,
+    QToolButton,
+    QVBoxLayout,
+    QWidget,
+    EasingOutCubic,
+    Signal,
+    Qt,
+)
 
 
 class SlidingDrawer(QWidget):
@@ -57,7 +68,7 @@ class SlidingDrawer(QWidget):
 
         self.anim = QPropertyAnimation(self, b"pos")
         self.anim.setDuration(animation_ms)
-        self.anim.setEasingCurve(QEasingCurve.OutCubic)
+        self.anim.setEasingCurve(EasingOutCubic)
 
         self._pending_hide = False
         self.anim.finished.connect(self._on_anim_finished)

@@ -11,6 +11,7 @@
 # -----------------------------------------------------------------------------
 
 from typing import Dict, List, Tuple, Union
+import importlib.util
 from vispy import scene
 
 import cigvis
@@ -18,6 +19,46 @@ from .indicator import XYZAxis, NorthPointer
 from .axis3d import Axis3D
 from .colorbar import Colorbar
 from .canvas_mixin import EventMixin, AxisMixin
+
+
+_QT_BACKENDS = (
+    ("PySide6", "pyside6"),
+    ("PyQt6", "pyqt6"),
+    ("PyQt5", "pyqt5"),
+)
+
+
+def _preferred_qt_backend():
+    for package, backend in _QT_BACKENDS:
+        if importlib.util.find_spec(package) is not None:
+            return backend
+    return None
+
+
+def _prefer_qt_backend():
+    backend = _preferred_qt_backend()
+    if backend is None:
+        return None
+    try:
+        from vispy.app import use_app
+        use_app(backend)
+    except RuntimeError:
+        # A user may have selected another VisPy backend before creating the
+        # canvas. In that case we keep their choice and let VisPy continue.
+        return None
+    return backend
+
+
+def _raise_backend_error(exc):
+    msg = str(exc)
+    if "Could not import any of the backends" not in msg:
+        raise exc
+    raise RuntimeError(
+        "Could not import a VisPy GUI backend. CIGVis supports PySide6, "
+        "PyQt6, and PyQt5; PySide6 is the default recommendation. Install "
+        "`pip install \"cigvis[gui]\"`, `pip install PySide6`, "
+        "`pip install PyQt6`, or `pip install PyQt5`."
+    ) from exc
 
 
 class VisCanvas(scene.SceneCanvas, EventMixin, AxisMixin):
@@ -101,11 +142,15 @@ class VisCanvas(scene.SceneCanvas, EventMixin, AxisMixin):
 
         # Create a SceneCanvas obj and unfreeze it so we can add more
         # attributes inside.
-        scene.SceneCanvas.__init__(self,
-                                   title=title,
-                                   keys=keys,
-                                   size=size,
-                                   bgcolor=bgcolor)
+        _prefer_qt_backend()
+        try:
+            scene.SceneCanvas.__init__(self,
+                                       title=title,
+                                       keys=keys,
+                                       size=size,
+                                       bgcolor=bgcolor)
+        except RuntimeError as exc:
+            _raise_backend_error(exc)
 
         self.unfreeze()
 

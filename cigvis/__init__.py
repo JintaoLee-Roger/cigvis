@@ -45,7 +45,8 @@ class ExceptionWrapper:
 
     def __init__(self, e, custom=''):
         if custom:
-            self.exception = type(e)(f"{e.args[0]}\n\t{custom}", *e.args[1:])
+            message = str(e) or e.__class__.__name__
+            self.exception = type(e)(f"{message}\n\t{custom}", *e.args[1:])
         else:
             self.exception = e
 
@@ -72,24 +73,68 @@ def is_running_in_notebook():
         return False
 
 
-import sys
 import importlib.util
 
-_has_viser = importlib.util.find_spec("viser") is not None
+
 _has_vispy = importlib.util.find_spec("vispy") is not None
-_has_plotly = importlib.util.find_spec("plotly") is not None
+
+_VISPYPLOT_EXPORTS = [
+    "create_slices",
+    "add_mask",
+    "create_overlay",
+    "create_colorbar",
+    "create_colorbar_from_nodes",
+    "create_surfaces",
+    "set_surface_color_by_slices_nodes",
+    "create_bodies",
+    "create_bodys",
+    "create_line_logs",
+    "create_Line_logs",
+    "create_well_logs",
+    "create_points",
+    "create_point_cloud",
+    "create_splats",
+    "create_fault_skin",
+    "create_arbitrary_line",
+    "create_axis",
+    "Plot3DView",
+    "Plot3DSave",
+    "Plot3DColorbar",
+    "Plot3DGui",
+    "plot3D",
+    "run",
+]
+
+def _install_vispyplot_exports(module):
+    for name in getattr(module, "__all__", _VISPYPLOT_EXPORTS):
+        globals()[name] = getattr(module, name)
+
+
+def _install_vispyplot_stub(exc):
+    global vispyplot
+    vispyplot = ExceptionWrapper(
+        exc,
+        "VisPy backend is optional. If you only need viserplot, use "
+        "`from cigvis import viserplot` or `import cigvis.viserplot`. "
+        "To use vispyplot, install the VisPy runtime dependencies "
+        "(for example system fontconfig in minimal containers) or run "
+        "`pip install \"cigvis[gui]\"` / `pip install \"cigvis[all]\"`."
+    )
+    for name in _VISPYPLOT_EXPORTS:
+        globals()[name] = vispyplot
 
 
 from .config import *
 from . import io
 from . import colormap
 from . import meshs
-_has_pyside6 = importlib.util.find_spec("PySide6") is not None
+_QT_GUI_BINDINGS = ("PySide6", "PyQt6", "PyQt5")
+_has_qt_gui = any(importlib.util.find_spec(name) is not None for name in _QT_GUI_BINDINGS)
 
 # GUI compatibility stubs are loaded lazily to avoid importing Qt unless needed.
 # Standalone gui2d/gui3d have been removed; use plot3D(gui=True) for node inspection.
 _lazy_modules = {}
-if _has_vispy and _has_pyside6:
+if _has_vispy and _has_qt_gui:
     _lazy_modules['gui'] = 'cigvis.gui'
 
 
@@ -102,7 +147,14 @@ def __getattr__(name):
     raise AttributeError(f"module 'cigvis' has no attribute {name!r}")
 
 if _has_vispy:
-    from .vispyplot import *
+    try:
+        from . import vispyplot
+        _install_vispyplot_exports(vispyplot)
+    except BaseException as E:
+        _has_vispy = False
+        _install_vispyplot_stub(E)
+else:
+    _install_vispyplot_stub(ImportError("vispy not found"))
 
 try:
     from . import plotlyplot

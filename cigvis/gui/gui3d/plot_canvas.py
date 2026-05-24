@@ -13,8 +13,7 @@ from typing import Any, Optional, List, Dict, Callable, Tuple
 
 import numpy as np
 
-from PySide6.QtCore import QEvent
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QMessageBox
+from cigvis.gui.qt_compat import QEvent, QMessageBox, QVBoxLayout, QWidget
 import cigvis
 from cigvis import colormap
 from cigvis.vispynodes import VisCanvas
@@ -794,7 +793,7 @@ class PlotCanvas3D(
     """
     3D vispy canvas widget using VolumeImage.
 
-    Embed a VisCanvas inside a QWidget so it plays nicely with PySide6 layouts.
+    Embed a VisCanvas inside a QWidget so it plays nicely with Qt layouts.
     """
 
     def __init__(

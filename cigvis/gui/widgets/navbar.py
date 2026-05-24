@@ -1,7 +1,6 @@
 """Compact icon navbar used to switch drawer modules."""
 
-from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QButtonGroup, QFrame, QToolButton, QVBoxLayout
+from cigvis.gui.qt_compat import QButtonGroup, QFrame, QToolButton, QVBoxLayout, Signal
 
 
 class NavBar(QFrame):

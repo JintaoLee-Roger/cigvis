@@ -1,6 +1,32 @@
 # Changelog
 
 
+### v0.3.2
+
+This release focuses on import-time stability and GUI backend compatibility for
+desktop, remote, and container-style environments.
+
+**Added**
+
+- Added a small Qt compatibility layer for the retained GUI shell. The GUI can
+  now use PySide6, PyQt6, or PyQt5 when one of them is installed, while PySide6
+  remains the default recommendation.
+- Added `CIGVIS_QT_API` / `QT_API` selection for the GUI Qt binding. Supported
+  values are `pyside6`, `pyqt6`, and `pyqt5`.
+
+**Fixed**
+
+- Fixed top-level `import cigvis` so environment-specific VisPy import failures
+  such as missing `fontconfig` in minimal containers are converted into clear
+  `ExceptionWrapper` errors for VisPy-specific functions instead of preventing
+  unrelated backends such as `viserplot` from being imported.
+- Updated VisPy canvas backend selection to prefer available Qt backends in the
+  order PySide6, PyQt6, then PyQt5.
+- Replaced VisPy's default "We recommend PyQt" backend error with a CIGVis
+  message that recommends `cigvis[gui]` / PySide6 while noting PyQt6 and PyQt5
+  are also supported.
+
+
 ### v0.3.1
 
 **Fixed**

@@ -18,12 +18,14 @@ from typing import Callable, List, Optional, Union
 
 import numpy as np
 
-from PySide6.QtWidgets import (
+from cigvis.gui.qt_compat import (
+    QRegularExpressionValidator,
+    FrameHLine,
+    Qt,
+    Signal,
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea,
     QPushButton, QFileDialog, QMessageBox, QListWidgetItem, QFrame,
 )
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QRegularExpressionValidator
 
 from cigvis.gui.widgets.common import (
     LineEdit, SpinBox, DoubleSpinBox, EditableComboBox,
@@ -37,7 +39,7 @@ from cigvis.gui.widgets.collapsible_section import CollapsibleSection
 
 def _sep() -> QFrame:
     f = QFrame()
-    f.setFrameShape(QFrame.HLine)
+    f.setFrameShape(FrameHLine)
     return f
 
 

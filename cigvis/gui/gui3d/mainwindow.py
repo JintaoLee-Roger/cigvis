@@ -21,12 +21,12 @@ from typing import Any, Dict, Optional
 
 import numpy as np
 
-from PySide6.QtWidgets import (
+from cigvis.gui.qt_compat import (
     QApplication, QMainWindow, QWidget, QHBoxLayout,
     QScrollArea, QStatusBar, QVBoxLayout,
+    Qt, QTimer, QKeySequence, QShortcut, QFont,
+    QT_API,
 )
-from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QKeySequence, QShortcut, QFont
 from pathlib import Path
 
 from cigvis.gui.widgets.navbar import NavBar
@@ -515,9 +515,9 @@ def launch_plot3d_gui(
     canvas_kwargs: Optional[Dict[str, Any]] = None,
     run_app: bool = True,
 ) -> Plot3DGuiWindow:
-    """Launch the retained ``plot3D(gui=True)`` PySide6 shell."""
+    """Launch the retained ``plot3D(gui=True)`` Qt shell."""
     from vispy.app import use_app
-    app_vispy = use_app("pyside6")
+    app_vispy = use_app(QT_API)
     app_vispy.create()
 
     qt_app = QApplication.instance() or QApplication(sys.argv)

@@ -1,4 +1,4 @@
-"""Common PySide6 custom widgets for CigVis GUI."""
+"""Common Qt custom widgets for CigVis GUI."""
 
 from __future__ import annotations
 
@@ -7,14 +7,17 @@ from typing import List, Optional, Callable
 
 import numpy as np
 
-from PySide6.QtWidgets import (
+from cigvis.gui.qt_compat import (
+    QRegularExpression,
+    QRegularExpressionValidator,
+    ComboBoxNoInsert,
+    Qt,
+    Signal,
     QWidget, QHBoxLayout, QVBoxLayout, QLabel, QLineEdit,
     QSpinBox, QDoubleSpinBox, QComboBox, QPushButton,
     QRadioButton, QButtonGroup, QListWidget, QListWidgetItem,
     QMenu, QFileDialog, QMessageBox, QSizePolicy,
 )
-from PySide6.QtCore import Qt, Signal, QRegularExpression
-from PySide6.QtGui import QRegularExpressionValidator
 
 INT_RE = QRegularExpression(r"^[1-9][0-9]*$")
 FLOAT_RE = QRegularExpression(r"[-+]?[0-9]*\.?[0-9]+")
@@ -89,7 +92,7 @@ class EditableComboBox(QComboBox):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.setEditable(True)
-        self.setInsertPolicy(QComboBox.NoInsert)
+        self.setInsertPolicy(ComboBoxNoInsert)
         self.activated.connect(lambda: self.changed.emit(self.currentText()))
 
     def keyPressEvent(self, event) -> None:
