@@ -1,4 +1,5 @@
 # Copyright (c) 2026 Jintao Li.
+# Zhejiang University (ZJU).
 # All rights reserved.
 """
 Point-cloud splats on the F3 demo

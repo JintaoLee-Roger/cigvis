@@ -1,4 +1,5 @@
 # Copyright (c) 2026 Jintao Li.
+# Zhejiang University (ZJU).
 # All rights reserved.
 """
 Native VisPy point clouds on the F3 demo

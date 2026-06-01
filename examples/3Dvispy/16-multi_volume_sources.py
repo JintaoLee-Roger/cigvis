@@ -1,6 +1,5 @@
 # Copyright (c) 2026 Jintao Li.
-# Computational and Interpretation Group (CIG),
-# University of Science and Technology of China (USTC).
+# Zhejiang University (ZJU).
 # All rights reserved.
 """
 Use different volume sources for different slice directions

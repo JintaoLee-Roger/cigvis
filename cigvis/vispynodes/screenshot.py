@@ -1,6 +1,5 @@
 # Copyright (c) 2026 Jintao Li.
-# Computational and Interpretation Group (CIG),
-# University of Science and Technology of China (USTC).
+# Zhejiang University (ZJU).
 """PNG export helpers shared by VisPy canvas saves and keyboard shortcuts."""
 
 from pathlib import Path
@@ -44,8 +43,11 @@ def _capture_screen_canvas(canvas, viewport, bgcolor) -> np.ndarray:
 
 
 def _transparent_screen_canvas_image(canvas, viewport) -> np.ndarray:
-    # Some VisPy image visuals keep framebuffer alpha at 0 on a transparent
-    # clear color. Solve the visible RGBA from black/white opaque renders.
+    # Keep this two-pass screen-canvas solve instead of relying on a transparent
+    # clear color or an offscreen FBO. In depth-tested scenes with interaction
+    # lines and semi-transparent overlays, VisPy framebuffer alpha can diverge
+    # from the visible color/depth compositing. Opaque black/white renders use
+    # the displayed canvas path and let us reconstruct the alpha afterward.
     black = _capture_screen_canvas(canvas, viewport, (0, 0, 0, 1))
     white = _capture_screen_canvas(canvas, viewport, (1, 1, 1, 1))
 
