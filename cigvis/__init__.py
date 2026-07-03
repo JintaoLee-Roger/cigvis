@@ -73,10 +73,8 @@ def is_running_in_notebook():
         return False
 
 
+import importlib
 import importlib.util
-
-
-_has_vispy = importlib.util.find_spec("vispy") is not None
 
 _VISPYPLOT_EXPORTS = [
     "create_slices",
@@ -105,82 +103,149 @@ _VISPYPLOT_EXPORTS = [
     "run",
 ]
 
-def _install_vispyplot_exports(module):
-    for name in getattr(module, "__all__", _VISPYPLOT_EXPORTS):
-        globals()[name] = getattr(module, name)
+_MPL2D_EXPORTS = [
+    "fg_image_args",
+    "line_args",
+    "marker_args",
+    "annotate_args",
+    "discrete_cbar",
+    "plot2d",
+    "flattened_view",
+]
 
+_MPL1D_EXPORTS = [
+    "plot1d",
+    "plot_multi_traces",
+    "plot_signal_compare",
+    "plot1_with_fill",
+]
 
-def _install_vispyplot_stub(exc):
-    global vispyplot
-    vispyplot = ExceptionWrapper(
-        exc,
-        "VisPy backend is optional. If you only need viserplot, use "
-        "`from cigvis import viserplot` or `import cigvis.viserplot`. "
-        "To use vispyplot, install the VisPy runtime dependencies "
-        "(for example system fontconfig in minimal containers) or run "
-        "`pip install \"cigvis[gui]\"` / `pip install \"cigvis[all]\"`."
-    )
-    for name in _VISPYPLOT_EXPORTS:
-        globals()[name] = vispyplot
+_CONFIG_EXPORTS = [
+    "LINE_FIRST",
+    "X_REVERSED",
+    "Y_REVERSED",
+    "Z_REVERSED",
+    "is_line_first",
+    "set_order",
+    "is_x_reversed",
+    "set_x_reversed",
+    "is_y_reversed",
+    "set_y_reversed",
+    "is_z_reversed",
+    "set_z_reversed",
+    "is_axis_reversed",
+    "set_axis_reversed",
+]
+
+_VISPYPLOT_ERROR = (
+    "VisPy backend is optional. If you only need viserplot, use "
+    "`from cigvis import viserplot` or `import cigvis.viserplot`. "
+    "To use vispyplot, install the VisPy runtime dependencies "
+    "(for example system fontconfig in minimal containers) or run "
+    "`pip install \"cigvis[gui]\"` / `pip install \"cigvis[all]\"`."
+)
+
+_LAZY_MODULES = {
+    "io": ("cigvis.io", None),
+    "colormap": ("cigvis.colormap", None),
+    "meshs": ("cigvis.meshs", None),
+    "colors": ("cigvis.colors", None),
+    "mplstyle": ("cigvis.mplstyle", None),
+    "mpl2dplot": ("cigvis.mpl2dplot", None),
+    "mpl1dplot": ("cigvis.mpl1dplot", None),
+    "gui": ("cigvis.gui", None),
+    "vispyplot": ("cigvis.vispyplot", _VISPYPLOT_ERROR),
+    "plotlyplot": (
+        "cigvis.plotlyplot",
+        "run `pip install \"cigvis[plotly]\"` or run `pip install \"cigvis[all]\"` to install the dependencies",
+    ),
+    "viserplot": (
+        "cigvis.viserplot",
+        "run `pip install \"cigvis[viser]\"` or run `pip install \"cigvis[all]\"` to install the dependencies",
+    ),
+    "sliceviewer": (
+        "cigvis.sliceviewer",
+        "run `pip install \"cigvis[sliceviewer]\"` or `pip install panel plotly anywidget` to enable sliceviewer",
+    ),
+}
+
+_LAZY_ATTRS = {
+    **{name: ("vispyplot", name) for name in _VISPYPLOT_EXPORTS},
+    **{name: ("mpl2dplot", name) for name in _MPL2D_EXPORTS},
+    **{name: ("mpl1dplot", name) for name in _MPL1D_EXPORTS},
+    "load_theme": ("mplstyle", "load_theme"),
+}
+
+_OPTIONAL_MODULE_SPECS = {
+    "vispyplot": "vispy",
+}
 
 
 from .config import *
-from . import io
-from . import colormap
-from . import meshs
-_QT_GUI_BINDINGS = ("PySide6", "PyQt6", "PyQt5")
-_has_qt_gui = any(importlib.util.find_spec(name) is not None for name in _QT_GUI_BINDINGS)
 
-# GUI compatibility stubs are loaded lazily to avoid importing Qt unless needed.
-# Standalone gui2d/gui3d have been removed; use plot3D(gui=True) for node inspection.
-_lazy_modules = {}
-if _has_vispy and _has_qt_gui:
-    _lazy_modules['gui'] = 'cigvis.gui'
+
+def _missing_optional_module(module_key):
+    spec_name = _OPTIONAL_MODULE_SPECS.get(module_key)
+    if spec_name and importlib.util.find_spec(spec_name) is None:
+        return ImportError(f"{spec_name} not found")
+    return None
+
+
+def _load_lazy_module(module_key):
+    module_name, message = _LAZY_MODULES[module_key]
+    missing = _missing_optional_module(module_key)
+    if missing is not None:
+        module = ExceptionWrapper(missing, message)
+        globals()[module_key] = module
+        return module
+
+    try:
+        module = importlib.import_module(module_name)
+    except BaseException as exc:
+        if message is None:
+            raise
+        module = ExceptionWrapper(exc, message)
+
+    globals()[module_key] = module
+    return module
 
 
 def __getattr__(name):
-    if name in _lazy_modules:
-        import importlib
-        mod = importlib.import_module(_lazy_modules[name])
-        globals()[name] = mod
-        return mod
+    if name in _LAZY_MODULES:
+        return _load_lazy_module(name)
+
+    if name in _LAZY_ATTRS:
+        module_key, attr_name = _LAZY_ATTRS[name]
+        module = _load_lazy_module(module_key)
+        value = module if isinstance(module, ExceptionWrapper) else getattr(module, attr_name)
+        globals()[name] = value
+        return value
+
     raise AttributeError(f"module 'cigvis' has no attribute {name!r}")
 
-if _has_vispy:
-    try:
-        from . import vispyplot
-        _install_vispyplot_exports(vispyplot)
-    except BaseException as E:
-        _has_vispy = False
-        _install_vispyplot_stub(E)
-else:
-    _install_vispyplot_stub(ImportError("vispy not found"))
 
-try:
-    from . import plotlyplot
-except BaseException as E:
-    plotlyplot = ExceptionWrapper(
-        E,
-        "run `pip install \"cigvis[plotly]\"` or run `pip install \"cigvis[all]\"` to install the dependencies"
-    )
+def __dir__():
+    return sorted(set(globals()) | set(__all__))
 
-try:
-    from . import viserplot
-except BaseException as E:
-    viserplot = ExceptionWrapper(
-        E,
-        "run `pip install \"cigvis[viser]\"` or run `pip install \"cigvis[all]\"` to install the dependencies"
-    )
 
-try:
-    from . import sliceviewer
-except BaseException as E:
-    sliceviewer = ExceptionWrapper(
-        E,
-        "run `pip install \"cigvis[sliceviewer]\"` or `pip install panel plotly anywidget` to enable sliceviewer"
-    )
-
-from .mpl2dplot import *
-from .mpl1dplot import *
-from . import colors
-from .mplstyle import load_theme
+__all__ = [
+    "ExceptionWrapper",
+    "is_running_in_notebook",
+    *_CONFIG_EXPORTS,
+    *_VISPYPLOT_EXPORTS,
+    *_MPL2D_EXPORTS,
+    *_MPL1D_EXPORTS,
+    "io",
+    "colormap",
+    "meshs",
+    "colors",
+    "mplstyle",
+    "mpl2dplot",
+    "mpl1dplot",
+    "gui",
+    "vispyplot",
+    "plotlyplot",
+    "viserplot",
+    "sliceviewer",
+    "load_theme",
+]

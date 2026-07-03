@@ -17,12 +17,22 @@ _REMOVED_MESSAGE = (
 
 Gui2dWindow = None
 
-try:
-    from .gui3d import Gui3dWindow, Plot3DGuiWindow, launch_plot3d_gui
-except Exception:
-    Gui3dWindow = None
-    Plot3DGuiWindow = None
-    launch_plot3d_gui = None
+_GUI3D_EXPORTS = {
+    "Gui3dWindow",
+    "Plot3DGuiWindow",
+    "launch_plot3d_gui",
+}
+
+
+def _load_gui3d_export(name: str):
+    try:
+        from . import gui3d as _gui3d
+    except Exception:
+        value = None
+    else:
+        value = getattr(_gui3d, name, None)
+    globals()[name] = value
+    return value
 
 
 def gui2d(*_args, **_kwargs):
@@ -33,6 +43,16 @@ def gui2d(*_args, **_kwargs):
 def gui3d(*_args, **_kwargs):
     """Removed standalone 3D GUI entry point."""
     raise RuntimeError(_REMOVED_MESSAGE)
+
+
+def __getattr__(name: str):
+    if name in _GUI3D_EXPORTS:
+        return _load_gui3d_export(name)
+    raise AttributeError(f"module 'cigvis.gui' has no attribute {name!r}")
+
+
+def __dir__():
+    return sorted(set(globals()) | set(__all__))
 
 
 __all__ = [
