@@ -29,6 +29,23 @@ progress). The 3D visualization component is heavily based on the code from
 and has been further developed upon this foundation.
 """
 
+import os
+import sys
+
+
+def _suppress_qt_windows_dpi_warning():
+    if sys.platform != 'win32':
+        return
+    key = 'QT_LOGGING_RULES'
+    rule = 'qt.qpa.window.warning=false'
+    existing = os.environ.get(key, '')
+    if 'qt.qpa.window.warning' in existing:
+        return
+    os.environ[key] = f'{existing};{rule}' if existing else rule
+
+
+_suppress_qt_windows_dpi_warning()
+
 
 class ExceptionWrapper:
     """
